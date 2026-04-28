@@ -333,22 +333,69 @@ Estado:   Pendiente
 
 ---
 
-### FASE 8 - Hardware y Optimización
+### FASE 8 - Migración a Servidor Dedicado
 ```
-Objetivo: Infraestructura dedicada y modelos más potentes
-Estado:   Pendiente (planificar en paralelo con FASE 3-4)
+Objetivo: Mover toda la inferencia a hardware dedicado y escalar a modelos más potentes
+Estado:   Pendiente (planificar en paralelo con FASE 3-4, ejecutar cuando el sistema esté estable)
+Laptop:   Pasa a rol de cliente/satélite y entorno de desarrollo
 ```
-- [ ] 8.1  Definir presupuesto para servidor dedicado
-- [ ] 8.2  GPU para fine-tuning:
-           RTX 3060 12GB (~$300-400 segunda mano) ← mínimo recomendado
-           RTX 3090 24GB (~$500-700 segunda mano) ← ideal
-- [ ] 8.3  Servidor siempre encendido (separar de laptop)
-- [ ] 8.4  Modelos más grandes en producción:
-           qwen2.5:14b  → mejor razonamiento
-           qwen2.5:32b  → cabe en 64GB RAM
-- [ ] 8.5  Fine-tuning de modelos por dominio con LoRA
-- [ ] 8.6  Wake word multi-persona (identificar quién habla)
-- [ ] 8.7  Satellite dedicado por habitación
+
+#### Etapa A - Definición de hardware objetivo
+- [ ] 8.1  Definir presupuesto y timeline de compra
+- [ ] 8.2  CPU objetivo: AMD Ryzen 9 7900X / 7950X o Intel i9-13900K
+           (muchos cores para inferencia paralela multi-agente)
+- [ ] 8.3  RAM objetivo: 128GB DDR5 mínimo (correr 2-3 modelos grandes simultáneos)
+- [ ] 8.4  GPU objetivo para inferencia:
+           RTX 4070 Ti 12GB  → buena relación precio/VRAM
+           RTX 3090 24GB     → VRAM ideal para modelos 20B+
+           RTX 4090 24GB     → techo actual para un solo agente grande
+- [ ] 8.5  GPU objetivo para fine-tuning (puede ser la misma o segunda):
+           RTX 3060 12GB     → mínimo para LoRA
+           RTX 3090 24GB     → cómodo para modelos hasta 13B
+- [ ] 8.6  Storage: SSD NVMe ~2TB para modelos + HDD para datos y backups
+- [ ] 8.7  Red: ethernet gigabit al switch (no WiFi para el servidor)
+
+#### Etapa B - Setup del servidor
+- [ ] 8.8  OS: Debian stable o Ubuntu Server LTS (priorizar estabilidad sobre cutting-edge)
+- [ ] 8.9  Drivers CUDA + cuDNN para GPU NVIDIA
+- [ ] 8.10 Ollama con soporte GPU (inferencia ~10-30x más rápida que CPU)
+- [ ] 8.11 Recompilar faster-whisper con soporte CUDA
+- [ ] 8.12 Docker Compose para todos los servicios (orquestador, agentes, bases de datos)
+- [ ] 8.13 IP estática en LAN, hostname fijo (ej: `agentes.local`)
+- [ ] 8.14 Acceso SSH seguro desde laptop y otros dispositivos de la red
+
+#### Etapa C - Migración de servicios
+- [ ] 8.15 Migrar Ollama + modelos al servidor (servidor nuevo como :11434)
+- [ ] 8.16 Migrar orquestador FastAPI (FASE 3) al servidor
+- [ ] 8.17 Migrar todos los agentes al servidor
+- [ ] 8.18 Laptop queda como: cliente de voz (mic/speaker) + entorno de desarrollo
+- [ ] 8.19 Período de operación paralela: laptop + servidor corriendo juntos para validar
+- [ ] 8.20 Cutover: redirigir laptop al servidor, apagar servicios locales
+
+#### Etapa D - Escalado de modelos
+- [ ] 8.21 Modelos de inferencia con GPU:
+           qwen2.5:14b   → mejor razonamiento, cabe en 12GB VRAM
+           qwen2.5:32b   → contexto largo, requiere 24GB VRAM o CPU offload
+           qwen2.5:72b   → máxima capacidad, requiere multi-GPU o CPU offload con 128GB RAM
+- [ ] 8.22 Whisper large-v3 en GPU (~0.5s latencia vs 4.6s actual en CPU)
+- [ ] 8.23 Modelos especializados por agente (ej: modelo financiero para agente inversiones)
+- [ ] 8.24 Fine-tuning con LoRA para dominio hogar (entity_ids reales, patrones propios)
+
+#### Etapa E - Operaciones y confiabilidad
+- [ ] 8.25 UPS para el servidor (evitar cortes abruptos con modelos en memoria)
+- [ ] 8.26 Systemd units para auto-restart de todos los servicios
+- [ ] 8.27 Monitoreo de recursos: temperatura GPU/CPU, uso de VRAM, latencias por agente
+- [ ] 8.28 Alertas si un servicio cae (notificación por WhatsApp vía FASE 3.5)
+- [ ] 8.29 Backup automático de modelos fine-tuneados y configuraciones
+- [ ] 8.30 Wake-on-LAN desde laptop (servidor puede estar en suspend fuera de horario)
+
+#### Latencias objetivo post-migración (con GPU)
+```
+STT (Whisper large-v3 GPU):   ~0.3-0.5s   (vs 4.6s actual)
+LLM qwen2.5:14b GPU:          ~1-2s        (vs 3.5s actual con 7b CPU)
+TTS Piper (sin cambio):       ~0.5s
+Total estimado:               ~2-3s        (vs 8s actual warm)
+```
 
 ---
 
