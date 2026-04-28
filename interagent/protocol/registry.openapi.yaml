@@ -1,0 +1,392 @@
+openapi: "3.1.0"
+info:
+  title: Interagent Registry API
+  version: "0.1.0"
+  description: |
+    API central de la plataforma Interagent.
+    Cada request de nodo autenticado debe incluir el header `X-Node-Signature`
+    (Ed25519 sobre el body + timestamp), más `X-Node-Id` y `X-Timestamp`.
+
+servers:
+  - url: https://registry.interagent.io/v1
+
+# ---------------------------------------------------------------------------
+# Auth
+# ---------------------------------------------------------------------------
+# Todas las rutas marcadas con `nodeSig` requieren firma del nodo.
+# Rutas públicas (búsqueda, detalle) no requieren auth.
+
+components:
+  securitySchemes:
+    nodeSig:
+      type: apiKey
+      in: header
+      name: X-Node-Signature
+      description: "Ed25519 signature over SHA256(body + X-Timestamp)"
+
+  schemas:
+    ServiceSummary:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        category: { type: string }
+        tier: { type: string, enum: [free, starter, pro, enterprise] }
+        price_per_1k_calls: { type: number }
+        stars: { type: number }
+        joins: { type: integer }
+        maturity_score: { type: number }
+        provider_node_id: { type: string }
+        status: { type: string, enum: [active, suspended, banned] }
+
+    ServiceDetail:
+      allOf:
+        - $ref: "#/components/schemas/ServiceSummary"
+        - type: object
+          properties:
+            version: { type: string }
+            tags: { type: array, items: { type: string } }
+            endpoint: { type: string }
+            schema: { type: object }
+            stats:
+              type: object
+              properties:
+                calls_total: { type: integer }
+                calls_last_30d: { type: integer }
+                uptime_30d_pct: { type: number }
+                ratings_count: { type: integer }
+
+    Node:
+      type: object
+      properties:
+        node_id: { type: string }
+        plan: { type: string, enum: [free, starter, pro, enterprise] }
+        public_key: { type: string }
+        verified_provider: { type: boolean }
+        created_at: { type: string, format: date-time }
+
+    Error:
+      type: object
+      properties:
+        code: { type: string }
+        message: { type: string }
+
+# ---------------------------------------------------------------------------
+# Endpoints
+# ---------------------------------------------------------------------------
+
+paths:
+
+  # --- Nodos ---
+
+  /nodes/register:
+    post:
+      summary: Registrar un nuevo nodo en la plataforma
+      description: Devuelve node_id y keypair generado. La clave privada NO se almacena.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [public_key, contact_email]
+              properties:
+                public_key: { type: string, description: "Ed25519 public key (base64)" }
+                contact_email: { type: string }
+                display_name: { type: string }
+      responses:
+        "201":
+          description: Nodo registrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Node"
+        "409":
+          description: Public key ya registrada
+
+  /nodes/me:
+    get:
+      summary: Info del nodo autenticado
+      security: [{ nodeSig: [] }]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Node"
+
+  # --- Servicios: descubrimiento (público) ---
+
+  /services:
+    get:
+      summary: Listar y buscar servicios
+      parameters:
+        - name: q
+          in: query
+          description: Búsqueda por nombre o descripción
+          schema: { type: string }
+        - name: category
+          in: query
+          schema: { type: string }
+        - name: tier
+          in: query
+          schema: { type: string, enum: [free, starter, pro, enterprise] }
+        - name: sort
+          in: query
+          schema: { type: string, enum: [maturity_score, stars, joins, calls_total] }
+          default: maturity_score
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: per_page
+          in: query
+          schema: { type: integer, default: 20, maximum: 100 }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total: { type: integer }
+                  page: { type: integer }
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/ServiceSummary" }
+
+  /services/{service_id}:
+    get:
+      summary: Detalle de un servicio
+      parameters:
+        - name: service_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ServiceDetail" }
+        "404":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  # --- Servicios: gestión (requiere auth de nodo) ---
+
+  /services:
+    post:
+      summary: Publicar un nuevo servicio
+      security: [{ nodeSig: [] }]
+      requestBody:
+        required: true
+        content:
+          application/yaml:
+            schema:
+              description: "Contenido del service.schema.yaml"
+              type: object
+      responses:
+        "201":
+          description: Servicio publicado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ServiceDetail" }
+        "400":
+          description: Schema inválido
+
+  /services/{service_id}:
+    put:
+      summary: Actualizar un servicio propio
+      security: [{ nodeSig: [] }]
+      parameters:
+        - name: service_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ServiceDetail" }
+        "403":
+          description: El servicio no pertenece a este nodo
+
+    delete:
+      summary: Despublicar un servicio
+      security: [{ nodeSig: [] }]
+      parameters:
+        - name: service_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204":
+          description: Servicio eliminado
+
+  # --- Joins ---
+
+  /services/{service_id}/join:
+    post:
+      summary: Registrar que el nodo usa este servicio (join)
+      security: [{ nodeSig: [] }]
+      parameters:
+        - name: service_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Join registrado o ya existente
+
+  /services/{service_id}/unjoin:
+    post:
+      summary: Dejar de usar el servicio
+      security: [{ nodeSig: [] }]
+      parameters:
+        - name: service_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Unjoin registrado
+
+  # --- Valoraciones ---
+
+  /services/{service_id}/ratings:
+    post:
+      summary: Calificar un servicio (solo nodos que hayan hecho join)
+      security: [{ nodeSig: [] }]
+      parameters:
+        - name: service_id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [stars]
+              properties:
+                stars:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                comment: { type: string, maxLength: 500 }
+      responses:
+        "201":
+          description: Valoración registrada
+        "403":
+          description: Nodo no ha hecho join a este servicio
+        "409":
+          description: Ya calificaste este servicio (actualizar con PUT)
+
+    put:
+      summary: Actualizar valoración propia
+      security: [{ nodeSig: [] }]
+      parameters:
+        - name: service_id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [stars]
+              properties:
+                stars: { type: integer, minimum: 1, maximum: 5 }
+                comment: { type: string, maxLength: 500 }
+      responses:
+        "200":
+          description: Valoración actualizada
+
+  # --- Reportes ---
+
+  /services/{service_id}/reports:
+    post:
+      summary: Reportar un servicio
+      security: [{ nodeSig: [] }]
+      parameters:
+        - name: service_id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason:
+                  type: string
+                  enum: [spam, malicious, false_description, abusive, other]
+                detail: { type: string, maxLength: 1000 }
+      responses:
+        "201":
+          description: Reporte registrado
+        "409":
+          description: Ya reportaste este servicio
+
+  # --- Metering (llamadas entre nodos) ---
+
+  /metering/record:
+    post:
+      summary: Registrar una llamada entre nodos (usado por el SDK)
+      description: |
+        Para llamadas free tier, el nodo proveedor reporta cada llamada recibida.
+        Para llamadas pagas, el gateway lo registra automáticamente.
+      security: [{ nodeSig: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [service_id, consumer_node_id, timestamp_ms, latency_ms, success]
+              properties:
+                service_id: { type: string }
+                consumer_node_id: { type: string }
+                timestamp_ms: { type: integer }
+                latency_ms: { type: integer }
+                success: { type: boolean }
+                error_code: { type: string }
+      responses:
+        "204":
+          description: Registrado
+
+  /metering/usage:
+    get:
+      summary: Ver uso del nodo autenticado (como consumidor y proveedor)
+      security: [{ nodeSig: [] }]
+      parameters:
+        - name: period
+          in: query
+          schema: { type: string, enum: [current_month, last_month] }
+          default: current_month
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  as_consumer:
+                    type: object
+                    properties:
+                      calls_total: { type: integer }
+                      calls_by_service: { type: object }
+                      amount_due_usd: { type: number }
+                  as_provider:
+                    type: object
+                    properties:
+                      calls_received: { type: integer }
+                      calls_by_service: { type: object }
+                      earnings_usd: { type: number }

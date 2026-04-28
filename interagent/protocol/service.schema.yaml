@@ -1,0 +1,91 @@
+# Interagent Service Schema v0.1
+# Formato de definición de un servicio publicado en la registry.
+
+$schema: "https://interagent.io/schemas/service/v0.1"
+
+# --- Identidad ---
+service:
+  id: "weather.forecast.v1"          # <category>.<name>.<version> — único en la registry
+  name: "Weather Forecast"
+  description: "Real-time weather and 7-day forecast for any coordinate."
+  version: "1.0.0"                   # semver
+  category: "environment"            # environment | home | finance | productivity | utility | other
+  tags: [weather, forecast, climate, open-meteo]
+
+# --- Proveedor ---
+  provider:
+    node_id: "node-abc123"           # asignado por la registry al registrar el nodo
+    contact: "matias@blasi.ar"       # opcional, para soporte
+    public_key: "ed25519:..."        # clave pública del nodo para verificar firmas
+
+# --- Acceso y precio ---
+  access:
+    tier: free                       # free | starter | pro | enterprise
+    price_per_1k_calls: 0.00         # USD; 0 = free
+    rate_limit_free:
+      calls_per_day: 100
+      calls_per_month: 1000
+    endpoint: "https://node-abc123.interagent.io/svc/weather/forecast"
+    # Para free tier, llamadas van directo a este endpoint.
+    # Para tiers pagos, el gateway redirige internamente.
+
+# --- Schema de entrada y salida ---
+  schema:
+    input:
+      type: object
+      required: [location]
+      properties:
+        location:
+          type: string
+          description: "Lat,Lon — e.g. '-34.6,-58.4'"
+          example: "-34.6,-58.4"
+        days:
+          type: integer
+          minimum: 1
+          maximum: 7
+          default: 1
+    output:
+      type: object
+      properties:
+        location:
+          type: string
+        current:
+          type: object
+          properties:
+            temperature_c: { type: number }
+            humidity_pct: { type: number }
+            wind_kmh: { type: number }
+            condition: { type: string }
+        forecast:
+          type: array
+          items:
+            type: object
+            properties:
+              date: { type: string, format: date }
+              temp_max_c: { type: number }
+              temp_min_c: { type: number }
+              precipitation_mm: { type: number }
+              condition: { type: string }
+    errors:
+      - code: "LOCATION_INVALID"
+        description: "Coordinates out of range or malformed."
+      - code: "PROVIDER_OFFLINE"
+        description: "The provider node is not reachable."
+      - code: "RATE_LIMIT_EXCEEDED"
+        description: "Free tier monthly limit reached."
+
+# --- Estadísticas (calculadas por la registry, no editables por el proveedor) ---
+  stats:
+    stars: 4.7                       # promedio 1-5
+    ratings_count: 89
+    joins: 342                       # nodos que lo tienen integrado
+    calls_total: 45000
+    calls_last_30d: 3200
+    uptime_30d_pct: 99.1
+    maturity_score: 87.3             # stars × log(joins) × log(calls_total), normalizado 0-100
+
+# --- Moderación ---
+  moderation:
+    status: active                   # active | suspended | banned
+    reports_count: 0
+    verified_provider: true          # badge: >1000 llamadas sin reportes
