@@ -3,6 +3,7 @@
 
 # Datos generados (samples TTS, modelos entrenados, outputs)
 wakeword/data/
+wakeword/output/
 models/
 logs/
 

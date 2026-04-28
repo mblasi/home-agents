@@ -180,12 +180,12 @@ Estado:   EN CURSO (~70% completo)
 - [x] 1.8  Samples positivos "Capitán" generados (90 samples, voz daniela)
 
 #### Pendiente
-- [ ] 1.9  Elegir voz TTS para respuestas (claude-high vs davefx-medium)
-- [ ] 1.10 Regenerar samples con 4 voces (~360 samples positivos)
-- [ ] 1.11 Descargar/generar samples negativos para training
-- [ ] 1.12 Extracción de features con embedding_model.onnx
-- [ ] 1.13 Training del clasificador (estimado 30-60min en CPU)
-- [ ] 1.14 Exportar modelo a ONNX (~/.local/share/wakeword/capitan.onnx)
+- [x] 1.9  Elegir voz TTS para respuestas → es_AR-daniela-high.onnx
+- [x] 1.10 Regenerar samples con 4 voces → 360 samples (daniela, claude, davefx, sharvard)
+- [x] 1.11 Generar samples negativos con Piper → 1320 samples (45 frases × 6 vel × 4 voces, incl. hard negatives)
+- [x] 1.12 Extracción de features con embedding_model.onnx → pos=(360,16,96), neg=(1320,16,96)
+- [x] 1.13 Training del clasificador → 10k steps, DNN 128-dim, ~20s en CPU
+- [x] 1.14 Exportar modelo a ONNX → ~/.local/share/wakeword/capitan.onnx (848KB)
 - [ ] 1.15 Integrar wake word al pipeline completo
 - [ ] 1.16 Conectar con HAOS real (token + entity_ids reales)
 - [ ] 1.17 Parser de acciones robusto + ejecución via REST API
@@ -193,7 +193,7 @@ Estado:   EN CURSO (~70% completo)
 - [ ] 1.19 Test end-to-end: "Capitán" → acción ejecutada en HAOS
 
 #### Decisiones pendientes
-- [ ] Voz TTS respuesta: ¿es_MX-claude-high o es_ES-davefx-medium?
+- [x] Voz TTS respuesta: es_AR-daniela-high.onnx (única voz argentina disponible en Piper)
 - [ ] Latencia aceptable: 15.7s actual, ¿optimizar o avanzar?
 
 ---
