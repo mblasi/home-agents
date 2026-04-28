@@ -26,6 +26,91 @@ Total latency: ~8s warm / ~15.7s cold start.
 
 ---
 
+## Architecture
+
+```mermaid
+graph LR
+    subgraph IN["Entrada"]
+        MIC["🎙️ Micrófono\nhw:1,0 · 44100Hz"]
+        WA_A["📱 WhatsApp\naudio PTT"]
+        WA_T["📱 WhatsApp\ntexto"]
+    end
+
+    subgraph AUDIO["Pipeline de voz"]
+        RS["scipy resample\n44100 → 16kHz"]
+        WW["openWakeWord\n'Capitán'"]
+        STT["faster-whisper\nsmall · int8 · ~4.6s"]
+        OGG["ffmpeg\nOGG → WAV 16kHz"]
+    end
+
+    subgraph CORE["Núcleo"]
+        ORCH["⚙️ Orquestador\nFastAPI"]
+        LLM["🧠 qwen2.5:7b\nOllama :11434 · ~3.5s"]
+        TTS["🗣️ Piper TTS\nvoz argentina · offline"]
+    end
+
+    subgraph AGENTS["Agentes"]
+        A1["Domótica"]
+        A2["Clima"]
+        A3["Agenda"]
+        A4["Inversiones"]
+        A5["Viajes"]
+    end
+
+    subgraph FISICO["Mundo físico"]
+        HAOS["Home Assistant OS\nREST :8123"]
+        D1["💡 Luces"]
+        D2["🪟 Persianas"]
+        D3["🌡️ Calefacción"]
+    end
+
+    subgraph FIN["Mundo financiero"]
+        YF["Yahoo Finance\nacciones intl."]
+        BCRA["BCRA API\ndólar · tasas AR"]
+        SC["Scraper\nAmbito · Infobae"]
+    end
+
+    subgraph INFO["Información & datos"]
+        OM["Open-Meteo API\nsin API key"]
+        CD["CalDAV · Radicale"]
+        RAG["RAG · PDFs\npasaportes · reservas"]
+    end
+
+    subgraph OUT["Salida"]
+        SP["🔊 Altavoz"]
+        WA_R["📲 WhatsApp\ntexto / nota de voz"]
+    end
+
+    MIC --> RS --> WW --> STT
+    WA_A --> OGG --> STT
+    WA_T --> ORCH
+    STT --> ORCH
+
+    ORCH <-->|"intent + contexto"| LLM
+    ORCH --> A1 & A2 & A3 & A4 & A5
+
+    A1 --> HAOS --> D1 & D2 & D3
+
+    A2 --> OM
+    A2 -.->|"lluvia → persianas\nfrío → calefacción"| HAOS
+
+    A3 --> CD
+    A3 -.->|"alarma → luces graduales"| HAOS
+
+    A4 --> YF & BCRA & SC
+
+    A5 --> RAG
+    A5 --> OM
+
+    ORCH --> TTS --> SP
+    ORCH --> WA_R
+    TTS -.->|nota de voz| WA_R
+```
+
+> Líneas sólidas: flujo principal. Líneas punteadas: integraciones cruzadas entre agentes (domótica reaccionando a clima, agenda, etc).
+
+---
+
 ## Stack
 
 | Layer | Tool | Notes |
