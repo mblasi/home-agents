@@ -1,0 +1,23 @@
+# Config local de herramientas
+.claude/
+
+# Datos generados (samples TTS, modelos entrenados, outputs)
+wakeword/data/
+models/
+logs/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+
+# Entornos virtuales
+venv/
+.venv/
+
+# OS / IDE
+.DS_Store
+*.swp
+*.swo
