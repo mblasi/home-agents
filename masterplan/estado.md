@@ -186,7 +186,7 @@ Estado:   EN CURSO (~70% completo)
 - [x] 1.12 Extracción de features con embedding_model.onnx → pos=(360,16,96), neg=(1320,16,96)
 - [x] 1.13 Training del clasificador → 10k steps, DNN 128-dim, ~20s en CPU
 - [x] 1.14 Exportar modelo a ONNX → ~/.local/share/wakeword/capitan.onnx (848KB)
-- [ ] 1.15 Integrar wake word al pipeline completo
+- [x] 1.15 Integrar wake word al pipeline completo → listen.py, score=0.96, STT funcional
 - [ ] 1.16 Conectar con HAOS real (token + entity_ids reales)
 - [ ] 1.17 Parser de acciones robusto + ejecución via REST API
 - [ ] 1.18 Feedback por voz (Piper responde confirmación)
