@@ -262,6 +262,49 @@ Estado:   Pendiente (inicia cuando FASE 1 esté completa)
 
 ---
 
+### FASE 2.5 - Gestión de Usuarios
+```
+Objetivo: Sistema de identidad que permite reconocer quién habla, definir su rol y
+          parentesco, y personalizar la experiencia. Prerequisito para interacciones
+          contextuales como "reproduce mi música preferida" o "¿cómo está mi portfolio?"
+Estado:   Pendiente (puede ejecutarse en paralelo con FASE 2)
+```
+
+#### Impacto por módulo
+
+**home-agents-core** (nuevos archivos):
+  · users.py          modelo User, registro CRUD, persistencia JSON/SQLite
+  · enrollment.py     workflow de captura de frases y cómputo de embedding
+  · Endpoints nuevos: GET/POST/DELETE /users, GET/PATCH /users/{id}/profile
+  · server.py         recibe speaker_id en POST /process, inyecta perfil al LLM
+  · RBAC middleware   check_role() aplicado por intent
+
+**home-agents-ear** (archivos nuevos/modificados):
+  · listen.py         speaker ID después del wake word, speaker_id en HTTP body
+  · panel_users.py    nuevo panel: usuarios registrados, speaker activo, enrollment progress
+  · dashboard.kdl     agregar panel_users a floating_panes
+
+#### Tareas
+- [ ] 2.5.1  Modelo de usuario: roles (admin/familiar/niño/invitado) y relaciones de parentesco
+             (padre/madre/hijo/hija/pareja/abuelo/invitado/propietario)
+- [ ] 2.5.2  Persistencia del registro: JSON/SQLite en ~/.local/share/capitan/users
+             Embeddings como .npy por separado — datos biométricos, nunca a la nube
+- [ ] 2.5.3  API REST en core: GET/POST/DELETE /users, GET/PATCH /users/{id}/profile
+- [ ] 2.5.4  Bootstrap del admin: enrollment guiado al detectar sistema sin usuarios registrados
+             Sistema anuncia → captura N frases → persiste con role=admin
+- [ ] 2.5.5  Comando de voz para agregar usuario (solo admin):
+             "Capitán, agregar a Gala como hija con acceso familiar"
+- [ ] 2.5.6  Proceso guiado de enrollment por voz: N frases predefinidas, tono de inicio/fin,
+             detección de ruido, confirmación. Nuevo estado en ear: enrolling
+- [ ] 2.5.7  Identificación de speaker en tiempo real: cosine similarity sobre audio ya capturado
+             (< 200ms), speaker_id adjunto al POST /process. Fallback: perfil guest
+- [ ] 2.5.8  RBAC básico: tabla de permisos por rol, check_role() en core,
+             respuesta de voz al denegar acceso
+- [ ] 2.5.9  Panel de usuarios en dashboard ear: lista de usuarios, speaker activo en el último
+             pedido, progress bar de enrollment en curso
+
+---
+
 ### FASE 3 - Infraestructura Multi-Agente
 ```
 Objetivo: Orquestador que coordina todos los agentes
