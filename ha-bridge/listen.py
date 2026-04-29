@@ -37,7 +37,7 @@ RESAMPLE_DOWN   = 441
 
 WAKEWORD_MODEL  = os.path.expanduser("~/.local/share/wakeword/capitan.onnx")
 WAKEWORD_LABEL  = "capitan"
-WAKEWORD_THRESH = 0.5
+WAKEWORD_THRESH = 0.8
 
 COMMAND_SECS    = 5           # segundos a grabar tras detección
 WHISPER_MODEL   = "small"

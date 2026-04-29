@@ -32,7 +32,7 @@ def read_json(name, default):
 def score_bar(score: float) -> Text:
     filled = int(score * BAR_WIDTH)
     empty  = BAR_WIDTH - filled
-    color  = "bright_red" if score > 0.5 else "bright_yellow" if score > 0.2 else "bright_black"
+    color  = "bright_red" if score > 0.8 else "bright_yellow" if score > 0.4 else "bright_black"
     bar = Text()
     bar.append("█" * filled, style=color)
     bar.append("░" * empty,  style="bright_black")
@@ -49,7 +49,7 @@ def render(score_data, state_data) -> Panel:
     content.append("  Wake word score\n", style="dim")
     content.append("  ")
     content.append_text(score_bar(score))
-    content.append(f"\n\n  umbral: 0.500\n", style="dim")
+    content.append(f"\n\n  umbral: 0.800\n", style="dim")
     if state == "recording":
         content.append("\n  🎙  grabando...\n", style="bold red blink")
     elif state == "processing":

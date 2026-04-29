@@ -125,9 +125,12 @@ def process(text: str, source: dict | None = None) -> tuple[str, str | None, str
     agent_id = registry.dispatch(text)
     registry.write_active_agent(agent_id)
 
+    # "unknown" → intentar con haos de todas formas (LLM decide si es accionable)
+    effective_id = agent_id if agent_id != "unknown" else "haos"
+
     # Si el agente no es haos y no está activo, responder apropiadamente
-    if agent_id != "haos" and registry.agent_status(agent_id) != "active":
-        return registry.unavailable_response(agent_id), None, agent_id
+    if effective_id != "haos" and registry.agent_status(effective_id) != "active":
+        return registry.unavailable_response(effective_id), None, agent_id
 
     # Agente HAOS (único activo)
     try:
