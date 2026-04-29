@@ -204,7 +204,7 @@ Estado:   EN CURSO (~70% completo)
 - [x] 1.16 Conectar con HAOS real → ha_client.py, IP documentada, 13 entity_ids mapeados
 - [x] 1.17 Parser de acciones robusto + ejecución via REST API → agent.py, qwen2.5:7b, 5/5 comandos correctos
 - [x] 1.18 Feedback por voz → tts.py, voz daniela, integrado en listen.py
-- [ ] 1.19 Test end-to-end: "Capitán" → acción ejecutada en HAOS
+- [x] 1.19 Test end-to-end: "Capitán" → acción ejecutada en HAOS → confirmación por voz ✓
 
 #### Decisiones pendientes
 - [x] Voz TTS respuesta: es_AR-daniela-high.onnx (única voz argentina disponible en Piper)

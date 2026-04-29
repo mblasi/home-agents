@@ -73,10 +73,11 @@ Latencia: ~4.6s para 5s de audio
 ```
 Binario: ~/.local/bin/piper/piper  (v1.2.0)
 Voces:   ~/.local/share/piper/
-  es_AR-daniela-high.onnx    ← usada para training de wake word
-  es_MX-claude-high.onnx     ← candidata para respuestas
-  es_ES-davefx-medium.onnx   ← candidata para respuestas
+  es_AR-daniela-high.onnx    ← voz del agente (wake word + respuestas)
+  es_MX-claude-high.onnx     ← descartada
+  es_ES-davefx-medium.onnx   ← descartada
   es_ES-sharvard-medium.onnx ← diversidad en training
+Sample rate: 22050Hz
 ```
 
 ### openWakeWord
@@ -93,11 +94,11 @@ Parche aplicado (no revertir):
 ## Home Assistant OS (HAOS)
 
 ```
-Acceso:    http://[IP-HAOS]:8123
+Acceso:    http://192.168.68.101:8123
 Estrategia: HAOS solo recibe órdenes via REST API
             Todo el procesamiento (STT/LLM/TTS) corre en la laptop
-Token:     pendiente documentar (Long-Lived Access Token)
-Entity IDs: pendiente mapear
+Token:     en .env (excluido del repo)
+Cliente:   ha-bridge/ha_client.py — get_state / call_service / ENTITIES map
 ```
 
 ## Estructura del repo
@@ -117,7 +118,11 @@ scripts/
   sync_issues.py          sincroniza estado.md con GitHub issues
   test_audio_pipeline.py  prueba cada componente de audio
 
-ha-bridge/         código del servidor principal (pendiente)
+ha-bridge/
+  listen.py        loop principal: wake word → STT → LLM → HA → TTS
+  agent.py         texto → qwen2.5:7b → parse ACTION → ha_client
+  ha_client.py     cliente REST HAOS + mapa de entidades
+  tts.py           Piper TTS → ffplay (voz daniela)
 models/            modelos GGUF (pendiente poblar)
 logs/
 
@@ -134,19 +139,21 @@ interagent/        concepto del producto Interagent (red de redes de agentes)
 # Activar entorno
 source ~/ai-env/bin/activate
 
+# Correr el agente (pipeline completo)
+python ha-bridge/listen.py
+
+# Debug wake word scores en tiempo real
+python wakeword/debug_scores.py
+
+# Test TTS
+python ha-bridge/tts.py
+
+# Test parser LLM + HA
+python ha-bridge/agent.py
+
 # Ollama
 ollama serve &
 ollama list
-
-# Test audio pipeline
-python scripts/test_audio_pipeline.py
-
-# Generar samples wake word
-python wakeword/generate_samples_multi.py
-
-# Training wake word (cuando haya negativos)
-cd wakeword/openWakeWord
-python -m openwakeword.train --config ~/ai-lab/wakeword/config.yaml
 
 # Sync issues con GitHub
 python scripts/sync_issues.py
@@ -178,3 +185,4 @@ Latencia warm: ~8s | Latencia cold: ~15.7s
 - Reproducción: ffplay (aplay descartado)
 - Arquitectura: todo en laptop, HAOS solo recibe REST
 - Resampling: scipy.signal.resample_poly (no librosa, más rápido)
+- Voz TTS: es_AR-daniela-high (claude y davefx descartadas)
