@@ -206,6 +206,7 @@ Estado:   EN CURSO (~70% completo)
 - [x] 1.18 Feedback por voz → tts.py, voz daniela, integrado en listen.py
 - [x] 1.19 Test end-to-end: "Capitán" → acción ejecutada en HAOS → confirmación por voz ✓
 - [x] 1.20 Servicio systemd para el agente → capitan.service (user), start/stop manual con systemctl --user
+- [ ] 1.21 Dashboard zellij para el agente: layout con paneles de reconocimiento, historial de comandos y latencias
 
 #### Decisiones pendientes
 - [x] Voz TTS respuesta: es_AR-daniela-high.onnx (única voz argentina disponible en Piper)
