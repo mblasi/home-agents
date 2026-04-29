@@ -202,7 +202,7 @@ Estado:   EN CURSO (~70% completo)
 - [x] 1.14 Exportar modelo a ONNX → ~/.local/share/wakeword/capitan.onnx (848KB)
 - [x] 1.15 Integrar wake word al pipeline completo → listen.py, score=0.96, STT funcional
 - [x] 1.16 Conectar con HAOS real → ha_client.py, IP documentada, 13 entity_ids mapeados
-- [ ] 1.17 Parser de acciones robusto + ejecución via REST API
+- [x] 1.17 Parser de acciones robusto + ejecución via REST API → agent.py, qwen2.5:7b, 5/5 comandos correctos
 - [ ] 1.18 Feedback por voz (Piper responde confirmación)
 - [ ] 1.19 Test end-to-end: "Capitán" → acción ejecutada en HAOS
 
