@@ -1,0 +1,45 @@
+layout {
+    pane size=1 borderless=true {
+        plugin location="zellij:tab-bar"
+    }
+
+    pane split_direction="horizontal" {
+
+        // ── Fila superior ─────────────────────────────────────────────────
+        pane size="75%" split_direction="vertical" {
+
+            // Panel izquierdo: score animado + estado (35% del ancho)
+            pane size="35%" {
+                command "/home/matias/ai-env/bin/python"
+                args "/home/matias/ai-lab/ha-bridge/panel_score.py"
+                name "wake word"
+            }
+
+            // Panel derecho: historial arriba, latencias abajo
+            pane split_direction="horizontal" {
+                pane size="60%" {
+                    command "/home/matias/ai-env/bin/python"
+                    args "/home/matias/ai-lab/ha-bridge/panel_history.py"
+                    name "historial"
+                }
+                pane {
+                    command "/home/matias/ai-env/bin/python"
+                    args "/home/matias/ai-lab/ha-bridge/panel_latency.py"
+                    name "latencias"
+                }
+            }
+        }
+
+        // ── Fila inferior: logs del agente (25% de la altura) ─────────────
+        pane {
+            command "/home/matias/ai-env/bin/python"
+            args "/home/matias/ai-lab/ha-bridge/listen.py"
+            name "agente"
+            cwd "/home/matias/ai-lab"
+        }
+    }
+
+    pane size=2 borderless=true {
+        plugin location="zellij:status-bar"
+    }
+}
