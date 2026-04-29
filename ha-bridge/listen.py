@@ -19,6 +19,9 @@ import scipy.signal
 from faster_whisper import WhisperModel
 import openwakeword
 
+sys.path.insert(0, os.path.dirname(__file__))
+import agent
+
 # ── Configuración ──────────────────────────────────────────────────────────────
 
 MIC_DEVICE_IDX  = 4           # HD-Audio Generic: ALC256 Analog (hw:1,0)
@@ -106,9 +109,12 @@ try:
             texto = transcribe(audio)
 
             if texto:
-                print(f"[{ts}] → \"{texto}\"")
+                print(f"[{ts}] → \"{texto}\"", flush=True)
+                respuesta, accion = agent.process(texto)
+                print(f"[{ts}]    acción: {accion}", flush=True)
+                print(f"[{ts}]    respuesta: {respuesta}", flush=True)
             else:
-                print(f"[{ts}] → (silencio)")
+                print(f"[{ts}] → (silencio)", flush=True)
 
             oww.reset()
             print()
