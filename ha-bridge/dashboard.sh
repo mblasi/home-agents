@@ -28,5 +28,5 @@ mkdir -p /tmp/capitan
 # Eliminar sesión zellij previa si existe
 zellij delete-session capitan --force 2>/dev/null || true
 
-exec zellij --layout "$REPO_DIR/ha-bridge/dashboard.kdl" \
+exec zellij --new-session-with-layout "$REPO_DIR/ha-bridge/dashboard.kdl" \
             --session capitan
