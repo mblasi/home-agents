@@ -123,6 +123,8 @@ ha-bridge/
   agent.py         texto → qwen2.5:7b → parse ACTION → ha_client
   ha_client.py     cliente REST HAOS + mapa de entidades
   tts.py           Piper TTS → ffplay (voz daniela)
+  run.sh           wrapper para systemd (reconstruye entorno)
+  capitan.service  unit file (instalar en ~/.config/systemd/user/)
 models/            modelos GGUF (pendiente poblar)
 logs/
 
@@ -140,7 +142,11 @@ interagent/        concepto del producto Interagent (red de redes de agentes)
 source ~/ai-env/bin/activate
 
 # Correr el agente (pipeline completo)
-python ha-bridge/listen.py
+python ha-bridge/listen.py        # terminal directo
+systemctl --user start capitan    # via servicio (requiere audio group)
+systemctl --user stop capitan
+systemctl --user status capitan
+journalctl --user -u capitan -f   # logs en tiempo real
 
 # Debug wake word scores en tiempo real
 python wakeword/debug_scores.py

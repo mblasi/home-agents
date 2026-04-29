@@ -1,0 +1,25 @@
+[Unit]
+Description=Agente Capitán — domótica por voz
+# Servicio de USUARIO — usar con: systemctl --user start|stop|status capitan
+# Instalar en: ~/.config/systemd/user/capitan.service
+After=network.target sound.target
+
+[Service]
+Type=simple
+SupplementaryGroups=audio
+WorkingDirectory=/home/matias/ai-lab
+ExecStart=/home/matias/ai-lab/ha-bridge/run.sh
+
+Restart=on-failure
+RestartSec=5
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=capitan
+
+# Tiempo para cerrar el stream de audio limpiamente
+TimeoutStopSec=10
+
+[Install]
+# No ejecutar enable — activación manual solamente
+WantedBy=default.target

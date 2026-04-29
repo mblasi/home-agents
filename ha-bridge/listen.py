@@ -25,7 +25,8 @@ import tts
 
 # ── Configuración ──────────────────────────────────────────────────────────────
 
-MIC_DEVICE_IDX  = 4           # HD-Audio Generic: ALC256 Analog (hw:1,0)
+MIC_DEVICE_NAME = "ALC256"    # buscar por nombre; fallback a índice 4
+MIC_DEVICE_IDX  = 4
 MIC_RATE        = 44100       # Única frecuencia soportada por ALC256
 CHUNK_MS        = 80          # Chunk para openWakeWord (80ms = 1280 samples a 16kHz)
 CHUNK_44K       = int(MIC_RATE * CHUNK_MS / 1000)   # ~3528 samples a 44100Hz
@@ -55,12 +56,29 @@ whisper = WhisperModel(WHISPER_MODEL, device=WHISPER_DEVICE, compute_type=WHISPE
 
 print("[init] Abriendo micrófono...", flush=True)
 pa = pyaudio.PyAudio()
+
+def _find_mic(pa, name=MIC_DEVICE_NAME, fallback=MIC_DEVICE_IDX):
+    for i in range(pa.get_device_count()):
+        d = pa.get_device_info_by_index(i)
+        if name in d["name"] and d["maxInputChannels"] > 0:
+            print(f"[init]   → device {i}: {d['name']}", flush=True)
+            return i
+    n = pa.get_device_count()
+    if fallback >= n:
+        raise RuntimeError(
+            f"Micrófono '{name}' no encontrado y fallback={fallback} inválido "
+            f"(solo {n} dispositivos). ¿Está el micrófono en uso por otro proceso?"
+        )
+    print(f"[init]   → '{name}' no encontrado, usando índice {fallback}", flush=True)
+    return fallback
+
+mic_idx = _find_mic(pa)
 stream = pa.open(
     format=pyaudio.paInt16,
     channels=1,
     rate=MIC_RATE,
     input=True,
-    input_device_index=MIC_DEVICE_IDX,
+    input_device_index=mic_idx,
     frames_per_buffer=CHUNK_44K,
 )
 
