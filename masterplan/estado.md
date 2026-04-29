@@ -525,3 +525,40 @@ beneficio neto sobre lo que REST ya da.
 **Restricción no negociable**: la solución debe correr 100% en LAN local, sin
 tráfico a internet. Cualquier implementación MCP debe usar modelos locales (Ollama
 u otro runtime local) como cliente MCP.
+
+---
+
+### A.2 Red de nodos de audio multi-ambiente
+
+**Contexto**: La arquitectura actual tiene un único punto de acceso (la laptop con
+micrófono y parlantes). Para hacer el agente realmente útil en toda la casa, se
+necesitan nodos de audio en distintos ambientes (cocina, living, dormitorio, etc.)
+que actúen como interfaces de voz distribuidas sobre la red WiFi hogareña.
+
+**Arquitectura propuesta**:
+- Nodos ligeros (Raspberry Pi Zero 2W o similar) con micrófono + parlante
+- Cada nodo corre wake word detection localmente (openWakeWord, modelo capitan.onnx)
+- Al detectar wake word, el nodo captura el audio del comando y lo envía via WebSocket
+  o MQTT al servidor central (la laptop)
+- El servidor central procesa STT → LLM → HAOS y devuelve el texto de respuesta al nodo
+- El nodo sintetiza la respuesta con Piper TTS y la reproduce localmente
+- Cada nodo se identifica con un nombre de ambiente (ej: `cocina`, `dormitorio`)
+  para logs y ruteo de respuesta correcto
+
+**Alternativa con hardware existente**:
+- Los Echo (echo_de_matias, echo_dot, echo_pop_de_gala, echo_show) ya están en la casa
+  y podrían usarse como parlantes de respuesta via HA `media_player.play_media`
+- La captura de audio requeriría nodos propios de todas formas (los Echo son cerrados)
+
+**Por qué no ahora**: requiere hardware adicional, diseño del protocolo de red
+nodo↔servidor, y gestión de múltiples streams de audio simultáneos. La Fase 1 del
+agente debe estar estable primero.
+
+**Condiciones para reevaluar**:
+- Cuando el agente single-node sea estable en uso diario
+- Cuando haya presupuesto/tiempo para hardware de nodos
+- Si el uso diario muestra que la cobertura de un solo ambiente es limitante
+
+**Restricción no negociable**: todo el procesamiento pesado (STT, LLM, TTS) corre
+en la laptop central. Los nodos son clientes ligeros — solo corren wake word detection
+y streaming de audio. Nada sale de la LAN local.
