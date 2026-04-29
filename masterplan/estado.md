@@ -234,7 +234,18 @@ Estado:   Pendiente (inicia cuando FASE 1 esté completa)
 - [ ] 2.6  Automatizaciones por voz ("cuando llegue a casa, encendé todo")
 - [ ] 2.7  Satellite en habitaciones (RPi Zero 2W o ESP32 con micrófono)
 - [ ] 2.8  Fine-tuning con entity_ids y patrones reales de tu casa
-- [ ] 2.9  Wake word multi-persona (detectar voz de distintos miembros)
+- [ ] 2.9  Wake word multi-persona: detectar y distinguir voces de distintos miembros del hogar.
+           Al identificar la persona, cargar su perfil persistido como contexto adicional de la
+           conversación: preferencias, rutinas, dispositivos favoritos, historial relevante.
+           Esto permite interacciones personalizadas: "reproduce mi música preferida",
+           "¿cómo está mi portfolio?", "recordame lo de mañana".
+           Diseño:
+             · Speaker ID: embeddings de voz por persona (SpeechBrain o resemblyzer)
+             · Perfil persistido por persona: JSON o SQLite en disco (nombre, prefs, historial)
+             · El perfil se inyecta como sección adicional en el prompt del LLM
+             · Actualización del perfil: el agente puede escribir/actualizar prefs por voz
+               ("de ahora en adelante, mi música preferida es jazz")
+             · Fallback: voz no reconocida → perfil "invitado" con contexto mínimo
 - [ ] 2.10 Gestión de conversaciones: identidad, contexto multi-turno y ciclo de vida
            Prerequisito para 2.3, 2.4 y 2.5. Cada exchange puede formar parte de una
            conversación activa identificada por fuente (mic/ambiente, número de WhatsApp).
