@@ -235,6 +235,19 @@ Estado:   Pendiente (inicia cuando FASE 1 esté completa)
 - [ ] 2.7  Satellite en habitaciones (RPi Zero 2W o ESP32 con micrófono)
 - [ ] 2.8  Fine-tuning con entity_ids y patrones reales de tu casa
 - [ ] 2.9  Wake word multi-persona (detectar voz de distintos miembros)
+- [ ] 2.10 Gestión de conversaciones: identidad, contexto multi-turno y ciclo de vida
+           Prerequisito para 2.3, 2.4 y 2.5. Cada exchange puede formar parte de una
+           conversación activa identificada por fuente (mic/ambiente, número de WhatsApp).
+           El LLM recibe los últimos N turnos como contexto. La conversación cierra por
+           keyword explícita ("gracias, eso es todo") o por timeout de inactividad.
+           El core expone GET /conversations y DELETE /conversations/{id}.
+           Diseño:
+             · conversation_id = hash(source) + timestamp del primer turno
+             · Continuación: nuevo pedido dentro de ventana de 2 min → mismo hilo
+             · Cierre explícito: detección de frases de cierre en el texto transcripto
+             · Cierre automático: timeout configurable (default 2 min sin actividad)
+             · Estado: active | closed | expired
+             · Contexto al LLM: últimos N turnos (default N=5) como messages[] previos
 
 ---
 
