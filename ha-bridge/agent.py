@@ -11,6 +11,7 @@ import requests
 
 sys.path.insert(0, os.path.dirname(__file__))
 import ha_client
+import agent_registry as registry
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
 MODEL      = "qwen2.5:7b"
@@ -115,35 +116,44 @@ def _parse(raw: str) -> dict | None:
     }
 
 
-def process(text: str) -> tuple[str, str | None]:
+def process(text: str, source: dict | None = None) -> tuple[str, str | None, str]:
     """
     Procesa texto transcripto.
-    Devuelve (texto_respuesta_para_TTS, descripcion_accion_o_None).
+    Devuelve (texto_respuesta_para_TTS, descripcion_accion_o_None, agent_id).
     """
+    # Dispatcher: determinar qué agente debe manejar el pedido
+    agent_id = registry.dispatch(text)
+    registry.write_active_agent(agent_id)
+
+    # Si el agente no es haos y no está activo, responder apropiadamente
+    if agent_id != "haos" and registry.agent_status(agent_id) != "active":
+        return registry.unavailable_response(agent_id), None, agent_id
+
+    # Agente HAOS (único activo)
     try:
         raw = _ask_llm(text)
     except requests.exceptions.ConnectionError:
-        return "No puedo conectarme al modelo de lenguaje.", None
+        return "No puedo conectarme al modelo de lenguaje.", None, agent_id
     except Exception as e:
-        return f"Error en el modelo: {e}", None
+        return f"Error en el modelo: {e}", None, agent_id
 
     if not raw or raw.strip().upper() == "NONE":
-        return "No encontré ninguna acción para ese comando.", None
+        return "No encontré ninguna acción para ese comando.", None, agent_id
 
     action = _parse(raw)
     if action is None:
-        return "No pude interpretar la respuesta del modelo.", None
+        return "No pude interpretar la respuesta del modelo.", None, agent_id
 
     try:
         ha_client.call_service(
             action["domain"], action["service"], action["entity_id"], **action["extras"]
         )
     except requests.exceptions.HTTPError as e:
-        return f"Error al ejecutar en Home Assistant: {e}", None
+        return f"Error al ejecutar en Home Assistant: {e}", None, agent_id
 
     verb = _VERBS.get(action["service"], "ejecutado")
     desc = f"{action['domain']}.{action['service']} → {action['entity_id']}"
-    return f"Listo, {verb}.", desc
+    return f"Listo, {verb}.", desc, agent_id
 
 
 if __name__ == "__main__":

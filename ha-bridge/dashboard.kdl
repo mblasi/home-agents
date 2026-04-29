@@ -39,6 +39,19 @@ layout {
         }
     }
 
+    // ── Panel flotante: agentes disponibles ───────────────────────────────
+    floating_panes {
+        pane {
+            command "/home/matias/ai-env/bin/python"
+            args "/home/matias/ai-lab/ha-bridge/panel_agents.py"
+            name "agentes"
+            height "14"
+            width "60"
+            x "5%"
+            y "5%"
+        }
+    }
+
     pane size=2 borderless=true {
         plugin location="zellij:status-bar"
     }

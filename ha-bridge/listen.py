@@ -62,8 +62,11 @@ def metrics_state(state: str) -> None:
     # state: "listening" | "triggered" | "recording" | "processing" | "speaking"
     _write("state.json", {"state": state, "ts": time.time()})
 
+SOURCE = {"type": "mic", "room": "laptop"}   # identificador del origen del pedido
+
 def metrics_event(texto: str, accion: str | None, respuesta: str,
-                  lat_stt: float, lat_llm: float, lat_haos: float) -> None:
+                  lat_stt: float, lat_llm: float, lat_haos: float,
+                  agent_id: str = "haos", source: dict | None = None) -> None:
     history_path = os.path.join(METRICS_DIR, "history.json")
     try:
         with open(history_path) as f:
@@ -75,6 +78,8 @@ def metrics_event(texto: str, accion: str | None, respuesta: str,
         "texto":     texto,
         "accion":    accion,
         "respuesta": respuesta,
+        "agent":     agent_id,
+        "source":    source or SOURCE,
         "lat_stt":   round(lat_stt, 2),
         "lat_llm":   round(lat_llm, 2),
         "lat_haos":  round(lat_haos, 2),
@@ -157,7 +162,7 @@ try:
         chunk_16k = resample_chunk(chunk_44k)
 
         prediction = oww.predict(chunk_16k)
-        score = prediction.get(WAKEWORD_LABEL, 0.0)
+        score = float(prediction.get(WAKEWORD_LABEL, 0.0))
         metrics_score(score)
 
         if score > WAKEWORD_THRESH:
@@ -176,15 +181,16 @@ try:
             if texto:
                 print(f"[{ts}] → \"{texto}\"", flush=True)
                 t_llm_start = time.time()
-                respuesta, accion = agent.process(texto)
+                respuesta, accion, agent_id = agent.process(texto, source=SOURCE)
                 lat_llm = time.time() - t_llm_start
-                lat_haos = lat_llm  # agent.process incluye la llamada a HAOS; separar si hace falta
 
+                print(f"[{ts}]    agente: {agent_id}", flush=True)
                 print(f"[{ts}]    acción: {accion}", flush=True)
                 print(f"[{ts}]    respuesta: {respuesta}", flush=True)
                 print(f"[{ts}]    latencias — STT:{lat_stt:.1f}s  LLM+HA:{lat_llm:.1f}s", flush=True)
 
-                metrics_event(texto, accion, respuesta, lat_stt, lat_llm, 0.0)
+                metrics_event(texto, accion, respuesta, lat_stt, lat_llm, 0.0,
+                              agent_id=agent_id, source=SOURCE)
 
                 metrics_state("speaking")
                 tts.say(respuesta)
