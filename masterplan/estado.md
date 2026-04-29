@@ -115,11 +115,25 @@ Device idx: 4 (HD-Audio Generic: ALC256 Analog hw:1,0)
 ### Home Assistant OS (HAOS)
 ```
 Hardware:   PC vieja dedicada en la red local
-Acceso:     http://[IP-HAOS]:8123
-Token:      pendiente documentar (Long-Lived Access Token)
-Entity IDs: pendiente mapear los reales
+Acceso:     http://192.168.68.101:8123
+Token:      en .env (Long-Lived Access Token, excluido del repo)
 Estrategia: HAOS solo recibe órdenes via REST API
             Todo el procesamiento (STT/LLM/TTS) corre en laptop
+
+Entity IDs relevantes:
+  light.wiz_rgbw_tunable_1fdbc2          → luz principal (WiZ RGBW)
+  climate.midea_ac_150633093419021        → aire acondicionado (Midea)
+  cover.tze200_nhyj64w2_ts0601           → persiana / toldo
+  switch.garaje_light                    → luz del garaje
+  switch.patio_light                     → luz del patio
+  switch.puerta_principal_light          → luz de la puerta principal
+  switch.mi_smart_kettle_pro             → pava / hervidor
+  switch.mi_smart_air_fryer_3_5l         → freidora
+  switch.agua_principal_valvula_de_cierre → válvula agua principal
+  switch.zone_1 … switch.zone_8          → zonas de riego (Rachio)
+  media_player.samsung_q8_65_tv          → TV principal (65")
+  media_player.samsung_7_series_50       → TV del cuarto (50")
+  media_player.echo_de_matias            → Echo de Matías
 ```
 
 ### openWakeWord Training
@@ -187,7 +201,7 @@ Estado:   EN CURSO (~70% completo)
 - [x] 1.13 Training del clasificador → 10k steps, DNN 128-dim, ~20s en CPU
 - [x] 1.14 Exportar modelo a ONNX → ~/.local/share/wakeword/capitan.onnx (848KB)
 - [x] 1.15 Integrar wake word al pipeline completo → listen.py, score=0.96, STT funcional
-- [ ] 1.16 Conectar con HAOS real (token + entity_ids reales)
+- [x] 1.16 Conectar con HAOS real → ha_client.py, IP documentada, 13 entity_ids mapeados
 - [ ] 1.17 Parser de acciones robusto + ejecución via REST API
 - [ ] 1.18 Feedback por voz (Piper responde confirmación)
 - [ ] 1.19 Test end-to-end: "Capitán" → acción ejecutada en HAOS

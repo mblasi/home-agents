@@ -18,6 +18,9 @@ __pycache__/
 venv/
 .venv/
 
+# Secrets locales
+.env
+
 # OS / IDE
 .DS_Store
 *.swp
