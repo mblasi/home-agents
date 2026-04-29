@@ -21,6 +21,7 @@ import openwakeword
 
 sys.path.insert(0, os.path.dirname(__file__))
 import agent
+import tts
 
 # ── Configuración ──────────────────────────────────────────────────────────────
 
@@ -113,6 +114,7 @@ try:
                 respuesta, accion = agent.process(texto)
                 print(f"[{ts}]    acción: {accion}", flush=True)
                 print(f"[{ts}]    respuesta: {respuesta}", flush=True)
+                tts.say(respuesta)
             else:
                 print(f"[{ts}] → (silencio)", flush=True)
 

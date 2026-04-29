@@ -203,7 +203,7 @@ Estado:   EN CURSO (~70% completo)
 - [x] 1.15 Integrar wake word al pipeline completo → listen.py, score=0.96, STT funcional
 - [x] 1.16 Conectar con HAOS real → ha_client.py, IP documentada, 13 entity_ids mapeados
 - [x] 1.17 Parser de acciones robusto + ejecución via REST API → agent.py, qwen2.5:7b, 5/5 comandos correctos
-- [ ] 1.18 Feedback por voz (Piper responde confirmación)
+- [x] 1.18 Feedback por voz → tts.py, voz daniela, integrado en listen.py
 - [ ] 1.19 Test end-to-end: "Capitán" → acción ejecutada en HAOS
 
 #### Decisiones pendientes
@@ -493,7 +493,6 @@ El asistente responderá con:
 - acoustics parcheado para compatibilidad con scipy 1.17.1 / Python 3.13
 
 ### Pendiente decidir
-- Voz TTS para respuestas: es_MX-claude-high vs es_ES-davefx-medium
 - Latencia: ¿optimizar ahora o avanzar con la integración?
 - Hardware servidor: timing y presupuesto
 
