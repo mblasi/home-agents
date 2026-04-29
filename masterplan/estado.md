@@ -482,19 +482,31 @@ El asistente responderá con:
 - Voz TTS para respuestas: es_MX-claude-high vs es_ES-davefx-medium
 - Latencia: ¿optimizar ahora o avanzar con la integración?
 - Hardware servidor: timing y presupuesto
-```
 
 ---
 
-```zsh
-# Guardar el archivo
-mkdir -p ~/ai-lab/masterplan
-# Copiar el contenido de arriba a:
-# ~/ai-lab/masterplan/estado.md
+## ANEXO — ITERACIONES FUTURAS
 
-# Verificar
-wc -l ~/ai-lab/masterplan/estado.md
-echo "Master plan guardado"
-```
+Mejoras identificadas que no bloquean el plan actual pero vale la pena evaluar
+en fases posteriores. Cada ítem tiene issue abierto en GitHub para seguimiento.
 
-Cuando quieras retomar escribís **"retomamos el master plan"** y arrancamos desde el paso 1.9.
+### A.1 Evaluar migración a Home Assistant MCP Server
+
+**Contexto**: La integración actual con HAOS usa REST API con `entity_id` estáticos
+en el contexto del LLM. El MCP Server de HA (`homeassistant.io/integrations/mcp_server`)
+expone herramientas dinámicas (`list_entities`, `get_state`, `call_service`) que
+permitirían al agente descubrir entidades en tiempo real y consultar estado antes de actuar.
+
+**Por qué no ahora**: qwen2.5:7b vía Ollama no habla protocolo MCP nativamente.
+Requeriría un puente MCP client → tool calls de Ollama, añadiendo complejidad sin
+beneficio neto sobre lo que REST ya da.
+
+**Condiciones para reevaluar**:
+- Si Ollama incorpora soporte nativo MCP en alguna versión futura
+- Si la lista de entidades crece lo suficiente como para que el contexto estático
+  se vuelva un problema real
+- Si se necesita leer estado antes de actuar (ej: "apagá lo que esté prendido")
+
+**Restricción no negociable**: la solución debe correr 100% en LAN local, sin
+tráfico a internet. Cualquier implementación MCP debe usar modelos locales (Ollama
+u otro runtime local) como cliente MCP.
