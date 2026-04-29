@@ -67,7 +67,7 @@ Cash out mensual a proveedores vía Stripe Connect.
 
 ## Relación con home-agents
 
-El proyecto home-agents (`~/ai-lab`) es el nodo de referencia:
+El proyecto home-agents (`~/workspace/home-agents`) es el nodo de referencia:
 - La FASE 3 (orquestador FastAPI) se convierte en la base del SDK
 - El agente de clima publica `weather.forecast.v1` como primer servicio real
 - Sirve como caso de estudio para la documentación de onboarding

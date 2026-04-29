@@ -29,11 +29,11 @@ Toda la inferencia corre en CPU con cuantización int8. No intentar usar la GPU.
 ## Entorno Python
 
 ```zsh
-source ~/ai-env/bin/activate   # siempre activar antes de correr cualquier script
+source ~/home-agents-env/bin/activate   # siempre activar antes de correr cualquier script
 ```
 
 - Python 3.13.12, pip 26.0.1, uv 0.11.8
-- El venv está en `~/ai-env`, NO en el repo
+- El venv está en `~/home-agents-env`, NO en el repo
 - `pyyaml` está instalado en el venv
 
 ## Audio — restricciones críticas
@@ -82,9 +82,9 @@ Sample rate: 22050Hz
 
 ### openWakeWord
 ```
-Repo:   ~/ai-lab/ear/wakeword/openWakeWord/
-Data:   ~/ai-lab/ear/wakeword/data/capitán/positive/  (90 samples WAV, voz daniela)
-        ~/ai-lab/ear/wakeword/data/capitán/negative/
+Repo:   ~/workspace/home-agents/ear/wakeword/openWakeWord/
+Data:   ~/workspace/home-agents/ear/wakeword/data/capitán/positive/  (90 samples WAV, voz daniela)
+        ~/workspace/home-agents/ear/wakeword/data/capitán/negative/
 Wake word objetivo: "Capitán"
 ```
 
@@ -153,14 +153,14 @@ CORE_TIMEOUT=30
 
 ```zsh
 # Activar entorno
-source ~/ai-env/bin/activate
+source ~/home-agents-env/bin/activate
 
 # Correr el core (debe estar antes que ear)
-cd ~/ai-lab/core
+cd ~/workspace/home-agents/core
 uvicorn server:app --host 127.0.0.1 --port 8765
 
 # Correr el agente (pipeline completo)
-bash ~/ai-lab/ear/dashboard.sh          # dashboard interactivo
+bash ~/workspace/home-agents/ear/dashboard.sh          # dashboard interactivo
 systemctl --user start capitan-core     # core como servicio
 systemctl --user start capitan          # ear como servicio
 systemctl --user stop capitan-core
@@ -175,13 +175,13 @@ curl -X POST http://localhost:8765/process \
   -d '{"text":"prende la luz"}'
 
 # Debug wake word scores en tiempo real
-python ~/ai-lab/ear/wakeword/debug_scores.py
+python ~/workspace/home-agents/ear/wakeword/debug_scores.py
 
 # Test TTS
-python ~/ai-lab/ear/tts.py
+python ~/workspace/home-agents/ear/tts.py
 
 # Test parser LLM + HA (directo, sin servidor)
-python ~/ai-lab/core/agent.py
+python ~/workspace/home-agents/core/agent.py
 
 # Sync issues con GitHub
 python scripts/sync_issues.py

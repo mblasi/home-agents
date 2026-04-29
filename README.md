@@ -127,22 +127,22 @@ home-agents/
 
 ```zsh
 # Clone with submodules
-git clone --recurse-submodules git@github.com:mblasi/home-agents.git ~/ai-lab
+git clone --recurse-submodules git@github.com:mblasi/home-agents.git ~/workspace/home-agents
 
 # Configure credentials
-cp ~/ai-lab/core/.env.example ~/ai-lab/core/.env   # add HAOS_URL + HAOS_TOKEN
-cp ~/ai-lab/ear/.env.example  ~/ai-lab/ear/.env    # set CORE_URL=http://localhost:8765
+cp ~/workspace/home-agents/core/.env.example ~/workspace/home-agents/core/.env   # add HAOS_URL + HAOS_TOKEN
+cp ~/workspace/home-agents/ear/.env.example  ~/workspace/home-agents/ear/.env    # set CORE_URL=http://localhost:8765
 
 # Activate Python environment
-source ~/ai-env/bin/activate
+source ~/home-agents-env/bin/activate
 
 # Start core, then ear
 systemctl --user start capitan-core
 systemctl --user start capitan
 
 # Or interactively with dashboard
-cd ~/ai-lab/core && uvicorn server:app --host 127.0.0.1 --port 8765
-bash ~/ai-lab/ear/dashboard.sh
+cd ~/workspace/home-agents/core && uvicorn server:app --host 127.0.0.1 --port 8765
+bash ~/workspace/home-agents/ear/dashboard.sh
 ```
 
 See [`ear/`](ear/) and [`core/`](core/) for detailed setup of each component.

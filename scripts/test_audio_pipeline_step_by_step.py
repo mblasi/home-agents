@@ -1,4 +1,4 @@
-# ~/ai-lab/scripts/test_audio_step_by_step.py
+# ~/workspace/home-agents/scripts/test_audio_step_by_step.py
 
 import subprocess
 import sys

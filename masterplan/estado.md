@@ -29,7 +29,7 @@ Micrófono:  ALC256 Analog (hw:1,0) - soporta 44100Hz y 48000Hz
 
 ### Python Environment
 ```
-Ubicación:  ~/ai-env (venv, activar con: source ~/ai-env/bin/activate)
+Ubicación:  ~/home-agents-env (venv, activar con: source ~/home-agents-env/bin/activate)
 Gestor:     pip 26.0.1 + uv 0.11.8 (instalado en root, pendiente en matias)
 
 Paquetes instalados:
@@ -138,17 +138,17 @@ Entity IDs relevantes:
 
 ### openWakeWord Training
 ```
-Repo:       ~/ai-lab/ear/wakeword/openWakeWord/
-Scripts:    ~/ai-lab/ear/wakeword/generate_samples.py
-            ~/ai-lab/ear/wakeword/generate_samples_multi.py
-Data:       ~/ai-lab/ear/wakeword/data/capitán/positive/  (90 samples, 1 voz)
-            ~/ai-lab/ear/wakeword/data/capitán/negative/  (pendiente)
+Repo:       ~/workspace/home-agents/ear/wakeword/openWakeWord/
+Scripts:    ~/workspace/home-agents/ear/wakeword/generate_samples.py
+            ~/workspace/home-agents/ear/wakeword/generate_samples_multi.py
+Data:       ~/workspace/home-agents/ear/wakeword/data/capitán/positive/  (90 samples, 1 voz)
+            ~/workspace/home-agents/ear/wakeword/data/capitán/negative/  (pendiente)
 Parche:     acoustics/directivity.py: sph_harm → sph_harm_y (scipy compat)
 ```
 
 ### Estructura de directorios
 ```
-~/ai-lab/                         ← home-agents (repo umbrella)
+~/workspace/home-agents/                         ← home-agents (repo umbrella)
 ├── ear/                          ← submodule: home-agents-ear
 │   ├── listen.py                 wake word → STT → HTTP/core → TTS
 │   ├── tts.py                    Piper TTS → ffplay
@@ -526,7 +526,7 @@ Total (cold):      ~15.7s
 ## COMANDOS DE USO FRECUENTE
 ```zsh
 # Activar entorno
-source ~/ai-env/bin/activate
+source ~/home-agents-env/bin/activate
 
 # Iniciar sistema completo (recomendado)
 systemctl --user start capitan-core   # 1. core primero
@@ -534,8 +534,8 @@ systemctl --user start capitan        # 2. ear después
 curl http://localhost:8765/health     # verificar
 
 # Dashboard interactivo (alternativa a systemd)
-cd ~/ai-lab/core && uvicorn server:app --host 127.0.0.1 --port 8765
-bash ~/ai-lab/ear/dashboard.sh
+cd ~/workspace/home-agents/core && uvicorn server:app --host 127.0.0.1 --port 8765
+bash ~/workspace/home-agents/ear/dashboard.sh
 
 # Logs
 journalctl --user -u capitan-core -f
@@ -547,22 +547,22 @@ curl -X POST http://localhost:8765/process \
   -d '{"text":"prende la luz"}'
 
 # Test TTS
-python ~/ai-lab/ear/tts.py
+python ~/workspace/home-agents/ear/tts.py
 
 # Test parser LLM + HA (sin servidor)
-python ~/ai-lab/core/agent.py
+python ~/workspace/home-agents/core/agent.py
 
 # Debug wake word scores en tiempo real
-python ~/ai-lab/ear/wakeword/debug_scores.py
+python ~/workspace/home-agents/ear/wakeword/debug_scores.py
 
 # Generar samples de wake word
-python ~/ai-lab/ear/wakeword/generate_samples_multi.py
+python ~/workspace/home-agents/ear/wakeword/generate_samples_multi.py
 
 # Sync issues con GitHub
-python ~/ai-lab/scripts/sync_issues.py
+python ~/workspace/home-agents/scripts/sync_issues.py
 
 # Actualizar submodules
-git -C ~/ai-lab submodule update --remote
+git -C ~/workspace/home-agents submodule update --remote
 ```
 
 ---
