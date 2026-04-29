@@ -1,6 +1,6 @@
 # Master Plan - Red de Agentes Locales
 # Matías Blasi | matias@blasi.ar
-# Última actualización: 2026-04-27
+# Última actualización: 2026-04-29
 
 ---
 
@@ -138,32 +138,38 @@ Entity IDs relevantes:
 
 ### openWakeWord Training
 ```
-Repo:       ~/ai-lab/wakeword/openWakeWord/
-Scripts:    ~/ai-lab/wakeword/generate_samples.py
-            ~/ai-lab/wakeword/generate_samples_multi.py
-Data:       ~/ai-lab/wakeword/data/capitán/positive/  (90 samples, 1 voz)
-            ~/ai-lab/wakeword/data/capitán/negative/  (pendiente)
+Repo:       ~/ai-lab/ear/wakeword/openWakeWord/
+Scripts:    ~/ai-lab/ear/wakeword/generate_samples.py
+            ~/ai-lab/ear/wakeword/generate_samples_multi.py
+Data:       ~/ai-lab/ear/wakeword/data/capitán/positive/  (90 samples, 1 voz)
+            ~/ai-lab/ear/wakeword/data/capitán/negative/  (pendiente)
 Parche:     acoustics/directivity.py: sph_harm → sph_harm_y (scipy compat)
 ```
 
 ### Estructura de directorios
 ```
-~/ai-lab/
+~/ai-lab/                         ← home-agents (repo umbrella)
+├── ear/                          ← submodule: home-agents-ear
+│   ├── listen.py                 wake word → STT → HTTP/core → TTS
+│   ├── tts.py                    Piper TTS → ffplay
+│   ├── panel_*.py                paneles Rich para zellij dashboard
+│   ├── dashboard.sh/kdl          lanzador del dashboard
+│   ├── run.sh / capitan.service  systemd service
+│   └── wakeword/
+│       ├── openWakeWord/         submodule del repo externo
+│       ├── data/capitán/positive/ (90 samples WAV)
+│       └── data/capitán/negative/
+├── core/                         ← submodule: home-agents-core
+│   ├── server.py                 FastAPI en :8765
+│   ├── agent.py                  texto → LLM → ACTION → HAOS
+│   ├── agent_registry.py         dispatcher + registry de agentes
+│   ├── ha_client.py              cliente REST HAOS + mapa de entidades
+│   └── capitan-core.service      systemd service
 ├── masterplan/
-│   └── estado.md           ← este archivo
-├── wakeword/
-│   ├── openWakeWord/       ← repo clonado
-│   ├── data/
-│   │   └── capitán/
-│   │       ├── positive/   ← 90 samples WAV generados
-│   │       └── negative/   ← pendiente
-│   ├── generate_samples.py
-│   └── generate_samples_multi.py
-├── models/                 ← modelos GGUF (pendiente poblar)
+│   └── estado.md                 ← este archivo
 ├── scripts/
-│   └── ollama_benchmark.py
-├── ha-bridge/              ← código del servidor principal
-└── logs/
+│   └── sync_issues.py
+└── interagent/                   concepto del producto (no ejecutable)
 
 ~/.cache/
 └── whisper/                ← modelos de faster-whisper (HuggingFace cache)
@@ -207,6 +213,7 @@ Estado:   EN CURSO (~70% completo)
 - [x] 1.19 Test end-to-end: "Capitán" → acción ejecutada en HAOS → confirmación por voz ✓
 - [x] 1.20 Servicio systemd para el agente → capitan.service (user), start/stop manual con systemctl --user
 - [x] 1.21 Dashboard zellij para el agente → dashboard.sh, 4 paneles: score animado, historial, latencias, logs
+- [x] 1.22 Modularización en submodules → ear (audio/UI) + core (FastAPI :8765, LLM, HAOS); comunicación via HTTP POST /process
 
 #### Decisiones pendientes
 - [x] Voz TTS respuesta: es_AR-daniela-high.onnx (única voz argentina disponible en Piper)
@@ -418,11 +425,16 @@ Total estimado:               ~2-3s        (vs 8s actual warm)
 ## PIPELINE ACTUAL (para referencia rápida)
 
 ```
+[ear/listen.py]
 [MIC hw:1,0 44100Hz]
         ↓
 [resampleo scipy: up=160, down=441 → 16000Hz]
         ↓
 [faster-whisper small, int8, CPU]  ~4.6s
+        ↓
+[HTTP POST localhost:8765/process]  ~10ms overhead
+        ↓
+[core/server.py — FastAPI]
         ↓
 [qwen2.5:7b via Ollama :11434]     ~3.5s
         ↓
@@ -430,7 +442,9 @@ Total estimado:               ~2-3s        (vs 8s actual warm)
         ↓
 [HAOS REST API :8123]
         ↓
-[Piper TTS respuesta]
+[ear/listen.py]
+        ↓
+[Piper TTS respuesta → ffplay]
 ```
 
 ## LATENCIAS ACTUALES
@@ -447,24 +461,41 @@ Total (cold):      ~15.7s
 # Activar entorno
 source ~/ai-env/bin/activate
 
-# Iniciar Ollama (si no está corriendo)
-ollama serve &
+# Iniciar sistema completo (recomendado)
+systemctl --user start capitan-core   # 1. core primero
+systemctl --user start capitan        # 2. ear después
+curl http://localhost:8765/health     # verificar
 
-# Ver modelos disponibles
-ollama list
+# Dashboard interactivo (alternativa a systemd)
+cd ~/ai-lab/core && uvicorn server:app --host 127.0.0.1 --port 8765
+bash ~/ai-lab/ear/dashboard.sh
 
-# Test rápido del pipeline STT
-python ~/ai-lab/scripts/test_stt.py
+# Logs
+journalctl --user -u capitan-core -f
+journalctl --user -u capitan -f
 
-# Monitor de recursos
-python ~/ai-lab/scripts/monitor.py
+# Test directo del core (sin ear)
+curl -X POST http://localhost:8765/process \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"prende la luz"}'
+
+# Test TTS
+python ~/ai-lab/ear/tts.py
+
+# Test parser LLM + HA (sin servidor)
+python ~/ai-lab/core/agent.py
+
+# Debug wake word scores en tiempo real
+python ~/ai-lab/ear/wakeword/debug_scores.py
 
 # Generar samples de wake word
-python ~/ai-lab/wakeword/generate_samples_multi.py
+python ~/ai-lab/ear/wakeword/generate_samples_multi.py
 
-# Training wake word (cuando estén los negativos)
-cd ~/ai-lab/wakeword/openWakeWord
-python -m openwakeword.train --config ~/ai-lab/wakeword/config.yaml
+# Sync issues con GitHub
+python ~/ai-lab/scripts/sync_issues.py
+
+# Actualizar submodules
+git -C ~/ai-lab submodule update --remote
 ```
 
 ---
