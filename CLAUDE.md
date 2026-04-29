@@ -82,9 +82,9 @@ Sample rate: 22050Hz
 
 ### openWakeWord
 ```
-Repo:   ~/ai-lab/wakeword/openWakeWord/
-Data:   ~/ai-lab/wakeword/data/capitán/positive/  (90 samples WAV, voz daniela)
-        ~/ai-lab/wakeword/data/capitán/negative/  (pendiente)
+Repo:   ~/ai-lab/ear/wakeword/openWakeWord/
+Data:   ~/ai-lab/ear/wakeword/data/capitán/positive/  (90 samples WAV, voz daniela)
+        ~/ai-lab/ear/wakeword/data/capitán/negative/
 Wake word objetivo: "Capitán"
 ```
 
@@ -97,42 +97,56 @@ Parche aplicado (no revertir):
 Acceso:    http://192.168.68.101:8123
 Estrategia: HAOS solo recibe órdenes via REST API
             Todo el procesamiento (STT/LLM/TTS) corre en la laptop
-Token:     en .env (excluido del repo)
-Cliente:   ha-bridge/ha_client.py — get_state / call_service / ENTITIES map
+Token:     en core/.env (excluido del repo)
+Cliente:   core/ha_client.py — get_state / call_service / ENTITIES map
 ```
 
 ## Estructura del repo
 
 ```
-masterplan/
-  estado.md        plan completo con estado, latencias y decisiones
-  issues.yaml      mapeo task_id → GitHub issue number
+home-agents/              ← repo umbrella (este repo)
+├── ear/                  ← submodule: github.com/mblasi/home-agents-ear
+│   ├── listen.py         loop principal: wake word → STT → HTTP/core → TTS
+│   ├── tts.py            Piper TTS → ffplay (voz daniela)
+│   ├── panel_*.py        paneles Rich para zellij dashboard
+│   ├── dashboard.sh/kdl  lanzador del dashboard interactivo
+│   ├── run.sh            wrapper para systemd
+│   ├── capitan.service   unit file (instalar en ~/.config/systemd/user/)
+│   └── wakeword/         datos de training y submodule openWakeWord
+│
+├── core/                 ← submodule: github.com/mblasi/home-agents-core
+│   ├── server.py         FastAPI en :8765 — POST /process, GET /agents, GET /health
+│   ├── agent.py          texto → qwen2.5:7b → parse ACTION → ha_client
+│   ├── agent_registry.py dispatcher + REGISTRY de agentes
+│   ├── ha_client.py      cliente REST HAOS + mapa de entidades
+│   └── capitan-core.service  unit file para el servidor
+│
+├── masterplan/
+│   ├── estado.md         plan completo con estado, latencias y decisiones
+│   └── issues.yaml       mapeo task_id → GitHub issue number
+│
+├── scripts/
+│   └── sync_issues.py    sincroniza estado.md con GitHub issues
+│
+└── interagent/           concepto del producto Interagent (red de redes de agentes)
+```
 
-wakeword/
-  openWakeWord/    repo clonado
-  data/capitán/    samples de training
-  generate_samples.py
-  generate_samples_multi.py
+## Configuración (.env)
 
-scripts/
-  sync_issues.py          sincroniza estado.md con GitHub issues
-  test_audio_pipeline.py  prueba cada componente de audio
+Cada submodule tiene su propio `.env` (gitignored):
 
-ha-bridge/
-  listen.py        loop principal: wake word → STT → LLM → HA → TTS
-  agent.py         texto → qwen2.5:7b → parse ACTION → ha_client
-  ha_client.py     cliente REST HAOS + mapa de entidades
-  tts.py           Piper TTS → ffplay (voz daniela)
-  run.sh           wrapper para systemd (reconstruye entorno)
-  capitan.service  unit file (instalar en ~/.config/systemd/user/)
-models/            modelos GGUF (pendiente poblar)
-logs/
+**`core/.env`**:
+```
+HAOS_URL=http://192.168.68.101:8123
+HAOS_TOKEN=eyJ...
+OLLAMA_URL=http://localhost:11434
+CORE_PORT=8765
+```
 
-interagent/        concepto del producto Interagent (red de redes de agentes)
-  CONCEPT.md
-  protocol/
-  sdk/
-  monetization/
+**`ear/.env`**:
+```
+CORE_URL=http://localhost:8765
+CORE_TIMEOUT=30
 ```
 
 ## Comandos frecuentes
@@ -141,44 +155,58 @@ interagent/        concepto del producto Interagent (red de redes de agentes)
 # Activar entorno
 source ~/ai-env/bin/activate
 
+# Correr el core (debe estar antes que ear)
+cd ~/ai-lab/core
+uvicorn server:app --host 127.0.0.1 --port 8765
+
 # Correr el agente (pipeline completo)
-python ha-bridge/listen.py        # terminal directo
-systemctl --user start capitan    # via servicio (requiere audio group)
+bash ~/ai-lab/ear/dashboard.sh          # dashboard interactivo
+systemctl --user start capitan-core     # core como servicio
+systemctl --user start capitan          # ear como servicio
+systemctl --user stop capitan-core
 systemctl --user stop capitan
-systemctl --user status capitan
-journalctl --user -u capitan -f   # logs en tiempo real
+journalctl --user -u capitan -f         # logs ear
+journalctl --user -u capitan-core -f    # logs core
+
+# Test del core
+curl http://localhost:8765/health
+curl -X POST http://localhost:8765/process \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"prende la luz"}'
 
 # Debug wake word scores en tiempo real
-python wakeword/debug_scores.py
+python ~/ai-lab/ear/wakeword/debug_scores.py
 
 # Test TTS
-python ha-bridge/tts.py
+python ~/ai-lab/ear/tts.py
 
-# Test parser LLM + HA
-python ha-bridge/agent.py
-
-# Ollama
-ollama serve &
-ollama list
+# Test parser LLM + HA (directo, sin servidor)
+python ~/ai-lab/core/agent.py
 
 # Sync issues con GitHub
 python scripts/sync_issues.py
+
+# Actualizar submodules
+git submodule update --remote
 ```
 
 ## Pipeline actual
 
 ```
-[MIC hw:1,0 44100Hz]
+[MIC hw:1,0 44100Hz]          ← ear/listen.py
     ↓ scipy resample_poly up=160 down=441
 [16000Hz]
     ↓ faster-whisper small int8 cpu          ~4.6s
 [texto]
+    ↓ HTTP POST :8765/process              ~10ms overhead
+[core/server.py]
     ↓ qwen2.5:7b Ollama :11434               ~3.5s
 [ACTION: domain.service | entity_id: X]
     ↓ parser
 [HAOS REST API :8123]
-    ↓
-[Piper TTS respuesta → ffplay]
+    ↓ HTTP response
+[ear/listen.py]
+    ↓ Piper TTS respuesta → ffplay
 
 Latencia warm: ~8s | Latencia cold: ~15.7s
 ```
@@ -192,3 +220,4 @@ Latencia warm: ~8s | Latencia cold: ~15.7s
 - Arquitectura: todo en laptop, HAOS solo recibe REST
 - Resampling: scipy.signal.resample_poly (no librosa, más rápido)
 - Voz TTS: es_AR-daniela-high (claude y davefx descartadas)
+- Comunicación ear↔core: HTTP REST en localhost:8765 (no IPC — permite múltiples ears)

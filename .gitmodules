@@ -1,3 +1,6 @@
-[submodule "wakeword/openWakeWord"]
-	path = wakeword/openWakeWord
-	url = https://github.com/dscripka/openWakeWord.git
+[submodule "core"]
+	path = core
+	url = git@github.com:mblasi/home-agents-core.git
+[submodule "ear"]
+	path = ear
+	url = git@github.com:mblasi/home-agents-ear.git
