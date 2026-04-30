@@ -7,12 +7,6 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script>tailwind.config = { darkMode: 'class' }</script>
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
-  <style>
-    .nav-link { @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors text-sm font-medium; }
-    .nav-link.active { @apply bg-gray-800 text-white; }
-    .badge-ok  { @apply inline-flex items-center gap-1 text-xs font-medium text-emerald-400; }
-    .badge-err { @apply inline-flex items-center gap-1 text-xs font-medium text-red-400; }
-  </style>
 </head>
 <body class="h-full text-gray-100 flex">
 
@@ -29,32 +23,35 @@
       <div class="text-gray-500">cargando…</div>
     </div>
 
-    <nav class="flex-1 px-3 py-3 overflow-y-auto space-y-5">
+    {% set link_base = "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-gray-400 hover:text-white hover:bg-gray-800" %}
+    {% set link_active = "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors bg-gray-800 text-white" %}
+
+    <nav class="flex-1 px-3 py-4 overflow-y-auto space-y-6">
 
       <!-- Monitoreo -->
-      <div class="space-y-1.5">
-        <p class="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-gray-600">Monitoreo</p>
-        <a href="/dashboard"     class="nav-link {% if section == 'dashboard'     %}active{% endif %}">📊 Dashboard</a>
-        <a href="/stats"         class="nav-link {% if section == 'stats'         %}active{% endif %}">📈 Estadísticas</a>
-        <a href="/alerts"        class="nav-link {% if section == 'alerts'        %}active{% endif %}">🔔 Alertas</a>
-        <a href="/logs"          class="nav-link {% if section == 'logs'          %}active{% endif %}">📋 Logs</a>
+      <div class="flex flex-col gap-1">
+        <p class="px-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-gray-600">Monitoreo</p>
+        <a href="/dashboard"    class="{{ link_active if section == 'dashboard'    else link_base }}">📊 Dashboard</a>
+        <a href="/stats"        class="{{ link_active if section == 'stats'        else link_base }}">📈 Estadísticas</a>
+        <a href="/alerts"       class="{{ link_active if section == 'alerts'       else link_base }}">🔔 Alertas</a>
+        <a href="/logs"         class="{{ link_active if section == 'logs'         else link_base }}">📋 Logs</a>
       </div>
 
       <!-- Sistema -->
-      <div class="space-y-1.5">
-        <p class="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-gray-600">Sistema</p>
-        <a href="/agents"        class="nav-link {% if section == 'agents'        %}active{% endif %}">🤖 Agentes</a>
-        <a href="/conversations" class="nav-link {% if section == 'conversations' %}active{% endif %}">💬 Conversaciones</a>
-        <a href="/shared-state"  class="nav-link {% if section == 'shared-state'  %}active{% endif %}">🔗 Shared State</a>
+      <div class="flex flex-col gap-1">
+        <p class="px-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-gray-600">Sistema</p>
+        <a href="/agents"       class="{{ link_active if section == 'agents'       else link_base }}">🤖 Agentes</a>
+        <a href="/conversations"class="{{ link_active if section == 'conversations'else link_base }}">💬 Conversaciones</a>
+        <a href="/shared-state" class="{{ link_active if section == 'shared-state' else link_base }}">🔗 Shared State</a>
       </div>
 
       <!-- Configuración -->
-      <div class="space-y-1.5">
-        <p class="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-gray-600">Configuración</p>
-        <a href="/users"         class="nav-link {% if section == 'users'         %}active{% endif %}">👥 Usuarios</a>
-        <a href="/devices"       class="nav-link {% if section == 'devices'       %}active{% endif %}">📡 Dispositivos</a>
-        <a href="/integrations"  class="nav-link {% if section == 'integrations'  %}active{% endif %}">🔌 Integraciones</a>
-        <a href="/config"        class="nav-link {% if section == 'config'        %}active{% endif %}">⚙️ Config (.env)</a>
+      <div class="flex flex-col gap-1">
+        <p class="px-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-gray-600">Configuración</p>
+        <a href="/users"        class="{{ link_active if section == 'users'        else link_base }}">👥 Usuarios</a>
+        <a href="/devices"      class="{{ link_active if section == 'devices'      else link_base }}">📡 Dispositivos</a>
+        <a href="/integrations" class="{{ link_active if section == 'integrations' else link_base }}">🔌 Integraciones</a>
+        <a href="/config"       class="{{ link_active if section == 'config'       else link_base }}">⚙️ Config (.env)</a>
       </div>
 
     </nav>
