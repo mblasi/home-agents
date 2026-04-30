@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Logs{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-4">
+  <h1 class="text-2xl font-bold">Logs en tiempo real</h1>
+  <!-- Filtro por servicio -->
+  <div class="flex gap-2" id="filter-btns">
+    {% for s, label in [("all", "Todos"), ("core", "Core"), ("ear", "Ear"), ("backoffice", "Backoffice")] %}
+    <button onclick="setFilter('{{ s }}')"
+            id="btn-{{ s }}"
+            class="text-xs px-3 py-1.5 rounded-lg border transition-colors border-gray-700 text-gray-400 hover:text-white">
+      {{ label }}
+    </button>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="bg-gray-950 border border-gray-800 rounded-xl p-4 h-[calc(100vh-220px)] overflow-y-auto font-mono text-xs"
+     id="log-container">
+  <div class="text-gray-600">Conectando…</div>
+</div>
+
+<script>
+let evtSource = null;
+let currentFilter = 'all';
+
+function setFilter(filter) {
+  currentFilter = filter;
+  document.querySelectorAll('[id^="btn-"]').forEach(b => {
+    b.classList.remove('bg-gray-700', 'text-white');
+    b.classList.add('text-gray-400');
+  });
+  const btn = document.getElementById('btn-' + filter);
+  if (btn) {
+    btn.classList.add('bg-gray-700', 'text-white');
+    btn.classList.remove('text-gray-400');
+  }
+  startStream(filter);
+}
+
+function startStream(filter) {
+  if (evtSource) evtSource.close();
+  const container = document.getElementById('log-container');
+  container.innerHTML = '<div class="text-gray-600">Conectando a journalctl…</div>';
+
+  evtSource = new EventSource('/logs/stream?service=' + filter);
+  evtSource.onmessage = function(e) {
+    const div = document.createElement('div');
+    div.innerHTML = e.data;
+    container.appendChild(div.firstChild);
+    container.scrollTop = container.scrollHeight;
+  };
+  evtSource.onerror = function() {
+    const div = document.createElement('div');
+    div.className = 'text-red-400';
+    div.textContent = '— stream desconectado —';
+    container.appendChild(div);
+  };
+}
+
+// Iniciar con "all" activo
+setFilter('all');
+</script>
+{% endblock %}

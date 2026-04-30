@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Conversaciones{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-bold">Conversaciones</h1>
+  <!-- Filtro por estado -->
+  <div class="flex gap-2">
+    {% for s, label in [("all", "Todas"), ("active", "Activas"), ("closed", "Cerradas"), ("expired", "Expiradas")] %}
+    <a href="/conversations?status={{ s }}"
+       class="text-xs px-3 py-1.5 rounded-lg border transition-colors
+              {% if status_filter == s %}bg-gray-700 border-gray-600 text-white
+              {% else %}border-gray-800 text-gray-500 hover:text-white{% endif %}">
+      {{ label }}
+    </a>
+    {% endfor %}
+  </div>
+</div>
+
+{% if convs %}
+<div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="border-b border-gray-800 text-gray-400 text-xs uppercase tracking-wider">
+        <th class="px-4 py-3 text-left">ID</th>
+        <th class="px-4 py-3 text-left">Fuente</th>
+        <th class="px-4 py-3 text-center">Turnos</th>
+        <th class="px-4 py-3 text-center">Estado</th>
+        <th class="px-4 py-3 text-right">Última actividad</th>
+        <th class="px-4 py-3 w-16"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-800">
+      {% for c in convs %}
+      <tr id="conv-{{ c.id }}" class="hover:bg-gray-800/50">
+        <td class="px-4 py-3 font-mono text-xs text-gray-400">{{ c.id }}</td>
+        <td class="px-4 py-3 text-xs text-gray-300 max-w-xs truncate">{{ c.source_key }}</td>
+        <td class="px-4 py-3 text-center text-gray-300">{{ c.turns }}</td>
+        <td class="px-4 py-3 text-center">
+          {% if c.state == "active" %}
+          <span class="px-2 py-0.5 bg-emerald-900/50 text-emerald-400 rounded text-xs">activa</span>
+          {% elif c.state == "expired" %}
+          <span class="px-2 py-0.5 bg-yellow-900/50 text-yellow-400 rounded text-xs">expirada</span>
+          {% else %}
+          <span class="px-2 py-0.5 bg-gray-800 text-gray-500 rounded text-xs">cerrada</span>
+          {% endif %}
+        </td>
+        <td class="px-4 py-3 text-right text-xs text-gray-500">
+          {{ c.updated_at | int }}
+        </td>
+        <td class="px-4 py-3 text-center">
+          {% if c.state == "active" %}
+          <button class="text-gray-600 hover:text-red-400 text-xs transition-colors"
+                  hx-delete="/conversations/{{ c.id }}"
+                  hx-target="#conv-{{ c.id }}"
+                  hx-swap="outerHTML">
+            ✕
+          </button>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="text-center py-16 text-gray-600">
+  <p class="text-4xl mb-3">💬</p>
+  <p>Sin conversaciones{% if status_filter != 'all' %} con estado "{{ status_filter }}"{% endif %}</p>
+</div>
+{% endif %}
+{% endblock %}

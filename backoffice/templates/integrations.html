@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Integraciones{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">Integraciones</h1>
+
+<!-- Estado de servicios externos -->
+<div class="grid grid-cols-2 gap-4 mb-6">
+  <!-- HAOS -->
+  <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-sm font-semibold text-gray-300">Home Assistant</h2>
+      <span class="text-lg">{{ "🟢" if health.get("haos") else "🔴" }}</span>
+    </div>
+    <div class="text-xs text-gray-500 space-y-1">
+      <div>Estado: <span class="{{ 'text-emerald-400' if health.get('haos') else 'text-red-400' }}">
+        {{ "online" if health.get("haos") else "offline" }}
+      </span></div>
+      <div>URL: <code class="text-gray-400">192.168.68.101:8123</code></div>
+    </div>
+  </div>
+
+  <!-- Ollama -->
+  <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-sm font-semibold text-gray-300">Ollama</h2>
+      <span class="text-lg">{{ "🟢" if health.get("ollama") else "🔴" }}</span>
+    </div>
+    <div class="text-xs text-gray-500 space-y-1">
+      <div>Estado: <span class="{{ 'text-emerald-400' if health.get('ollama') else 'text-red-400' }}">
+        {{ "online" if health.get("ollama") else "offline" }}
+      </span></div>
+      <div>URL: <code class="text-gray-400">localhost:11434</code></div>
+    </div>
+    {% if ollama_models %}
+    <div class="mt-3 pt-3 border-t border-gray-800">
+      <div class="text-xs text-gray-500 mb-2">Modelos cargados:</div>
+      <div class="flex flex-wrap gap-1">
+        {% for m in ollama_models %}
+        <span class="px-2 py-0.5 bg-gray-800 text-gray-300 rounded text-xs font-mono">{{ m }}</span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Entity IDs mapeados en ha_client -->
+<div class="bg-gray-900 border border-gray-800 rounded-xl p-4 mb-6">
+  <h2 class="text-sm font-semibold text-gray-400 mb-3">Entity IDs mapeados</h2>
+  <div class="grid grid-cols-2 gap-x-8 gap-y-1">
+    {% set entities = [
+      ("luz principal",         "light.wiz_rgbw_tunable_1fdbc2"),
+      ("aire acondicionado",    "climate.midea_ac_150633093419021"),
+      ("persiana / toldo",      "cover.tze200_nhyj64w2_ts0601"),
+      ("luz garaje",            "switch.garaje_light"),
+      ("luz patio",             "switch.patio_light"),
+      ("luz puerta principal",  "switch.puerta_principal_light"),
+      ("pava",                  "switch.mi_smart_kettle_pro"),
+      ("freidora",              "switch.mi_smart_air_fryer_3_5l"),
+      ("válvula agua",          "switch.agua_principal_valvula_de_cierre"),
+      ("TV principal (65\")",   "media_player.samsung_q8_65_tv"),
+      ("TV cuarto (50\")",      "media_player.samsung_7_series_50"),
+      ("Echo de Matías",        "media_player.echo_de_matias"),
+    ] %}
+    {% for name, eid in entities %}
+    <div class="flex gap-2 text-xs py-1">
+      <span class="text-gray-400 w-40 shrink-0">{{ name }}</span>
+      <code class="text-blue-300 truncate">{{ eid }}</code>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Agentes registrados -->
+<div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+  <h2 class="text-sm font-semibold text-gray-400 mb-3">Agentes en el registry</h2>
+  <div class="flex flex-wrap gap-2">
+    {% for aid, info in agents.items() %}
+    <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 text-sm">
+      <span>{{ info.icon }}</span>
+      <span class="text-gray-300">{{ info.name }}</span>
+      <span class="text-xs {% if info.status == 'active' %}text-emerald-400{% else %}text-gray-600{% endif %}">
+        {{ info.status }}
+      </span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

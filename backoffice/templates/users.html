@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Usuarios{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">Usuarios</h1>
+
+{% if users %}
+<div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="border-b border-gray-800 text-gray-400 text-xs uppercase tracking-wider">
+        <th class="px-4 py-3 text-left">Usuario</th>
+        <th class="px-4 py-3 text-left">Rol</th>
+        <th class="px-4 py-3 text-left">Relación</th>
+        <th class="px-4 py-3 text-center">Speaker</th>
+        <th class="px-4 py-3 text-right">Registrado</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-800">
+      {% for uid, u in users.items() %}
+      <tr class="hover:bg-gray-800/50">
+        <td class="px-4 py-3">
+          <div class="font-medium">{{ u.name }}</div>
+          <div class="text-xs text-gray-500 font-mono">{{ uid }}</div>
+        </td>
+        <td class="px-4 py-3">
+          {% if u.role == "admin" %}
+          <span class="px-2 py-0.5 bg-purple-900/50 text-purple-400 rounded text-xs">{{ u.role }}</span>
+          {% elif u.role == "familiar" %}
+          <span class="px-2 py-0.5 bg-blue-900/50 text-blue-400 rounded text-xs">{{ u.role }}</span>
+          {% elif u.role == "niño" %}
+          <span class="px-2 py-0.5 bg-green-900/50 text-green-400 rounded text-xs">{{ u.role }}</span>
+          {% else %}
+          <span class="px-2 py-0.5 bg-gray-800 text-gray-400 rounded text-xs">{{ u.role }}</span>
+          {% endif %}
+        </td>
+        <td class="px-4 py-3 text-gray-300">{{ u.relationship }}</td>
+        <td class="px-4 py-3 text-center">
+          {% if u.has_embedding %}
+          <span class="text-emerald-400 text-base" title="Modelo de voz entrenado">✓</span>
+          {% else %}
+          <span class="text-gray-600 text-base" title="Sin modelo de voz">—</span>
+          {% endif %}
+        </td>
+        <td class="px-4 py-3 text-right text-xs text-gray-500">
+          {{ u.created_at | int }}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="text-center py-16 text-gray-600">
+  <p class="text-4xl mb-3">👥</p>
+  <p>Sin usuarios registrados</p>
+  <p class="text-xs mt-2">Registrate con "Capitán, registrarme" por voz</p>
+</div>
+{% endif %}
+{% endblock %}

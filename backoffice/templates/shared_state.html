@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Shared State{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-bold">Shared State</h1>
+  <button class="text-xs text-gray-400 hover:text-white px-3 py-1.5 border border-gray-700 rounded-lg"
+          hx-get="/shared-state" hx-target="body" hx-push-url="true">
+    ↺ Refrescar
+  </button>
+</div>
+
+{% if entries %}
+<div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden"
+     hx-get="/api/shared-state-table" hx-trigger="every 5s" hx-target="#state-table" hx-swap="innerHTML">
+  <table class="w-full text-sm" id="state-table">
+    <thead>
+      <tr class="border-b border-gray-800 text-gray-400 text-xs uppercase tracking-wider">
+        <th class="px-4 py-3 text-left">Clave</th>
+        <th class="px-4 py-3 text-left">Valor</th>
+        <th class="px-4 py-3 text-right">TTL restante</th>
+        <th class="px-4 py-3 text-center w-16"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-800">
+      {% for key, entry in entries.items() %}
+      <tr id="row-{{ key|replace('.', '-') }}" class="hover:bg-gray-800/50">
+        <td class="px-4 py-3 font-mono text-blue-300 text-xs">{{ key }}</td>
+        <td class="px-4 py-3 font-mono text-gray-200 text-xs max-w-xs truncate">{{ entry.value }}</td>
+        <td class="px-4 py-3 text-right text-xs
+          {% if entry.ttl_remaining < 60 %}text-red-400
+          {% elif entry.ttl_remaining < 300 %}text-yellow-400
+          {% else %}text-gray-400{% endif %}">
+          {{ entry.ttl_remaining }}s
+        </td>
+        <td class="px-4 py-3 text-center">
+          <button class="text-gray-600 hover:text-red-400 text-xs transition-colors"
+                  hx-delete="/shared-state/{{ key }}"
+                  hx-target="#row-{{ key|replace('.', '-') }}"
+                  hx-swap="outerHTML"
+                  hx-confirm="¿Eliminar '{{ key }}'?">
+            ✕
+          </button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="text-center py-16 text-gray-600">
+  <p class="text-4xl mb-3">🔗</p>
+  <p>El shared state está vacío</p>
+</div>
+{% endif %}
+{% endblock %}

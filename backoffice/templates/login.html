@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-gray-950">
+<head>
+  <meta charset="UTF-8">
+  <title>Capitán — Login</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="h-full flex items-center justify-center text-gray-100">
+  <div class="w-80">
+    <div class="text-center mb-8">
+      <div class="text-5xl mb-3">⚓</div>
+      <h1 class="text-2xl font-bold">Capitán</h1>
+      <p class="text-gray-500 text-sm mt-1">Backoffice</p>
+    </div>
+
+    <form method="post" action="/login" class="bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-4">
+      {% if error %}
+      <div class="text-red-400 text-sm bg-red-900/20 border border-red-800 rounded-lg px-3 py-2">
+        {{ error }}
+      </div>
+      {% endif %}
+
+      <div>
+        <label class="block text-xs text-gray-400 mb-1">Token de acceso</label>
+        <input type="password" name="token" autofocus required
+               class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm
+                      focus:outline-none focus:border-blue-500 transition-colors font-mono"
+               placeholder="BACKOFFICE_TOKEN">
+      </div>
+
+      <button type="submit"
+              class="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-2 rounded-lg
+                     text-sm transition-colors">
+        Ingresar
+      </button>
+    </form>
+  </div>
+</body>
+</html>

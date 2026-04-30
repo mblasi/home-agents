@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Alertas{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">Alertas</h1>
+
+<!-- Cola de alertas pendientes -->
+<div class="bg-gray-900 border border-gray-800 rounded-xl p-4 mb-6">
+  <h2 class="text-sm font-semibold text-gray-400 mb-3">Cola de alertas (consume-once)</h2>
+  {% if alerts %}
+  <ul class="space-y-2">
+    {% for a in alerts %}
+    <li class="flex items-start gap-2 text-sm">
+      <span class="text-yellow-400 mt-0.5">⚠️</span>
+      <span class="text-gray-200">{{ a }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  <p class="text-xs text-gray-600 mt-2">Nota: GET /alerts consume la cola; estas alertas ya fueron drenadas.</p>
+  {% else %}
+  <p class="text-sm text-gray-600">Sin alertas en cola</p>
+  {% endif %}
+</div>
+
+<!-- Claves de alerta en shared state -->
+<div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+  <h2 class="text-sm font-semibold text-gray-400 mb-3">Estado de alertas (shared state)</h2>
+  {% if alert_state %}
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="border-b border-gray-800 text-xs text-gray-500">
+        <th class="pb-2 text-left">Clave</th>
+        <th class="pb-2 text-left">Valor</th>
+        <th class="pb-2 text-right">TTL</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-800">
+      {% for k, v in alert_state.items() %}
+      <tr>
+        <td class="py-2 font-mono text-xs text-blue-300">{{ k }}</td>
+        <td class="py-2 text-xs text-gray-300">{{ v.value }}</td>
+        <td class="py-2 text-right text-xs text-gray-500">{{ v.ttl_remaining }}s</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="text-sm text-gray-600">Sin claves de alerta en shared state</p>
+  {% endif %}
+</div>
+{% endblock %}

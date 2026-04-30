@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Configuración{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold mb-2">Configuración</h1>
+<p class="text-sm text-gray-500 mb-6">Variables de <code class="text-gray-400">core/.env</code> — tokens ocultos por seguridad.</p>
+
+{% set sections = {
+  "HAOS": ["HAOS_URL", "HAOS_TOKEN"],
+  "Ollama": ["OLLAMA_URL"],
+  "Clima": ["LATITUDE", "LONGITUDE", "LOCATION_NAME"],
+  "Alertas": ["ALERT_POLL_INTERVAL"],
+  "Servidor": ["CORE_PORT"],
+} %}
+
+<div class="space-y-4">
+  {% for sec_name, keys in sections.items() %}
+  {% set sec_vars = {} %}
+  {% for k in keys %}
+    {% if k in env_vars %}{% set _ = sec_vars.update({k: env_vars[k]}) %}{% endif %}
+  {% endfor %}
+  {% if sec_vars %}
+  <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+    <div class="px-4 py-2.5 border-b border-gray-800 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+      {{ sec_name }}
+    </div>
+    <table class="w-full text-sm">
+      <tbody class="divide-y divide-gray-800">
+        {% for k, v in sec_vars.items() %}
+        <tr class="hover:bg-gray-800/30">
+          <td class="px-4 py-2.5 font-mono text-xs text-blue-300 w-1/3">{{ k }}</td>
+          <td class="px-4 py-2.5 font-mono text-xs text-gray-300">{{ v }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+  {% endfor %}
+
+  <!-- Variables no categorizadas -->
+  {% set shown = [] %}
+  {% for keys in sections.values() %}{% for k in keys %}{% set _ = shown.append(k) %}{% endfor %}{% endfor %}
+  {% set other = {} %}
+  {% for k, v in env_vars.items() %}
+    {% if k not in shown %}{% set _ = other.update({k: v}) %}{% endif %}
+  {% endfor %}
+  {% if other %}
+  <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+    <div class="px-4 py-2.5 border-b border-gray-800 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+      Otras
+    </div>
+    <table class="w-full text-sm">
+      <tbody class="divide-y divide-gray-800">
+        {% for k, v in other.items() %}
+        <tr class="hover:bg-gray-800/30">
+          <td class="px-4 py-2.5 font-mono text-xs text-blue-300 w-1/3">{{ k }}</td>
+          <td class="px-4 py-2.5 font-mono text-xs text-gray-300">{{ v }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+
+{% if not env_vars %}
+<div class="text-center py-16 text-gray-600">
+  <p class="text-4xl mb-3">⚙️</p>
+  <p>No se pudo leer el archivo <code>.env</code></p>
+</div>
+{% endif %}
+{% endblock %}

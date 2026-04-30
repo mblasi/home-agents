@@ -1,0 +1,16 @@
+[Unit]
+Description=Capitán Backoffice — panel web de administración
+After=network.target capitan-core.service
+Wants=capitan-core.service
+
+[Service]
+Type=simple
+WorkingDirectory=%h/workspace/home-agents/backoffice
+EnvironmentFile=-%h/workspace/home-agents/core/.env
+EnvironmentFile=-%h/workspace/home-agents/backoffice/.env
+ExecStart=%h/home-agents-env/bin/uvicorn server:app --host 0.0.0.0 --port 8080
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
