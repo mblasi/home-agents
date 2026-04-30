@@ -227,7 +227,7 @@ Objetivo: Sistema robusto, contextual y con memoria del hogar
 Estado:   Pendiente (inicia cuando FASE 1 esté completa)
 ```
 - [ ] 2.1  RAG con estado dinámico de HAOS (FAISS + embeddings)
-- [ ] 2.2  Context window inteligente (solo entidades relevantes)
+- [x] 2.2  Context window inteligente (solo entidades relevantes)
 - [ ] 2.3  Parser de acciones v2 (manejo de errores, validación)
 - [ ] 2.4  Manejo de ambigüedad ("las luces" → ¿cuáles?)
 - [ ] 2.5  Historial de conversación en sesión
