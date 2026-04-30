@@ -702,6 +702,62 @@ solo cambia la URL y el modelo.
 
 ---
 
+### FASE 12 - Backoffice Web
+```
+Objetivo: Panel web local para explorar y configurar toda la red de agentes sin tocar archivos
+          ni endpoints crudos. Reemplaza el acceso directo a .env, logs y shared_state.
+          Accesible desde cualquier dispositivo de la LAN (tablet, teléfono, laptop).
+Estado:   Pendiente
+Deps:     FASE 3 (core API — ya completa). No requiere agentes futuros para arrancar.
+          Cobra más valor cuando hay ≥3 agentes activos (FASE 5-6).
+Cuándo:   Puede empezarse en cualquier momento. Recomendado después de FASE 5.
+```
+
+Stack elegido:
+- Servicio FastAPI separado en :8080 (no acoplar admin al core de agentes)
+- Jinja2 + Tailwind CDN + HTMX (sin build step, coherente con "todo Python, todo local")
+- Server-Sent Events (SSE) para dashboard y log viewer en tiempo real
+- Token de autenticación en .env, cookie de sesión httponly
+
+#### Infraestructura base
+- [ ] 12.1  Nuevo servicio `backoffice/server.py` en :8080:
+            FastAPI + Jinja2 templates + Tailwind CDN, layout base con sidebar de navegación
+            y header con indicadores de estado (Ollama/HAOS/core up/down)
+- [ ] 12.2  Autenticación básica: `BACKOFFICE_TOKEN` en .env, cookie de sesión httponly.
+            Sin auth no se expone .env ni shared_state al resto de la LAN
+- [ ] 12.3  Heartbeat de "ears": `listen.py` registra en shared_state al arrancar y cada 60s
+            (hostname, PID, estado, última actividad). Base para la sección Dispositivos.
+- [ ] 12.4  Systemd unit `capitan-backoffice.service` (user), arranca junto con core
+
+#### Secciones del panel
+- [ ] 12.5  **Dashboard**: servicios activos (Ollama / HAOS / core / backoffice), última actividad
+            (polling de `/tmp/capitan/history.json` + `/health`), latencias promedio de la sesión,
+            alertas pendientes en cola. Vista principal al entrar.
+- [ ] 12.6  **Agentes**: tabla completa del registry (nombre, estado, keywords, descripción),
+            toggle active ↔ planned sin reiniciar el core, enlace a docs/fuente de cada agente
+- [ ] 12.7  **Shared State**: tabla en tiempo real de todas las claves (vía `GET /shared-state`),
+            TTL restante, valor, botón eliminar entrada. Auto-refresco via HTMX polling
+- [ ] 12.8  **Conversaciones**: listado paginado (vía `GET /conversations`), filtro por estado
+            (active/closed/expired), ver turns completos de una conversación, cerrar manualmente
+- [ ] 12.9  **Estadísticas**: latencias p50/p95 por agente (STT/LLM/total), comandos por hora
+            (gráfico temporal), agentes más usados, errores frecuentes. Fuente: history.json acumulado
+- [ ] 12.10 **Alertas**: reglas activas de cada agente con cooldown restante (desde shared_state),
+            historial de últimas N alertas emitidas, botón "emitir alerta de prueba" para debug
+- [ ] 12.11 **Configuración**: editor de `.env` del core estructurado por sección
+            (HAOS, Ollama, Clima, Alertas, Ubicación), validación de campos, guardar y recargar
+            el provider/cliente sin reiniciar el proceso completo
+- [ ] 12.12 **Dispositivos**: lista de "ears" activos (desde shared_state heartbeat),
+            hostname, estado, mic en uso, última actividad. Útil cuando hay múltiples instancias
+            (laptop + tablet + RPi, etc.)
+- [ ] 12.13 **Usuarios**: stub integrado con FASE 2.5 — lista de usuarios registrados, rol,
+            si tiene modelo de speaker entrenado, fecha de enrollment. Operativo cuando FASE 2.5 esté activa
+- [ ] 12.14 **Log viewer**: SSE con `journalctl --user -u capitan* -f` en tiempo real,
+            filtro por servicio (core / ear / backoffice), color por nivel (INFO/WARN/ERROR)
+- [ ] 12.15 **Integraciones**: test de conexión on-demand a HAOS / Ollama / proveedores de clima,
+            lista de entity_ids mapeados en ha_client.py, estado de modelos cargados en Ollama
+
+---
+
 ## PIPELINE ACTUAL (para referencia rápida)
 
 ```
