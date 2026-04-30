@@ -2,7 +2,12 @@
 {% block title %}Agentes{% endblock %}
 
 {% block content %}
-<h1 class="text-2xl font-bold mb-6">Agentes</h1>
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-bold">Agentes</h1>
+  <div id="restart-banner" class="hidden bg-yellow-900/30 border border-yellow-700 text-yellow-300 text-xs px-3 py-2 rounded-lg">
+    ⚠️ Hay cambios de config/keywords pendientes — reiniciar el core para aplicar.
+  </div>
+</div>
 
 <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
   <table class="w-full text-sm">
@@ -12,6 +17,8 @@
         <th class="px-4 py-3 text-left">Descripción</th>
         <th class="px-4 py-3 text-left">Keywords</th>
         <th class="px-4 py-3 text-center">Estado</th>
+        <th class="px-4 py-3 text-center">Accesible</th>
+        <th class="px-4 py-3 text-center">Editar</th>
       </tr>
     </thead>
     <tbody class="divide-y divide-gray-800">
@@ -37,18 +44,50 @@
             {% endif %}
           </div>
         </td>
+        <td class="px-4 py-3 text-center" id="status-cell-{{ aid }}">
+          {% set st = info.status %}
+          <button
+            hx-post="/agents/{{ aid }}/toggle"
+            hx-target="#status-cell-{{ aid }}"
+            hx-swap="innerHTML"
+            title="Click para cambiar estado"
+            class="cursor-pointer px-2 py-1 rounded text-xs font-medium transition-colors
+              {% if st == 'active' %}bg-emerald-900/50 text-emerald-400 hover:bg-emerald-900{% elif st == 'planned' %}bg-gray-800 text-gray-500 hover:bg-gray-700{% else %}bg-red-900/50 text-red-400 hover:bg-red-900{% endif %}">
+            {{ st }}
+          </button>
+        </td>
         <td class="px-4 py-3 text-center">
-          {% if info.status == "active" %}
-          <span class="px-2 py-1 bg-emerald-900/50 text-emerald-400 rounded text-xs font-medium">activo</span>
-          {% elif info.status == "planned" %}
-          <span class="px-2 py-1 bg-gray-800 text-gray-500 rounded text-xs font-medium">planificado</span>
+          {% if info.reachable is none %}
+            <span class="text-gray-600 text-xs">—</span>
+          {% elif info.reachable %}
+            <span title="Accesible" class="text-emerald-400">●</span>
           {% else %}
-          <span class="px-2 py-1 bg-red-900/50 text-red-400 rounded text-xs font-medium">{{ info.status }}</span>
+            <span title="No accesible" class="text-red-400">●</span>
           {% endif %}
+        </td>
+        <td class="px-4 py-3 text-center">
+          <a href="/agents/{{ aid }}/edit"
+             class="px-2 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white rounded text-xs transition-colors">
+            Editar
+          </a>
         </td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
 </div>
+
+<script>
+  // Mostrar banner de restart cuando haya cambios de keywords/config
+  document.addEventListener('htmx:afterRequest', function(e) {
+    if (e.detail.pathInfo && e.detail.pathInfo.requestPath &&
+        e.detail.pathInfo.requestPath.includes('/toggle')) {
+      document.getElementById('restart-banner').classList.add('hidden');
+    }
+  });
+
+  function showRestartBanner() {
+    document.getElementById('restart-banner').classList.remove('hidden');
+  }
+</script>
 {% endblock %}

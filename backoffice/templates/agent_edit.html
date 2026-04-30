@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Editar agente {{ agent_id }}{% endblock %}
+
+{% block content %}
+<div class="flex items-center gap-3 mb-6">
+  <a href="/agents" class="text-gray-500 hover:text-gray-300 text-sm">← Agentes</a>
+  <span class="text-gray-700">/</span>
+  <h1 class="text-2xl font-bold">
+    {{ agent.icon }} {{ agent.name }}
+    <span class="text-gray-500 text-base font-normal ml-1">{{ agent_id }}</span>
+  </h1>
+</div>
+
+{% if error %}
+<div class="mb-4 bg-red-900/30 border border-red-700 text-red-300 px-4 py-3 rounded-lg text-sm">
+  {{ error }}
+</div>
+{% endif %}
+
+<form method="POST" action="/agents/{{ agent_id }}/edit">
+
+  <!-- Sección 1: Status -->
+  <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-5">
+    <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Estado</h2>
+    <div class="flex gap-4">
+      {% for st, label, desc in [
+          ('active',      'Activo',       'Responde comandos y aparece en el dispatcher'),
+          ('planned',     'Planificado',  'No responde comandos; visible como próximo agente'),
+          ('unavailable', 'No disponible','Temporalmente fuera de servicio')
+      ] %}
+      <label class="flex-1 cursor-pointer">
+        <input type="radio" name="status" value="{{ st }}"
+               {% if agent.status == st %}checked{% endif %}
+               class="sr-only peer">
+        <div class="border rounded-lg px-4 py-3 transition-colors
+          peer-checked:border-indigo-500 peer-checked:bg-indigo-900/20
+          border-gray-700 hover:border-gray-500 bg-gray-800/50">
+          <div class="font-medium text-sm
+            {% if st == 'active' %}text-emerald-400
+            {% elif st == 'planned' %}text-gray-400
+            {% else %}text-red-400{% endif %}">{{ label }}</div>
+          <div class="text-xs text-gray-500 mt-0.5">{{ desc }}</div>
+        </div>
+      </label>
+      {% endfor %}
+    </div>
+    {% if agent.reachable is not none %}
+    <p class="mt-3 text-xs text-gray-600">
+      Conectividad:
+      {% if agent.reachable %}
+        <span class="text-emerald-400">● accesible</span>
+      {% else %}
+        <span class="text-red-400">● no accesible</span>
+        — revisar la URL del servicio asociado
+      {% endif %}
+    </p>
+    {% endif %}
+  </div>
+
+  <!-- Sección 2: Keywords -->
+  <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-5">
+    <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-1">Keywords del dispatcher</h2>
+    <p class="text-xs text-gray-600 mb-3">Una keyword por línea. El dispatcher usa estas palabras para enrutar comandos a este agente.</p>
+    <textarea
+      name="keywords"
+      rows="10"
+      class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 font-mono
+             focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 resize-y"
+      placeholder="una keyword por línea">{{ (agent.keywords or []) | join('\n') }}</textarea>
+    <p class="mt-1 text-xs text-gray-600">
+      {{ (agent.keywords or []) | length }} keywords actuales.
+      Los cambios de keywords aplican al reiniciar el core.
+    </p>
+  </div>
+
+  <!-- Sección 3: Configuración específica -->
+  {% if agent.config_schema %}
+  <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-5">
+    <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-1">Configuración</h2>
+    <p class="text-xs text-gray-600 mb-4">Los cambios de configuración aplican al reiniciar el core.</p>
+    <div class="grid grid-cols-1 gap-4">
+      {% for key, meta in agent.config_schema.items() %}
+      {% set cur_val = agent.config.get(key, meta.default) %}
+      <div>
+        <label class="block text-xs font-medium text-gray-400 mb-1">
+          {{ meta.label }}
+          <span class="text-gray-600 font-normal ml-1">({{ key }})</span>
+        </label>
+        {% if meta.type == 'int' or meta.type == 'float' %}
+        <input
+          type="number"
+          name="config_{{ key }}"
+          value="{{ cur_val }}"
+          {% if meta.type == 'float' %}step="any"{% endif %}
+          class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200
+                 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500">
+        {% else %}
+        <input
+          type="text"
+          name="config_{{ key }}"
+          value="{{ cur_val }}"
+          class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200
+                 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500">
+        {% endif %}
+        <p class="mt-0.5 text-xs text-gray-600">Default: <code class="bg-gray-800 px-1 rounded">{{ meta.default }}</code></p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="flex gap-3">
+    <button type="submit"
+            class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors">
+      Guardar cambios
+    </button>
+    <a href="/agents"
+       class="px-5 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium rounded-lg transition-colors">
+      Cancelar
+    </a>
+  </div>
+
+</form>
+{% endblock %}
