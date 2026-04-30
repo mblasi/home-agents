@@ -224,43 +224,26 @@ Estado:   EN CURSO (~70% completo)
 ### FASE 2 - Agente Domótica Completo
 ```
 Objetivo: Sistema robusto, contextual y con memoria del hogar
-Estado:   Pendiente (inicia cuando FASE 1 esté completa)
+Estado:   COMPLETA
 ```
 - [x] 2.1  RAG con estado dinámico de HAOS (FAISS + embeddings)
 - [x] 2.2  Context window inteligente (solo entidades relevantes)
 - [x] 2.3  Parser de acciones v2 (manejo de errores, validación)
 - [x] 2.4  Manejo de ambigüedad ("las luces" → ¿cuáles?)
-- [ ] 2.5  Historial de conversación en sesión
-- [ ] 2.9  Wake word multi-persona: detectar y distinguir voces de distintos miembros del hogar.
+- [x] 2.10 Gestión de conversaciones: identidad, contexto multi-turno y ciclo de vida
 
 #### Postergadas (movidas a otras fases)
+- ~~2.5  Historial de conversación en sesión~~ → implementado como parte de 2.10
 - ~~2.6  Automatizaciones por voz~~ → FASE 9.10 (requests condicionales en el coordinador LLM)
 - ~~2.7  Satellite en habitaciones~~ → Anexo A.2 (red de nodos de audio multi-ambiente)
 - ~~2.8  Fine-tuning con entity_ids~~ → FASE 8.24 (fine-tuning con LoRA en servidor con GPU)
-           Al identificar la persona, cargar su perfil persistido como contexto adicional de la
-           conversación: preferencias, rutinas, dispositivos favoritos, historial relevante.
-           Esto permite interacciones personalizadas: "reproduce mi música preferida",
-           "¿cómo está mi portfolio?", "recordame lo de mañana".
-           Diseño:
-             · Speaker ID: embeddings de voz por persona (SpeechBrain o resemblyzer)
-             · Perfil persistido por persona: JSON o SQLite en disco (nombre, prefs, historial)
-             · El perfil se inyecta como sección adicional en el prompt del LLM
-             · Actualización del perfil: el agente puede escribir/actualizar prefs por voz
-               ("de ahora en adelante, mi música preferida es jazz")
-             · Fallback: voz no reconocida → perfil "invitado" con contexto mínimo
-- [x] 2.10 Gestión de conversaciones: identidad, contexto multi-turno y ciclo de vida
-           Prerequisito para 2.3, 2.4 y 2.5. Cada exchange puede formar parte de una
-           conversación activa identificada por fuente (mic/ambiente, número de WhatsApp).
-           El LLM recibe los últimos N turnos como contexto. La conversación cierra por
-           keyword explícita ("gracias, eso es todo") o por timeout de inactividad.
-           El core expone GET /conversations y DELETE /conversations/{id}.
-           Diseño:
-             · conversation_id = hash(source) + timestamp del primer turno
-             · Continuación: nuevo pedido dentro de ventana de 2 min → mismo hilo
-             · Cierre explícito: detección de frases de cierre en el texto transcripto
-             · Cierre automático: timeout configurable (default 2 min sin actividad)
-             · Estado: active | closed | expired
-             · Contexto al LLM: últimos N turnos (default N=5) como messages[] previos
+- ~~2.9  Wake word multi-persona~~ → FASE 2.5 tasks 2.5.6 + 2.5.7 (enrollment + speaker ID).
+         Prerequisito de FASE 11.7 (amigo/asesor personalizado por usuario).
+
+#### Estado
+```
+FASE 2 COMPLETA
+```
 
 ---
 

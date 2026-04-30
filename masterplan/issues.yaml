@@ -24,11 +24,11 @@
 "2.2":  {number: 2, repo: mblasi/home-agents-core}
 "2.3":  {number: 3, repo: mblasi/home-agents-core}
 "2.4":  {number: 4, repo: mblasi/home-agents-core}
-"2.5":  {number: 5, repo: mblasi/home-agents-core}
+# 2.5 → implementado como parte de 2.10 (home-agents-core #5, cerrado)
 # 2.6 → FASE 9.10 (home-agents-core #6, cerrado)
 # 2.7 → Anexo A.2 (home-agents-ear #1, cerrado)
 # 2.8 → FASE 8.24 (home-agents-core #7, cerrado)
-"2.9":  {number: 8, repo: mblasi/home-agents-core}
+# 2.9 → FASE 2.5 tasks 2.5.6+2.5.7 (home-agents-core #8, cerrado)
 "2.10": {number: 9, repo: mblasi/home-agents-core}
 
 # ── FASE 2.5 (gestión de usuarios) ───────────────────────────────────────────
