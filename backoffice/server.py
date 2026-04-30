@@ -114,6 +114,17 @@ def _core(path: str, method: str = "GET", **kwargs):
         return None
 
 
+def _get_ollama_models() -> list[str]:
+    """Devuelve los nombres de modelos disponibles en Ollama."""
+    try:
+        r = requests.get(f"{OLLAMA_URL}/api/tags", timeout=3)
+        if r.status_code == 200:
+            return [m["name"] for m in r.json().get("models", [])]
+    except Exception:
+        pass
+    return []
+
+
 def _read_json(filename: str):
     try:
         with open(METRICS_DIR / filename) as f:
@@ -231,7 +242,8 @@ _ROLES_AGENTS = ["admin", "familiar", "adolescente", "niño", "invitado", "guest
 def agent_new_page(request: Request):
     role_perms = _core("/rbac/roles") or {}
     return _render(request, "agent_new.html", "agents",
-                   error="", role_perms=role_perms, roles=_ROLES_AGENTS)
+                   error="", role_perms=role_perms, roles=_ROLES_AGENTS,
+                   ollama_models=_get_ollama_models())
 
 
 @app.post("/agents/new")
@@ -249,13 +261,16 @@ async def agent_new_submit(request: Request):
         "keywords":      keywords,
         "default_roles": default_roles,
         "system_prompt": str(form.get("system_prompt", "")).strip(),
+        "backend":       str(form.get("backend", "ollama")),
+        "model":         str(form.get("model", "qwen2.5:7b")),
     }
     result = _core("/agents", method="POST", json=payload)
     if result is None:
         role_perms = _core("/rbac/roles") or {}
         return _render(request, "agent_new.html", "agents",
                        error="No se pudo crear el agente (¿ID ya existe?)",
-                       role_perms=role_perms, roles=_ROLES_AGENTS)
+                       role_perms=role_perms, roles=_ROLES_AGENTS,
+                       ollama_models=_get_ollama_models())
     return RedirectResponse("/agents", status_code=303)
 
 
@@ -267,7 +282,8 @@ def agent_edit_page(request: Request, agent_id: str):
     role_perms = _core("/rbac/roles") or {}
     return _render(request, "agent_edit.html", "agents",
                    agent=agent, agent_id=agent_id, error="",
-                   role_perms=role_perms, roles=_ROLES_AGENTS)
+                   role_perms=role_perms, roles=_ROLES_AGENTS,
+                   ollama_models=_get_ollama_models())
 
 
 @app.post("/agents/{agent_id}/edit")
@@ -539,7 +555,13 @@ async def rbac_roles_save(request: Request):
 
 @app.get("/ear", response_class=HTMLResponse)
 def ear_page(request: Request):
-    return _render(request, "ear.html", "ear")
+    devices = _read_json("devices.json") or {}
+    return _render(request, "ear.html", "ear", devices=devices)
+
+
+@app.get("/devices", response_class=HTMLResponse)
+def devices_redirect():
+    return RedirectResponse("/ear", status_code=301)
 
 
 @app.get("/ear/stream")

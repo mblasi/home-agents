@@ -80,7 +80,40 @@
     </div>
   </div>
 
-  <!-- Sección 2: System prompt -->
+  <!-- Sección 2: Backend y modelo -->
+  <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-5">
+    <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Backend y modelo</h2>
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label class="block text-xs font-medium text-gray-400 mb-1">Backend LLM</label>
+        <select name="backend"
+                class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200
+                       focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500">
+          <option value="ollama" selected>Ollama</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-400 mb-1">Modelo</label>
+        {% if ollama_models %}
+        <select name="model"
+                class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200
+                       focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500">
+          {% for m in ollama_models %}
+          <option value="{{ m }}" {% if m == 'qwen2.5:7b' %}selected{% endif %}>{{ m }}</option>
+          {% endfor %}
+        </select>
+        {% else %}
+        <input type="text" name="model" value="qwen2.5:7b"
+               placeholder="ej: qwen2.5:7b"
+               class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200
+                      focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500">
+        <p class="mt-0.5 text-xs text-gray-600">Ollama no accesible — escribí el nombre del modelo manualmente.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Sección 3: System prompt -->
   <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-5">
     <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-1">System prompt</h2>
     <p class="text-xs text-gray-600 mb-3">
@@ -96,7 +129,7 @@
       placeholder="Sos un asistente útil y conciso que responde en español."></textarea>
   </div>
 
-  <!-- Sección 3: Keywords -->
+  <!-- Sección 4: Keywords -->
   <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-5">
     <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-1">Keywords del dispatcher</h2>
     <p class="text-xs text-gray-600 mb-3">Una keyword por línea. El dispatcher usará estas palabras para enrutar comandos a este agente.</p>
@@ -108,7 +141,7 @@
       placeholder="una keyword por línea"></textarea>
   </div>
 
-  <!-- Sección 4: Acceso por rol -->
+  <!-- Sección 5: Acceso por rol -->
   <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-5">
     <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-1">Acceso por rol</h2>
     <p class="text-xs text-gray-600 mb-3">Qué roles tendrán acceso a este agente desde el inicio.</p>

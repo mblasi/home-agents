@@ -111,6 +111,19 @@
           rows="5"
           class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 font-mono
                  focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 resize-y">{{ cur_val }}</textarea>
+        {% elif meta.type == 'select' %}
+        {% set static_opts = meta.options if meta.options is iterable and meta.options is not string else [] %}
+        {% set dynamic_opts = ollama_models if meta.options == 'ollama_models' else static_opts %}
+        <select name="config_{{ key }}"
+                class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200
+                       focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500">
+          {% for opt in dynamic_opts %}
+          <option value="{{ opt }}" {% if cur_val == opt %}selected{% endif %}>{{ opt }}</option>
+          {% endfor %}
+          {% if cur_val and cur_val not in dynamic_opts %}
+          <option value="{{ cur_val }}" selected>{{ cur_val }} (actual)</option>
+          {% endif %}
+        </select>
         {% elif meta.type == 'int' or meta.type == 'float' %}
         <input
           type="number"

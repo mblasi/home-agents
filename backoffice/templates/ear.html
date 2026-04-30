@@ -92,6 +92,42 @@
   </div>
 </div>
 
+<!-- Dispositivos de audio (instancias ear activas) -->
+<div class="mt-4 bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+  <div class="px-4 py-2.5 border-b border-gray-800">
+    <span class="text-sm font-semibold text-gray-300">Dispositivos</span>
+    <span class="ml-2 text-xs text-gray-600">instancias ear · heartbeat cada 60s</span>
+  </div>
+  {% if devices %}
+  <div class="grid grid-cols-3 gap-3 p-3">
+    {% for key, d in devices.items() %}
+    {% set age = (now - d.get("ts", now)) | int %}
+    <div class="bg-gray-800/60 border {% if age < 90 %}border-emerald-800/60{% else %}border-gray-700{% endif %} rounded-lg p-3">
+      <div class="flex items-center justify-between mb-2">
+        <div class="flex items-center gap-2">
+          <span class="text-base">📡</span>
+          <span class="text-sm font-medium text-gray-200">{{ d.get("hostname", key) }}</span>
+        </div>
+        <span class="text-xs {% if age < 90 %}text-emerald-400{% else %}text-yellow-400{% endif %}">{{ age }}s</span>
+      </div>
+      <div class="space-y-0.5 text-xs text-gray-400">
+        <div class="flex justify-between">
+          <span>Estado</span><span class="text-gray-300">{{ d.get("state", "—") }}</span>
+        </div>
+        <div class="flex justify-between">
+          <span>PID</span><span class="font-mono text-gray-300">{{ d.get("pid", "—") }}</span>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="text-center py-6 text-gray-600 text-sm">
+    📡 Sin dispositivos registrados — arrancá <code class="text-gray-500">listen.py</code> para ver instancias activas.
+  </div>
+  {% endif %}
+</div>
+
 <script>
 (function () {
   const STATES = {
