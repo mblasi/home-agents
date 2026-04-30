@@ -1,0 +1,18 @@
+[Unit]
+Description=Capitán WhatsApp Channel
+Documentation=https://github.com/mblasi/home-agents
+After=network.target capitan-core.service
+Wants=capitan-core.service
+
+[Service]
+Type=simple
+WorkingDirectory=%h/workspace/home-agents/wa
+ExecStart=/usr/bin/node index.js
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=capitan-wa
+
+[Install]
+WantedBy=default.target
