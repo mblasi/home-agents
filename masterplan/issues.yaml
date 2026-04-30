@@ -203,9 +203,15 @@
 "14.3": {number: 35, repo: mblasi/home-agents-core}
 "14.4": {number: 36, repo: mblasi/home-agents-core}
 "14.5": {number: 37, repo: mblasi/home-agents-core}
-"14.6": 202
-"14.7": 203
-"14.8": 204
+"14.6":  202
+"14.7":  203
+"14.8":  204
+"14.9":  {number: 42, repo: mblasi/home-agents-core}
+"14.10": {number: 43, repo: mblasi/home-agents-core}
+"14.11": {number: 44, repo: mblasi/home-agents-core}
+"14.12": 216
+"14.13": 217
+"14.14": 218
 
 # ── Anexos (iteraciones futuras) ──────────────────────────────────────────────
 "A.1":   118

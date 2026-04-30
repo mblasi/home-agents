@@ -771,7 +771,7 @@ Auth:     Google OAuth2 — device flow para el primer login, token refresh auto
 
 ---
 
-### FASE 14 — Gestión dinámica de agentes desde el backoffice
+### FASE 14 - Gestión dinámica de agentes desde el backoffice
 ```
 Objetivo: Hacer que status, keywords y configuración específica de cada agente sean editables
           desde el backoffice sin tocar código. Persiste en ~/.local/share/capitan/agents.json.
@@ -800,6 +800,19 @@ Nota:     Cambios de config/keywords aplican en el próximo reinicio del core.
             de conectividad, textarea de keywords, campos dinámicos según config_schema
 - [x] 14.8  `backoffice/server.py` — toggle real (alterna active ↔ planned via PATCH al core),
             GET/POST /agents/{id}/edit con conversión de tipos para config
+
+- [x] 14.9  `core/agent_config.py` — soporte para agentes dinámicos: `create_dynamic_agent()`,
+            `delete_dynamic_agent()`, `is_dynamic()`; flag `dynamic: true` en agents.json
+- [x] 14.10 `core/agent_registry.py` — `get_registry()` incluye agentes dinámicos del JSON;
+            `is_static_agent()` protege de eliminación a los del REGISTRY hardcodeado
+- [x] 14.11 `core/server.py` — POST /agents (crear dinámico), DELETE /agents/{id} (solo dinámicos);
+            fix PATCH endpoints para usar get_registry() en lugar de REGISTRY estático
+- [x] 14.12 `backoffice/templates/agent_edit.html` — sección RBAC: checkboxes de roles que tienen
+            acceso al agente; aplica a estáticos y dinámicos; POST actualiza /rbac/roles/{role}
+- [x] 14.13 `backoffice/templates/agent_new.html` — form de creación: id, nombre, icono, desc,
+            status, keywords, roles por defecto
+- [x] 14.14 `backoffice/server.py` — GET/POST /agents/new, DELETE /agents/{id} (HTMX),
+            + RBAC aplicado al guardar edición y al crear; badge 'dinámico' en agents.html
 
 ---
 
