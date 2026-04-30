@@ -813,6 +813,16 @@ Nota:     Cambios de config/keywords aplican en el próximo reinicio del core.
             status, keywords, roles por defecto
 - [x] 14.14 `backoffice/server.py` — GET/POST /agents/new, DELETE /agents/{id} (HTMX),
             + RBAC aplicado al guardar edición y al crear; badge 'dinámico' en agents.html
+- [x] 14.15 `core/generic_agent.py` (nuevo) — GenericAgent(agent_id): relay LLM puro con
+            system_prompt y model configurables via agents.json; process() usa conv.context()
+            y devuelve respuesta del LLM directamente, sin parseo ni llamadas a APIs externas
+- [x] 14.16 `core/server.py` — carga GenericAgent para todos los agentes dinámicos al arrancar;
+            POST /agents instancia y agrega a AGENTS; DELETE elimina de AGENTS;
+            PATCH /config re-instancia GenericAgent para aplicar cambios sin reiniciar;
+            agent_config.create_dynamic_agent acepta agent_type y system_prompt
+- [x] 14.17 `backoffice/templates/agent_new.html` — sección System prompt (textarea required);
+            agent_edit.html: type='text' en config_schema renderiza como textarea;
+            backoffice/server.py: system_prompt en payload de POST /agents
 
 ---
 
