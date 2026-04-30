@@ -737,6 +737,40 @@ Stack elegido:
 
 ---
 
+### FASE 13 - Agente NotebookLM
+```
+Objetivo: Wrapper sobre NotebookLM — consultar notebooks, agregar fuentes y recibir respuestas
+          desde voz o WA, sin salir de la red de agentes.
+Estado:   Pendiente
+Deps:     FASE 3.2 (orquestador), FASE 3.5 (WA — canal ideal para queries largas y URLs)
+API:      No hay API oficial pública. Opciones en orden de preferencia:
+          1. Cliente HTTP no oficial (reverse-engineered): más liviano, sin browser
+          2. Playwright browser automation: más robusto ante cambios de API
+          Elegir en 13.1 según estado actual de librerías disponibles.
+Auth:     Google OAuth2 — device flow para el primer login, token refresh automático,
+          credenciales persistidas en ~/.local/share/capitan/ (fuera del repo)
+```
+- [ ] 13.1  Evaluar stack de acceso: testear cliente HTTP no oficial (PyPI/GitHub) vs Playwright.
+            Criterios: funciona con cuenta personal, soporta query + add_source, se mantiene activo.
+            Documentar decisión y dependencias necesarias.
+- [ ] 13.2  Autenticación Google OAuth2: device flow para primer login, refresh automático del token,
+            credenciales en ~/.local/share/capitan/notebooklm_token.json (gitignored)
+- [ ] 13.3  notebooklm_client.py: listar notebooks (id, título, nro de fuentes), obtener notebook por nombre/id
+- [ ] 13.4  Query: preguntar a un notebook específico → respuesta con citas de fuentes
+- [ ] 13.5  Gestión de fuentes: agregar URL, PDF local o texto plano a un notebook específico
+- [ ] 13.6  Notebook activo en shared_state: configurar cuál se usa cuando no se especifica nombre,
+            persistido cross-session en shared_state["notebooklm.active_notebook"]
+- [ ] 13.7  NotebookLMAgent: implementar BaseAgent, keywords de dispatch, manejo de intención
+            ("preguntá", "consultá", "qué dice", "agregá fuente", "notebook de X")
+- [ ] 13.8  Comandos de voz: "preguntale al notebook de inversiones si GGAL vale la pena",
+            "agregá esta URL al notebook de viajes", "qué dice el notebook sobre el ayuno"
+- [ ] 13.9  Canal WA: soporte para queries largas (sin límite de audio), pegar URLs en el chat
+            para agregarlas como fuente al notebook activo o a uno nombrado
+- [ ] 13.10 Dashboard: panel en backoffice con lista de notebooks, notebook activo, última consulta
+            y estado del token OAuth (válido / expirado / no configurado)
+
+---
+
 ## PIPELINE ACTUAL (para referencia rápida)
 
 ```
