@@ -217,7 +217,7 @@ Estado:   EN CURSO (~70% completo)
 
 #### Decisiones pendientes
 - [x] Voz TTS respuesta: es_AR-daniela-high.onnx (única voz argentina disponible en Piper)
-- [ ] Latencia aceptable: 15.7s actual, ¿optimizar o avanzar?
+- [x] Latencia aceptable: 15.7s actual → avanzar con FASE 2, optimizar en FASE 8 con hardware dedicado
 
 ---
 
@@ -246,7 +246,7 @@ Estado:   Pendiente (inicia cuando FASE 1 esté completa)
              · Actualización del perfil: el agente puede escribir/actualizar prefs por voz
                ("de ahora en adelante, mi música preferida es jazz")
              · Fallback: voz no reconocida → perfil "invitado" con contexto mínimo
-- [ ] 2.10 Gestión de conversaciones: identidad, contexto multi-turno y ciclo de vida
+- [x] 2.10 Gestión de conversaciones: identidad, contexto multi-turno y ciclo de vida
            Prerequisito para 2.3, 2.4 y 2.5. Cada exchange puede formar parte de una
            conversación activa identificada por fuente (mic/ambiente, número de WhatsApp).
            El LLM recibe los últimos N turnos como contexto. La conversación cierra por
@@ -572,6 +572,71 @@ simples en <100ms y el LLM entra solo cuando hay ambigüedad real.
 - [ ] 9.13 Evaluar qwen2.5:3b como coordinador: instalar, benchmark de routing vs. 7b
 - [ ] 9.14 Clasificador rápido para intenciones simples: entrenar con historial de requests reales (sklearn o reglas con score de confianza)
 - [ ] 9.15 Híbrido: usar clasificador cuando confianza > umbral configurable, coordinador LLM para el resto
+
+---
+
+### FASE 11 - Agente Amigo / Asesores Personales
+```
+Objetivo: Agente conversacional con quien charlar libremente, pedir consejos o consultar
+          a un asesor especializado. Sin intención de acción — respuestas en lenguaje
+          natural, tono informal, memoria entre sesiones.
+Estado:   Pendiente
+Deps:     FASE 1 (stack base) — puede implementarse en cualquier momento.
+          FASE 2.5 (usuarios) deseable para asociar perfiles por persona.
+          FASE 3 (orquestador) necesario para coexistir con múltiples agentes.
+Nota:     El agente base (11.1–11.3) puede arrancar hoy: solo requiere un nuevo
+          system prompt y lógica de dispatch. Los perfiles múltiples y la memoria
+          persistente escalan naturalmente sobre esa base.
+```
+
+#### Por qué un "amigo" y no solo el LLM en modo libre
+
+El LLM ya está disponible, pero sin contexto ni personalidad producirá respuestas
+genéricas y frías. El valor del agente-amigo está en:
+- **Personalidad consistente**: nombre, forma de hablar, valores propios
+- **Memoria entre sesiones**: recuerda lo que hablaron la semana pasada
+- **Perfiles múltiples**: podés charlar con "el amigo de siempre" o consultar
+  al "asesor financiero" o al "coach de vida", cada uno con su expertise y tono
+- **Contexto del usuario** (FASE 2.5): sabe quién habla y adapta la respuesta
+
+#### Diseño de perfiles
+
+Cada perfil es un YAML con:
+```yaml
+id: coach
+nombre: Marcos
+tono: directo y motivador, no da vueltas
+expertise: [coaching de vida, productividad, hábitos]
+prompt_extra: |
+  Hacés preguntas concretas antes de dar consejos. No te quedás en lo abstracto.
+  Usás ejemplos reales. Si el usuario no sabe qué quiere, lo ayudás a clarificarlo.
+```
+
+El agente carga el perfil y lo inyecta como system prompt enriquecido.
+La selección de perfil puede ser explícita ("che, hablo con el coach") o
+automática según el contexto del pedido.
+
+#### Tareas
+- [ ] 11.1  Agente conversacional base: system prompt de "amigo" en lenguaje natural,
+            sin formato ACTION, respuestas libres. Dispatch activado cuando no hay
+            intención domótica clara y el usuario quiere charlar.
+- [ ] 11.2  Perfil del amigo: YAML configurable (nombre, tono, expertise, prompt_extra).
+            Un perfil por defecto "amigo general" cargado al arrancar.
+- [ ] 11.3  Detección de intención conversacional en el dispatcher: distinguir
+            "prende la luz" (haos) de "che, cómo estás" o "necesito un consejo" (amigo).
+- [ ] 11.4  Perfiles múltiples: registro de perfiles en YAML, selección por nombre
+            explícito ("hablo con el coach") o por detección de tema.
+- [ ] 11.5  Memoria persistente entre sesiones: SQLite con historial de conversaciones
+            previas por perfil. El amigo "recuerda" lo que hablaron antes.
+            Los datos nunca salen de la red local.
+- [ ] 11.6  Asesores especializados: perfiles con expertise marcado y prompt enriquecido
+            con contexto del área (finanzas, nutrición, coach de vida, etc.).
+            El asesor puede combinar conocimiento propio del usuario (FASE 2.5)
+            con su expertise: "sabiendo que invertís en acciones, te diría que..."
+- [ ] 11.7  Integración con FASE 2.5: cada usuario registrado puede configurar
+            su perfil de amigo/asesor preferido, persistido en su perfil de usuario.
+- [ ] 11.8  Dashboard: panel o indicador en panel_agents mostrando el amigo activo
+            y el perfil en uso cuando la conversación es con el agente-amigo.
 
 ---
 
