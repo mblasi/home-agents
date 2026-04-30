@@ -224,13 +224,49 @@ async def toggle_agent(agent_id: str):
     )
 
 
+_ROLES_AGENTS = ["admin", "familiar", "adolescente", "niño", "invitado", "guest"]
+
+
+@app.get("/agents/new", response_class=HTMLResponse)
+def agent_new_page(request: Request):
+    role_perms = _core("/rbac/roles") or {}
+    return _render(request, "agent_new.html", "agents",
+                   error="", role_perms=role_perms, roles=_ROLES_AGENTS)
+
+
+@app.post("/agents/new")
+async def agent_new_submit(request: Request):
+    form = await request.form()
+    default_roles = [r for r in _ROLES_AGENTS if r != "admin" and form.get(f"role_{r}")]
+    kw_raw = str(form.get("keywords", ""))
+    keywords = [k.strip() for k in kw_raw.splitlines() if k.strip()]
+    payload = {
+        "id":            str(form.get("id", "")).strip().lower().replace(" ", "_"),
+        "name":          str(form.get("name", "")).strip(),
+        "icon":          str(form.get("icon", "")).strip(),
+        "desc":          str(form.get("desc", "")).strip(),
+        "status":        str(form.get("status", "planned")),
+        "keywords":      keywords,
+        "default_roles": default_roles,
+    }
+    result = _core("/agents", method="POST", json=payload)
+    if result is None:
+        role_perms = _core("/rbac/roles") or {}
+        return _render(request, "agent_new.html", "agents",
+                       error="No se pudo crear el agente (¿ID ya existe?)",
+                       role_perms=role_perms, roles=_ROLES_AGENTS)
+    return RedirectResponse("/agents", status_code=303)
+
+
 @app.get("/agents/{agent_id}/edit", response_class=HTMLResponse)
 def agent_edit_page(request: Request, agent_id: str):
     agent = _core(f"/agents/{agent_id}")
     if not agent:
         return RedirectResponse("/agents", status_code=303)
+    role_perms = _core("/rbac/roles") or {}
     return _render(request, "agent_edit.html", "agents",
-                   agent=agent, agent_id=agent_id, error="")
+                   agent=agent, agent_id=agent_id, error="",
+                   role_perms=role_perms, roles=_ROLES_AGENTS)
 
 
 @app.post("/agents/{agent_id}/edit")
@@ -276,7 +312,29 @@ async def agent_edit_submit(request: Request, agent_id: str):
     if config:
         _core(f"/agents/{agent_id}/config", method="PATCH", json=config)
 
+    # RBAC: actualizar roles según checkboxes
+    role_perms_current = _core("/rbac/roles") or {}
+    for role in _ROLES_AGENTS:
+        if role == "admin":
+            continue
+        current_agents = set(role_perms_current.get(role, []))
+        if "*" in current_agents:
+            continue
+        checked = bool(form.get(f"role_{role}"))
+        if checked and agent_id not in current_agents:
+            _core(f"/rbac/roles/{role}", method="PATCH",
+                  json={"agents": sorted(current_agents | {agent_id})})
+        elif not checked and agent_id in current_agents:
+            _core(f"/rbac/roles/{role}", method="PATCH",
+                  json={"agents": sorted(current_agents - {agent_id})})
+
     return RedirectResponse("/agents", status_code=303)
+
+
+@app.delete("/agents/{agent_id}", response_class=HTMLResponse)
+def delete_agent_htmx(agent_id: str):
+    _core(f"/agents/{agent_id}", method="DELETE")
+    return HTMLResponse("")
 
 
 @app.get("/shared-state", response_class=HTMLResponse)
