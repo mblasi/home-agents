@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Permisos por rol{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <div>
+    <h1 class="text-2xl font-bold">Permisos por rol</h1>
+    <p class="text-xs text-gray-500 mt-1">
+      Define qué agentes tiene habilitados cada rol por defecto.
+      Los permisos individuales por usuario sobreescriben esto.
+    </p>
+  </div>
+  <a href="/users" class="text-xs text-gray-500 hover:text-gray-300">← Usuarios</a>
+</div>
+
+<form method="post" action="/rbac/roles/edit">
+  <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden mb-4">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b border-gray-800">
+          <th class="px-4 py-3 text-left text-gray-400 font-medium w-36">Rol</th>
+          {% for aid, info in agents.items() %}
+          <th class="px-3 py-3 text-center text-gray-400 font-medium" title="{{ info.name }}">
+            <div class="flex flex-col items-center gap-0.5">
+              <span class="text-base">{{ info.icon }}</span>
+              <span class="text-[10px] text-gray-500">{{ info.name }}</span>
+            </div>
+          </th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-800/50">
+
+        {# Admin — siempre acceso total, no editable #}
+        <tr class="bg-gray-800/20">
+          <td class="px-4 py-3">
+            <span class="text-purple-400 font-medium">admin</span>
+            <span class="ml-2 text-[10px] text-gray-600">acceso total</span>
+          </td>
+          {% for aid, info in agents.items() %}
+          <td class="px-3 py-3 text-center">
+            <span class="text-emerald-400 opacity-50" title="Admin siempre tiene acceso total">●</span>
+          </td>
+          {% endfor %}
+        </tr>
+
+        {# Roles editables #}
+        {% for role in roles %}
+        {% if role == "admin" %}{% continue %}{% endif %}
+        {% set rperms = role_perms.get(role, []) %}
+        {% set role_has_all = "*" in rperms %}
+        <tr class="hover:bg-gray-800/30">
+          <td class="px-4 py-3">
+            {% if role == "familiar" %}
+            <span class="text-blue-400 font-medium">{{ role }}</span>
+            {% elif role == "adolescente" %}
+            <span class="text-cyan-400 font-medium">{{ role }}</span>
+            {% elif role == "niño" %}
+            <span class="text-green-400 font-medium">{{ role }}</span>
+            {% else %}
+            <span class="text-gray-400 font-medium">{{ role }}</span>
+            {% endif %}
+          </td>
+          {% for aid, info in agents.items() %}
+          {% set checked = role_has_all or aid in rperms %}
+          <td class="px-3 py-3 text-center">
+            <label class="cursor-pointer inline-flex items-center justify-center">
+              <input type="checkbox"
+                     name="{{ role }}__{{ aid }}"
+                     class="w-4 h-4 rounded accent-emerald-500 cursor-pointer"
+                     {{ "checked" if checked }}>
+            </label>
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+
+      </tbody>
+    </table>
+  </div>
+
+  <div class="flex items-center gap-3">
+    <button type="submit"
+            class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors">
+      Guardar permisos
+    </button>
+    <a href="/users" class="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors">
+      Cancelar
+    </a>
+  </div>
+</form>
+{% endblock %}

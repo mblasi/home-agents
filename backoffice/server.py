@@ -382,6 +382,32 @@ def delete_user_htmx(uid: str):
     return HTMLResponse("")
 
 
+# ── RBAC roles ─────────────────────────────────────────────────────────────────
+
+_ROLES_ORDER = ["admin", "familiar", "adolescente", "niño", "invitado", "guest"]
+
+
+@app.get("/rbac/roles/edit", response_class=HTMLResponse)
+def rbac_roles_edit_page(request: Request):
+    agents, role_perms = _load_rbac_context()
+    return _render(request, "rbac_edit.html", "users",
+                   agents=agents, role_perms=role_perms, roles=_ROLES_ORDER, saved=False)
+
+
+@app.post("/rbac/roles/edit")
+async def rbac_roles_save(request: Request):
+    form = await request.form()
+    agents_data = _core("/agents") or {}
+    role_perms = _core("/rbac/roles") or {}
+    all_agent_ids = list(agents_data.keys())
+    for role in _ROLES_ORDER:
+        if role == "admin":
+            continue  # admin siempre tiene "*", no se edita
+        checked = [aid for aid in all_agent_ids if form.get(f"{role}__{aid}")]
+        _core(f"/rbac/roles/{role}", method="PATCH", json={"agents": checked})
+    return RedirectResponse("/users", status_code=303)
+
+
 @app.get("/ear", response_class=HTMLResponse)
 def ear_page(request: Request):
     return _render(request, "ear.html", "ear")
