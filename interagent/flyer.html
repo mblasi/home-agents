@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Interagent — Red de redes de agentes</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0a0c12;
+      --surface:  #111420;
+      --card:     #161a28;
+      --border:   #1f2540;
+      --accent:   #5b6ef5;
+      --accent2:  #7c3aed;
+      --green:    #22c55e;
+      --amber:    #f59e0b;
+      --text:     #e2e8f0;
+      --muted:    #64748b;
+      --radius:   14px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* ─── HERO ─── */
+    .hero {
+      text-align: center;
+      padding: 72px 24px 60px;
+      background: radial-gradient(ellipse 80% 60% at 50% 0%, #1a1f40 0%, var(--bg) 70%);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      border-radius: 100px;
+      padding: 4px 14px;
+      margin-bottom: 24px;
+    }
+
+    .hero h1 {
+      font-size: clamp(2.8rem, 7vw, 5rem);
+      font-weight: 800;
+      letter-spacing: -.03em;
+      line-height: 1.05;
+      background: linear-gradient(135deg, #fff 30%, #7c9bff 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 20px;
+    }
+
+    .hero .tagline {
+      font-size: clamp(1rem, 2.5vw, 1.25rem);
+      color: var(--muted);
+      max-width: 600px;
+      margin: 0 auto 36px;
+    }
+
+    .hero .cta-row {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 26px;
+      border-radius: 10px;
+      font-size: .95rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: filter .15s;
+    }
+    .btn:hover { filter: brightness(1.15); }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff;
+    }
+    .btn-outline {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    /* ─── STATS BAR ─── */
+    .stats {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .stat {
+      flex: 1 1 160px;
+      text-align: center;
+      padding: 28px 20px;
+      border-right: 1px solid var(--border);
+    }
+    .stat:last-child { border-right: none; }
+
+    .stat .num {
+      font-size: 2rem;
+      font-weight: 800;
+      color: #fff;
+      display: block;
+    }
+    .stat .label { font-size: .8rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+
+    /* ─── SECTIONS ─── */
+    .section {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 64px 24px;
+    }
+
+    .section-header {
+      text-align: center;
+      margin-bottom: 48px;
+    }
+    .section-header .eyebrow {
+      font-size: .8rem;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 10px;
+    }
+    .section-header h2 {
+      font-size: clamp(1.6rem, 4vw, 2.4rem);
+      font-weight: 800;
+      letter-spacing: -.02em;
+      color: #fff;
+    }
+    .section-header p {
+      color: var(--muted);
+      max-width: 520px;
+      margin: 12px auto 0;
+      font-size: .95rem;
+    }
+
+    /* ─── GRID CARDS ─── */
+    .grid { display: grid; gap: 16px; }
+    .grid-2 { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+    .grid-3 { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+      transition: border-color .2s, transform .2s;
+    }
+    .card:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+    }
+
+    .card .icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+      margin-bottom: 16px;
+    }
+    .icon-blue   { background: rgba(91,110,245,.18); }
+    .icon-purple { background: rgba(124,58,237,.18); }
+    .icon-green  { background: rgba(34,197,94,.18); }
+    .icon-amber  { background: rgba(245,158,11,.18); }
+    .icon-pink   { background: rgba(236,72,153,.18); }
+    .icon-cyan   { background: rgba(6,182,212,.18); }
+    .icon-red    { background: rgba(239,68,68,.18); }
+    .icon-teal   { background: rgba(20,184,166,.18); }
+
+    .card h3 { font-size: 1.05rem; font-weight: 700; color: #fff; margin-bottom: 8px; }
+    .card p  { font-size: .875rem; color: var(--muted); line-height: 1.65; }
+
+    .tag {
+      display: inline-block;
+      font-size: .7rem;
+      font-weight: 700;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      padding: 2px 9px;
+      border-radius: 100px;
+      margin-top: 12px;
+    }
+    .tag-live   { background: rgba(34,197,94,.15); color: var(--green); }
+    .tag-soon   { background: rgba(245,158,11,.12); color: var(--amber); }
+    .tag-vision { background: rgba(91,110,245,.15); color: #8ea3ff; }
+
+    /* ─── PIPELINE ─── */
+    .pipeline {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 36px;
+    }
+
+    .pipe-steps {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+    }
+
+    .pipe-step {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 20px;
+      text-align: center;
+      min-width: 120px;
+    }
+    .pipe-step .ps-label { font-size: .7rem; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; }
+    .pipe-step .ps-name  { font-size: .9rem; font-weight: 700; color: #fff; margin-top: 2px; }
+    .pipe-step .ps-lat   { font-size: .75rem; color: var(--green); margin-top: 2px; }
+
+    .pipe-arrow { color: var(--muted); font-size: 1.1rem; }
+
+    /* ─── INTERAGENT NET ─── */
+    .net-section {
+      background: linear-gradient(135deg, #0e1230 0%, #0a0c12 100%);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .pricing {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+    }
+
+    .price-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px 22px;
+      text-align: center;
+    }
+    .price-card.featured {
+      border-color: var(--accent);
+      background: linear-gradient(180deg, #1a1f45 0%, var(--card) 100%);
+    }
+    .price-card .tier    { font-size: .75rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+    .price-card .amount  { font-size: 2.2rem; font-weight: 800; color: #fff; margin: 8px 0 2px; }
+    .price-card .period  { font-size: .8rem; color: var(--muted); }
+    .price-card .calls   { font-size: .85rem; color: var(--text); margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+
+    /* ─── AGENTS GRID ─── */
+    .agent-chip {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 18px;
+    }
+    .agent-chip .emoji { font-size: 1.4rem; }
+    .agent-chip .info .name  { font-size: .9rem; font-weight: 700; color: #fff; }
+    .agent-chip .info .desc  { font-size: .78rem; color: var(--muted); }
+
+    /* ─── PRIVACY BANNER ─── */
+    .privacy-banner {
+      background: linear-gradient(135deg, rgba(34,197,94,.08) 0%, rgba(6,182,212,.06) 100%);
+      border: 1px solid rgba(34,197,94,.2);
+      border-radius: var(--radius);
+      padding: 36px 40px;
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+    .privacy-banner .lock { font-size: 2.5rem; }
+    .privacy-banner h3    { font-size: 1.2rem; font-weight: 800; color: #fff; margin-bottom: 4px; }
+    .privacy-banner p     { font-size: .875rem; color: var(--muted); }
+
+    /* ─── FOOTER ─── */
+    footer {
+      border-top: 1px solid var(--border);
+      text-align: center;
+      padding: 32px 24px;
+      color: var(--muted);
+      font-size: .8rem;
+    }
+
+    /* ─── DIVIDER ─── */
+    .divider {
+      border: none;
+      border-top: 1px solid var(--border);
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════ HERO ══════════════════════ -->
+<section class="hero">
+  <div class="badge">Local-first AI · Sin cloud · Sin latencia de red</div>
+  <h1>Interagent</h1>
+  <p class="tagline">
+    Una red de agentes de IA que vive en tu casa. Domótica, clima, agenda,
+    inversiones y viajes — todo por voz, todo privado, todo offline-first.
+  </p>
+  <div class="cta-row">
+    <a class="btn btn-primary" href="#">Empezar ahora</a>
+    <a class="btn btn-outline" href="#">Ver en GitHub</a>
+  </div>
+</section>
+
+<!-- ══════════════════════ STATS ══════════════════════ -->
+<div class="stats">
+  <div class="stat"><span class="num">~8s</span><span class="label">Latencia warm</span></div>
+  <div class="stat"><span class="num">100%</span><span class="label">Local · Sin cloud</span></div>
+  <div class="stat"><span class="num">0.96</span><span class="label">Score wake word</span></div>
+  <div class="stat"><span class="num">13+</span><span class="label">Entidades HAOS</span></div>
+  <div class="stat"><span class="num">5+</span><span class="label">Agentes de dominio</span></div>
+</div>
+
+<!-- ══════════════════════ PIPELINE ══════════════════════ -->
+<div class="section">
+  <div class="section-header">
+    <div class="eyebrow">Arquitectura</div>
+    <h2>Pipeline de voz end-to-end</h2>
+    <p>Desde "Capitán" hasta la acción en tu casa. Todo corre en tu laptop.</p>
+  </div>
+  <div class="pipeline">
+    <div class="pipe-steps">
+      <div class="pipe-step">
+        <div class="ps-label">Micrófono</div>
+        <div class="ps-name">ALC256</div>
+        <div class="ps-lat">44100Hz</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step">
+        <div class="ps-label">Wake Word</div>
+        <div class="ps-name">openWakeWord</div>
+        <div class="ps-lat">score 0.96</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step">
+        <div class="ps-label">STT</div>
+        <div class="ps-name">faster-whisper</div>
+        <div class="ps-lat">~4.6s</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step">
+        <div class="ps-label">LLM</div>
+        <div class="ps-name">qwen2.5:7b</div>
+        <div class="ps-lat">~3.5s</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step">
+        <div class="ps-label">HAOS REST</div>
+        <div class="ps-name">:8123</div>
+        <div class="ps-lat">&lt;200ms</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step">
+        <div class="ps-label">TTS</div>
+        <div class="ps-name">Piper · Daniela</div>
+        <div class="ps-lat">es_AR</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ══════════════════════ AGENTES ══════════════════════ -->
+<div class="section">
+  <div class="section-header">
+    <div class="eyebrow">Agentes de dominio</div>
+    <h2>Un agente para cada área de tu vida</h2>
+    <p>Cada agente es especialista. El orquestador decide a quién rutear cada pedido.</p>
+  </div>
+  <div class="grid grid-3">
+    <div class="agent-chip">
+      <div class="emoji">💡</div>
+      <div class="info">
+        <div class="name">Domótica</div>
+        <div class="desc">Luces, AC, persianas, riego, puertas — voz o WhatsApp</div>
+      </div>
+    </div>
+    <div class="agent-chip">
+      <div class="emoji">🌦️</div>
+      <div class="info">
+        <div class="name">Clima</div>
+        <div class="desc">Pronóstico 7 días, alertas proactivas, integrado con domótica</div>
+      </div>
+    </div>
+    <div class="agent-chip">
+      <div class="emoji">📅</div>
+      <div class="info">
+        <div class="name">Agenda</div>
+        <div class="desc">CalDAV local, recordatorios por voz, sync Google Calendar</div>
+      </div>
+    </div>
+    <div class="agent-chip">
+      <div class="emoji">📈</div>
+      <div class="info">
+        <div class="name">Inversiones</div>
+        <div class="desc">Portfolio privado, dólar BCRA, Yahoo Finance — sin salir de la LAN</div>
+      </div>
+    </div>
+    <div class="agent-chip">
+      <div class="emoji">✈️</div>
+      <div class="info">
+        <div class="name">Viajes</div>
+        <div class="desc">RAG sobre reservas y pasaportes, clima en destino, itinerarios</div>
+      </div>
+    </div>
+    <div class="agent-chip">
+      <div class="emoji">🤝</div>
+      <div class="info">
+        <div class="name">Amigo / Asesor</div>
+        <div class="desc">Conversación libre, memoria entre sesiones, perfiles múltiples</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ══════════════════════ FEATURES ══════════════════════ -->
+<div class="section">
+  <div class="section-header">
+    <div class="eyebrow">Features</div>
+    <h2>Todo lo que el sistema sabe hacer</h2>
+  </div>
+  <div class="grid grid-2">
+
+    <div class="card">
+      <div class="icon icon-blue">🎙️</div>
+      <h3>Wake word propio</h3>
+      <p>Modelo ONNX entrenado con voz Daniela (es_AR). 90 samples positivos, 1320 negativos.
+         Score 0.96 en producción. Corre en CPU, sin Porcupine ni servicios de terceros.</p>
+      <span class="tag tag-live">Live</span>
+    </div>
+
+    <div class="card">
+      <div class="icon icon-purple">🧠</div>
+      <h3>LLM local, sin API key</h3>
+      <p>qwen2.5:7b via Ollama. Entiende comandos ambiguos, maneja contexto multi-turno,
+         genera respuestas en español rioplatense. Latencia warm ~3.5s.</p>
+      <span class="tag tag-live">Live</span>
+    </div>
+
+    <div class="card">
+      <div class="icon icon-green">🌐</div>
+      <h3>WhatsApp como canal</h3>
+      <p>Texto y notas de voz desde WhatsApp hacia el mismo orquestador.
+         Whitelist de números. STT con faster-whisper. Respuesta texto o audio (Piper).</p>
+      <span class="tag tag-soon">Próximo</span>
+    </div>
+
+    <div class="card">
+      <div class="icon icon-amber">🔔</div>
+      <h3>Alertas proactivas</h3>
+      <p>Cualquier agente puede publicar alertas en una cola FIFO. El sistema las anuncia
+         por voz cuando estás en modo listening. Primer caso: lluvia inminente.</p>
+      <span class="tag tag-live">Live</span>
+    </div>
+
+    <div class="card">
+      <div class="icon icon-pink">👥</div>
+      <h3>Identificación de usuarios</h3>
+      <p>Enrollment por voz, embeddings biométricos locales, cosine similarity &lt;200ms.
+         Roles (admin/familiar/niño/invitado) con RBAC. Los datos nunca salen del hogar.</p>
+      <span class="tag tag-soon">Próximo</span>
+    </div>
+
+    <div class="card">
+      <div class="icon icon-cyan">🔀</div>
+      <h3>Coordinador LLM multi-agente</h3>
+      <p>"¿Debería llevar paraguas y tengo algo agendado mañana?" — el coordinador
+         descompone el request, lanza agentes en paralelo y sintetiza la respuesta.</p>
+      <span class="tag tag-soon">Próximo</span>
+    </div>
+
+    <div class="card">
+      <div class="icon icon-teal">🗺️</div>
+      <h3>Estado compartido cross-agente</h3>
+      <p>El agente clima publica `weather.is_raining` en shared_state. El agente domótica
+         lo lee para bajar persianas sin que el usuario lo pida.</p>
+      <span class="tag tag-live">Live</span>
+    </div>
+
+    <div class="card">
+      <div class="icon icon-red">📊</div>
+      <h3>Dashboard en terminal</h3>
+      <p>Panel zellij con wake word score animado, historial de comandos, latencias STT/LLM,
+         agente activo. Métricas en tiempo real via /tmp/capitan/*.json.</p>
+      <span class="tag tag-live">Live</span>
+    </div>
+
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ══════════════════════ PRIVACY ══════════════════════ -->
+<div class="section">
+  <div class="privacy-banner">
+    <div class="lock">🔒</div>
+    <div>
+      <h3>Privacidad total — ningún dato sale de tu red local</h3>
+      <p>STT, LLM, TTS y todos los agentes corren en CPU, dentro de tu LAN.
+         HAOS solo recibe órdenes via REST. Sin tokens de terceros, sin telemetría,
+         sin cloud. Tus datos de inversiones, agenda y biométricos nunca abandonan el hogar.</p>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ══════════════════════ INTERAGENT NET ══════════════════════ -->
+<section class="net-section">
+  <div class="section">
+    <div class="section-header">
+      <div class="eyebrow">Visión · Interagent Network</div>
+      <h2>Internet es una red de redes.<br>Interagent es una red de redes de agentes.</h2>
+      <p>Cada hogar o empresa corre su nodo. Los nodos publican y consumen servicios entre sí,
+         formando un ecosistema distribuido con billing y reputación incorporados.</p>
+    </div>
+
+    <div class="grid grid-3" style="margin-bottom: 48px;">
+      <div class="card">
+        <div class="icon icon-blue">🏠</div>
+        <h3>Nodo (local)</h3>
+        <p>Orquestador FastAPI + agentes especializados. Agent SDK con keypair único.
+           Publica y consume servicios de la registry. Metering agent para billing.</p>
+        <span class="tag tag-vision">Visión</span>
+      </div>
+      <div class="card">
+        <div class="icon icon-purple">🗄️</div>
+        <h3>Registry (cloud)</h3>
+        <p>Catálogo de servicios con búsqueda, tags y schemas. Auth via keypair.
+           Metering y billing mensual. Gateway para llamadas pagas.</p>
+        <span class="tag tag-vision">Visión</span>
+      </div>
+      <div class="card">
+        <div class="icon icon-green">⭐</div>
+        <h3>Community layer</h3>
+        <p>Stars por uso real, joins, maturity score. Sistema de reportes y auto-ban.
+           Llamadas free directo nodo-a-nodo con rate limiting en el SDK.</p>
+        <span class="tag tag-vision">Visión</span>
+      </div>
+    </div>
+
+    <div class="section-header" style="margin-bottom: 24px;">
+      <h2>Modelo de negocio</h2>
+      <p>70% al proveedor · 25% plataforma · 5% comunidad. Cash out mensual via Stripe Connect.</p>
+    </div>
+
+    <div class="pricing">
+      <div class="price-card">
+        <div class="tier">Free</div>
+        <div class="amount">$0</div>
+        <div class="period">/ mes</div>
+        <div class="calls">1.000 llamadas<br>por servicio</div>
+      </div>
+      <div class="price-card featured">
+        <div class="tier">Starter</div>
+        <div class="amount">$9</div>
+        <div class="period">/ mes</div>
+        <div class="calls">50.000 llamadas<br>totales</div>
+      </div>
+      <div class="price-card">
+        <div class="tier">Pro</div>
+        <div class="amount">$49</div>
+        <div class="period">/ mes</div>
+        <div class="calls">500.000 llamadas<br>totales</div>
+      </div>
+      <div class="price-card">
+        <div class="tier">Enterprise</div>
+        <div class="amount">Custom</div>
+        <div class="period">&nbsp;</div>
+        <div class="calls">Llamadas<br>ilimitadas</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════ STACK ══════════════════════ -->
+<div class="section">
+  <div class="section-header">
+    <div class="eyebrow">Stack técnico</div>
+    <h2>Open source, sin dependencias de pago</h2>
+  </div>
+  <div class="grid grid-3">
+    <div class="card">
+      <div class="icon icon-blue">⚡</div>
+      <h3>Inferencia</h3>
+      <p>Ollama 0.20.3 · qwen2.5:7b (AVX2 + FMA3) · faster-whisper small int8 · Piper TTS v1.2 · openWakeWord ONNX</p>
+    </div>
+    <div class="card">
+      <div class="icon icon-purple">🔧</div>
+      <h3>Backend</h3>
+      <p>FastAPI · uvicorn · Python 3.13 · FAISS + embeddings (RAG) · pydantic · systemd units</p>
+    </div>
+    <div class="card">
+      <div class="icon icon-green">🖥️</div>
+      <h3>Hardware</h3>
+      <p>AMD Ryzen 9 5900HX · 64GB DDR4 · Gentoo Linux GCC 15.2 znver3 · Todo en CPU · Sin GPU requerida</p>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════ FOOTER ══════════════════════ -->
+<footer>
+  <p>Interagent · <a href="mailto:matias@blasi.ar" style="color: var(--accent); text-decoration: none;">matias@blasi.ar</a> · github.com/mblasi/home-agents</p>
+  <p style="margin-top: 6px;">Construido con fastapi · ollama · faster-whisper · openWakeWord · Piper TTS · Home Assistant OS</p>
+</footer>
+
+</body>
+</html>
