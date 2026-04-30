@@ -771,6 +771,36 @@ Auth:     Google OAuth2 — device flow para el primer login, token refresh auto
 
 ---
 
+### FASE 14 — Gestión dinámica de agentes desde el backoffice
+```
+Objetivo: Hacer que status, keywords y configuración específica de cada agente sean editables
+          desde el backoffice sin tocar código. Persiste en ~/.local/share/capitan/agents.json.
+          Nuevos agentes aparecen automáticamente al declarar su config_schema.
+Estado:   Pendiente
+Stack:    core/agent_config.py (nuevo) + backoffice/templates/agent_edit.html (nuevo)
+Nota:     Cambios de config/keywords aplican en el próximo reinicio del core.
+          Toggle de status aplica en runtime (el dispatcher lee el registry en cada llamada).
+```
+- [ ] 14.1  `core/agent_config.py` — persistencia de config de agentes en JSON
+            (singleton + atomic write, mismo patrón que users.py)
+- [ ] 14.2  `core/agent_registry.py` — `get_registry()` que fusiona REGISTRY estático + overrides
+            del JSON; dispatcher y agent_status() usan keywords/status efectivos
+- [ ] 14.3  `core/server.py` — 4 endpoints nuevos: GET /agents/{id},
+            PATCH /agents/{id}/status, /agents/{id}/keywords, /agents/{id}/config;
+            GET /agents enriquecido con config_schema y config actual
+- [ ] 14.4  `core/agent.py` (HaosAgent) — agregar config_schema (model, top_k_entities,
+            max_retries) + leer valores desde agent_config en __init__
+- [ ] 14.5  `core/clima_agent.py` (ClimaAgent) — agregar config_schema (lat, lon,
+            location_name, provider) + leer desde agent_config (prioridad sobre .env)
+- [ ] 14.6  `backoffice/templates/agents.html` — toggle HTMX de status en cada fila
+            + columna "Editar" + banner "reiniciar core para aplicar cambios"
+- [ ] 14.7  `backoffice/templates/agent_edit.html` (nuevo) — form dinámico con tres
+            secciones: radio de status, textarea de keywords, campos dinámicos según config_schema
+- [ ] 14.8  `backoffice/server.py` — implementar toggle real (reemplaza stub), rutas
+            GET/POST /agents/{id}/edit, POST /agents/{id}/keywords y /config con conversión de tipos
+
+---
+
 ## PIPELINE ACTUAL (para referencia rápida)
 
 ```
