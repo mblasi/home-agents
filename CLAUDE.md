@@ -45,6 +45,23 @@ Al implementar **cada ítem del plan** (`- [ ] N.M ...`), seguir este flujo obli
 
 Si la tarea afecta solo el repo umbrella (`masterplan/`, `scripts/`), el branch y PR van en `home-agents` directamente.
 
+### Sincronización obligatoria al terminar cada tarea
+
+Al completar cualquier ítem del plan, **siempre** hacer estas dos cosas antes de avanzar a la siguiente:
+
+1. **Marcar `[x]` en `estado.md`** — la tarea debe quedar marcada como completada.
+
+2. **Correr el sync de issues**:
+   ```zsh
+   source ~/home-agents-env/bin/activate
+   python scripts/sync_issues.py
+   ```
+   Esto cierra el issue de GitHub correspondiente. Sin este paso, el proyecto de GH
+   queda desincronizado con el plan.
+
+Si se completaron varias tareas en la sesión sin sincronizar, correr el sync al final
+de la sesión como mínimo. Hacer siempre `--dry-run` primero para verificar.
+
 ---
 
 ## Plan y estado
