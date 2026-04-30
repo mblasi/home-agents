@@ -44,10 +44,10 @@
     <div class="grid grid-cols-2 gap-3">
       <div>
         <label class="block text-xs text-gray-400 mb-1 uppercase tracking-wider">Rol</label>
-        <select name="role"
+        <select name="role" id="role-select"
                 class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm
                        focus:border-blue-500 focus:outline-none">
-          {% for r in ["admin", "familiar", "niño", "invitado"] %}
+          {% for r in ["admin", "familiar", "adolescente", "niño", "invitado"] %}
           <option value="{{ r }}" {{ "selected" if user and user.role == r }}>{{ r }}</option>
           {% endfor %}
         </select>
@@ -63,6 +63,58 @@
         </select>
       </div>
     </div>
+
+    {# ── Permisos sobre agentes ───────────────────────────────────────────────── #}
+    {% if agents %}
+    <div>
+      <label class="block text-xs text-gray-400 mb-2 uppercase tracking-wider">Acceso a agentes</label>
+
+      {# Calcular estado actual del usuario #}
+      {% set current_role = user.role if user else "invitado" %}
+      {% set role_grants = role_perms.get(current_role, []) %}
+      {% set has_all = "*" in role_grants %}
+      {% set user_grants = user.agent_ids if user and user.agent_ids else [] %}
+      {% set user_revokes = user.revoked_agents if user and user.revoked_agents else [] %}
+
+      <div class="bg-gray-800/50 border border-gray-700 rounded-lg divide-y divide-gray-700/50" id="agents-list">
+        {% for aid, info in agents.items() %}
+          {% set from_role = has_all or aid in role_grants %}
+          {% set explicitly_granted = aid in user_grants %}
+          {% set explicitly_revoked = aid in user_revokes %}
+          {% set checked = (from_role and not explicitly_revoked) or explicitly_granted %}
+          <label class="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-800/70 agent-row"
+                 data-agent="{{ aid }}">
+            <input type="checkbox"
+                   name="agent_{{ aid }}"
+                   id="agent_{{ aid }}"
+                   {% if checked %}checked{% endif %}
+                   class="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-500
+                          focus:ring-blue-500 focus:ring-offset-gray-900 agent-checkbox"
+                   data-from-role="{{ 'true' if from_role else 'false' }}">
+            <span class="text-base">{{ info.icon }}</span>
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-medium text-gray-200">{{ info.name }}</div>
+              <div class="text-xs text-gray-500 truncate">{{ info.desc }}</div>
+            </div>
+            <span class="text-xs shrink-0 override-label
+                         {% if explicitly_granted %}text-emerald-400
+                         {% elif explicitly_revoked %}text-red-400
+                         {% elif from_role %}text-gray-600
+                         {% else %}text-gray-700{% endif %}"
+                  id="label_{{ aid }}">
+              {% if explicitly_granted %}+ otorgado
+              {% elif explicitly_revoked %}&mdash; revocado
+              {% elif from_role %}por rol
+              {% else %}sin acceso{% endif %}
+            </span>
+          </label>
+        {% endfor %}
+      </div>
+      <p class="text-xs text-gray-600 mt-1.5">
+        Los checkboxes con "por rol" siguen el rol seleccionado. Cualquier cambio manual es un override individual.
+      </p>
+    </div>
+    {% endif %}
 
     <div>
       <label class="block text-xs text-gray-400 mb-1 uppercase tracking-wider">
@@ -92,4 +144,62 @@
     </div>
   </form>
 </div>
+
+<script>
+// Permisos por rol (inyectados desde el servidor)
+const ROLE_PERMS = {{ role_perms | tojson }};
+
+const roleSelect = document.getElementById("role-select");
+if (roleSelect) {
+  roleSelect.addEventListener("change", function () {
+    const role = this.value;
+    const grants = ROLE_PERMS[role] || [];
+    const hasAll = grants.includes("*");
+
+    document.querySelectorAll(".agent-checkbox").forEach(function (cb) {
+      const aid = cb.closest(".agent-row").dataset.agent;
+      const fromRole = hasAll || grants.includes(aid);
+      const label = document.getElementById("label_" + aid);
+
+      cb.checked = fromRole;
+      cb.dataset.fromRole = fromRole ? "true" : "false";
+
+      if (label) {
+        label.className = label.className.replace(/text-\w+-\d+/g, "").trim();
+        label.textContent = fromRole ? "por rol" : "sin acceso";
+        label.classList.add(fromRole ? "text-gray-600" : "text-gray-700");
+      }
+    });
+  });
+
+  // Actualizar label al hacer click manual en un checkbox
+  document.querySelectorAll(".agent-checkbox").forEach(function (cb) {
+    cb.addEventListener("change", function () {
+      const aid = cb.closest(".agent-row").dataset.agent;
+      const role = roleSelect.value;
+      const grants = ROLE_PERMS[role] || [];
+      const hasAll = grants.includes("*");
+      const fromRole = hasAll || grants.includes(aid);
+      const label = document.getElementById("label_" + aid);
+
+      if (!label) return;
+      label.className = label.className.replace(/text-\w+-\d+/g, "").trim();
+
+      if (cb.checked && !fromRole) {
+        label.textContent = "+ otorgado";
+        label.classList.add("text-emerald-400");
+      } else if (!cb.checked && fromRole) {
+        label.textContent = "— revocado";
+        label.classList.add("text-red-400");
+      } else if (cb.checked) {
+        label.textContent = "por rol";
+        label.classList.add("text-gray-600");
+      } else {
+        label.textContent = "sin acceso";
+        label.classList.add("text-gray-700");
+      }
+    });
+  });
+}
+</script>
 {% endblock %}

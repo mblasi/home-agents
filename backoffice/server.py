@@ -274,31 +274,69 @@ def devices_page(request: Request):
     return _render(request, "devices.html", "devices", devices=devices)
 
 
+def _load_rbac_context() -> tuple[dict, dict]:
+    """Devuelve (agents, role_perms) del core. Ambos son dicts."""
+    agents = _core("/agents") or {}
+    role_perms = _core("/rbac/roles") or {}
+    return agents, role_perms
+
+
+def _compute_agent_overrides(
+    form, role: str, role_perms: dict, all_agent_ids: list[str]
+) -> tuple[list[str], list[str]]:
+    """Calcula grants y revocaciones a partir de los checkboxes del form.
+
+    Devuelve (agent_ids, revoked_agents):
+      agent_ids      — agentes marcados que el rol NO otorga (grants explícitos)
+      revoked_agents — agentes NO marcados que el rol SÍ otorga (revocaciones explícitas)
+    """
+    role_grants = set(role_perms.get(role, []))
+    if "*" in role_grants:
+        role_grants = set(all_agent_ids)
+
+    checked = {aid for aid in all_agent_ids if form.get(f"agent_{aid}")}
+
+    agent_ids      = sorted(checked - role_grants)
+    revoked_agents = sorted(role_grants - checked)
+    return agent_ids, revoked_agents
+
+
 @app.get("/users", response_class=HTMLResponse)
 def users_page(request: Request):
     data = _core("/users") or {}
-    return _render(request, "users.html", "users", users=data)
+    agents, role_perms = _load_rbac_context()
+    return _render(request, "users.html", "users", users=data, agents=agents, role_perms=role_perms)
 
 
 @app.get("/users/new", response_class=HTMLResponse)
 def new_user_page(request: Request):
-    return _render(request, "user_form.html", "users", user=None, uid=None, error="")
+    agents, role_perms = _load_rbac_context()
+    return _render(request, "user_form.html", "users",
+                   user=None, uid=None, error="", agents=agents, role_perms=role_perms)
 
 
 @app.post("/users/create")
 async def create_user_submit(request: Request):
     form = await request.form()
+    agents, role_perms = _load_rbac_context()
+    role = str(form.get("role", "invitado"))
+    agent_ids, revoked_agents = _compute_agent_overrides(
+        form, role, role_perms, list(agents.keys())
+    )
     payload = {
-        "id":           str(form.get("id", "")).strip(),
-        "name":         str(form.get("name", "")).strip(),
-        "role":         str(form.get("role", "invitado")),
-        "relationship": str(form.get("relationship", "invitado")),
-        "wa_phone":     str(form.get("wa_phone", "")).strip() or None,
+        "id":             str(form.get("id", "")).strip(),
+        "name":           str(form.get("name", "")).strip(),
+        "role":           role,
+        "relationship":   str(form.get("relationship", "invitado")),
+        "wa_phone":       str(form.get("wa_phone", "")).strip() or None,
+        "agent_ids":      agent_ids,
+        "revoked_agents": revoked_agents,
     }
     result = _core("/users", method="POST", json=payload)
     if result is None:
         return _render(request, "user_form.html", "users",
-                       user=payload, uid=None, error="No se pudo crear el usuario (¿ID ya existe?)")
+                       user=payload, uid=None, error="No se pudo crear el usuario (¿ID ya existe?)",
+                       agents=agents, role_perms=role_perms)
     return RedirectResponse("/users", status_code=303)
 
 
@@ -307,22 +345,33 @@ def edit_user_page(request: Request, uid: str):
     user = _core(f"/users/{uid}")
     if not user:
         return RedirectResponse("/users", status_code=303)
-    return _render(request, "user_form.html", "users", user=user, uid=uid, error="")
+    agents, role_perms = _load_rbac_context()
+    return _render(request, "user_form.html", "users",
+                   user=user, uid=uid, error="", agents=agents, role_perms=role_perms)
 
 
 @app.post("/users/{uid}/update")
 async def update_user_submit(request: Request, uid: str):
     form = await request.form()
+    agents, role_perms = _load_rbac_context()
+    role = str(form.get("role", "invitado"))
+    agent_ids, revoked_agents = _compute_agent_overrides(
+        form, role, role_perms, list(agents.keys())
+    )
     payload = {
-        "name":         str(form.get("name", "")).strip(),
-        "role":         str(form.get("role", "invitado")),
-        "relationship": str(form.get("relationship", "invitado")),
-        "wa_phone":     str(form.get("wa_phone", "")).strip() or None,
+        "name":           str(form.get("name", "")).strip(),
+        "role":           role,
+        "relationship":   str(form.get("relationship", "invitado")),
+        "wa_phone":       str(form.get("wa_phone", "")).strip() or None,
+        "agent_ids":      agent_ids,
+        "revoked_agents": revoked_agents,
     }
     result = _core(f"/users/{uid}", method="PATCH", json=payload)
     if result is None:
         return _render(request, "user_form.html", "users",
-                       user={**payload, "id": uid}, uid=uid, error="No se pudo actualizar el usuario")
+                       user={**payload, "id": uid}, uid=uid,
+                       error="No se pudo actualizar el usuario",
+                       agents=agents, role_perms=role_perms)
     return RedirectResponse("/users", status_code=303)
 
 

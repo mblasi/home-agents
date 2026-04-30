@@ -17,7 +17,7 @@
       <tr class="border-b border-gray-800 text-gray-400 text-xs uppercase tracking-wider">
         <th class="px-4 py-3 text-left">Usuario</th>
         <th class="px-4 py-3 text-left">Rol</th>
-        <th class="px-4 py-3 text-left">Relación</th>
+        <th class="px-4 py-3 text-left">Agentes</th>
         <th class="px-4 py-3 text-left">WhatsApp</th>
         <th class="px-4 py-3 text-center">Speaker</th>
         <th class="px-4 py-3 text-right">Acciones</th>
@@ -25,6 +25,11 @@
     </thead>
     <tbody class="divide-y divide-gray-800">
       {% for uid, u in users.items() %}
+      {# Calcular acceso efectivo a cada agente #}
+      {% set role_grants = role_perms.get(u.role, []) %}
+      {% set has_all = "*" in role_grants %}
+      {% set user_grants = u.get("agent_ids", []) %}
+      {% set user_revokes = u.get("revoked_agents", []) %}
       <tr id="user-row-{{ uid }}" class="hover:bg-gray-800/50">
         <td class="px-4 py-3">
           <div class="font-medium">{{ u.name }}</div>
@@ -35,13 +40,38 @@
           <span class="px-2 py-0.5 bg-purple-900/50 text-purple-400 rounded text-xs">{{ u.role }}</span>
           {% elif u.role == "familiar" %}
           <span class="px-2 py-0.5 bg-blue-900/50 text-blue-400 rounded text-xs">{{ u.role }}</span>
+          {% elif u.role == "adolescente" %}
+          <span class="px-2 py-0.5 bg-cyan-900/50 text-cyan-400 rounded text-xs">{{ u.role }}</span>
           {% elif u.role == "niño" %}
           <span class="px-2 py-0.5 bg-green-900/50 text-green-400 rounded text-xs">{{ u.role }}</span>
           {% else %}
           <span class="px-2 py-0.5 bg-gray-800 text-gray-400 rounded text-xs">{{ u.role }}</span>
           {% endif %}
         </td>
-        <td class="px-4 py-3 text-gray-300">{{ u.relationship }}</td>
+        <td class="px-4 py-3">
+          <div class="flex flex-wrap gap-1">
+            {% for aid, info in agents.items() %}
+              {% set from_role = has_all or aid in role_grants %}
+              {% set explicitly_granted = aid in user_grants %}
+              {% set explicitly_revoked = aid in user_revokes %}
+              {% set can_access = (from_role and not explicitly_revoked) or explicitly_granted %}
+              {% if can_access %}
+                {% if explicitly_granted %}
+                <span class="px-1.5 py-0.5 bg-emerald-900/40 text-emerald-400 border border-emerald-800/50 rounded text-xs"
+                      title="{{ info.name }} — otorgado individualmente">{{ info.icon }}</span>
+                {% else %}
+                <span class="px-1.5 py-0.5 bg-gray-800/60 text-gray-300 rounded text-xs"
+                      title="{{ info.name }}">{{ info.icon }}</span>
+                {% endif %}
+              {% else %}
+                {% if explicitly_revoked %}
+                <span class="px-1.5 py-0.5 bg-red-900/30 text-red-600 border border-red-900/50 rounded text-xs line-through"
+                      title="{{ info.name }} — revocado individualmente">{{ info.icon }}</span>
+                {% endif %}
+              {% endif %}
+            {% endfor %}
+          </div>
+        </td>
         <td class="px-4 py-3 font-mono text-xs text-gray-400">
           {{ u.wa_phone if u.wa_phone else "—" }}
         </td>
@@ -72,6 +102,13 @@
     </tbody>
   </table>
 </div>
+
+<div class="mt-3 flex gap-4 text-xs text-gray-600">
+  <span><span class="text-gray-300">🔲</span> acceso por rol</span>
+  <span><span class="text-emerald-400">🟩</span> otorgado individualmente</span>
+  <span><span class="text-red-600 line-through">🔴</span> revocado individualmente</span>
+</div>
+
 {% else %}
 <div class="text-center py-16 text-gray-600">
   <p class="text-4xl mb-3">👥</p>
