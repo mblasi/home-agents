@@ -229,12 +229,14 @@ Estado:   Pendiente (inicia cuando FASE 1 esté completa)
 - [x] 2.1  RAG con estado dinámico de HAOS (FAISS + embeddings)
 - [x] 2.2  Context window inteligente (solo entidades relevantes)
 - [x] 2.3  Parser de acciones v2 (manejo de errores, validación)
-- [ ] 2.4  Manejo de ambigüedad ("las luces" → ¿cuáles?)
+- [x] 2.4  Manejo de ambigüedad ("las luces" → ¿cuáles?)
 - [ ] 2.5  Historial de conversación en sesión
-- [ ] 2.6  Automatizaciones por voz ("cuando llegue a casa, encendé todo")
-- [ ] 2.7  Satellite en habitaciones (RPi Zero 2W o ESP32 con micrófono)
-- [ ] 2.8  Fine-tuning con entity_ids y patrones reales de tu casa
 - [ ] 2.9  Wake word multi-persona: detectar y distinguir voces de distintos miembros del hogar.
+
+#### Postergadas (movidas a otras fases)
+- ~~2.6  Automatizaciones por voz~~ → FASE 9.10 (requests condicionales en el coordinador LLM)
+- ~~2.7  Satellite en habitaciones~~ → Anexo A.2 (red de nodos de audio multi-ambiente)
+- ~~2.8  Fine-tuning con entity_ids~~ → FASE 8.24 (fine-tuning con LoRA en servidor con GPU)
            Al identificar la persona, cargar su perfil persistido como contexto adicional de la
            conversación: preferencias, rutinas, dispositivos favoritos, historial relevante.
            Esto permite interacciones personalizadas: "reproduce mi música preferida",
