@@ -3,6 +3,50 @@
 Red de agentes de IA local-first para domótica, clima, agenda, inversiones y viajes.
 Todo corre en la laptop. Nada sale de la red local.
 
+## Dashboard — política de actualización
+
+Al implementar cualquier tarea del plan que introduzca datos o estados nuevos
+(conversaciones, agentes, fuentes, latencias, entidades, etc.), evaluar si tiene
+sentido reflejarlo en el dashboard zellij (`ear/dashboard.kdl`).
+
+Paneles existentes y su rol:
+- `panel_score.py`   — wake word score animado + estado del agente (listening/recording/etc.)
+- `panel_history.py` — historial de comandos con acción, respuesta y latencias
+- `panel_latency.py` — latencias STT/LLM/HAOS promedio y por comando
+- `panel_agents.py`  — panel flotante: agentes disponibles, agente activo, fuente del pedido
+
+Los paneles leen métricas de `/tmp/capitan/*.json` escritos por `listen.py`.
+Si la feature genera datos nuevos, agregar la escritura a `listen.py` y
+actualizar el panel correspondiente (o crear uno nuevo si no aplica a ninguno).
+
+---
+
+## Flujo de trabajo por tarea
+
+Al implementar **cada ítem del plan** (`- [ ] N.M ...`), seguir este flujo obligatorio:
+
+1. **Crear branch** en cada submodule afectado (`core`, `ear`, o ambos):
+   ```zsh
+   git -C ~/workspace/home-agents/core checkout -b fase-N-M-descripcion-corta
+   ```
+2. **Implementar** los cambios en el branch.
+3. **Commitear** con mensaje claro que referencie la tarea:
+   ```zsh
+   git -C ~/workspace/home-agents/core add -p
+   git -C ~/workspace/home-agents/core commit -m "feat: fase N.M — descripcion"
+   ```
+4. **Hacer PR a main** usando `gh pr create`.
+5. **Mergear** el PR (`gh pr merge --merge`).
+6. **Actualizar el submodule pointer** en el repo umbrella y commitear:
+   ```zsh
+   git -C ~/workspace/home-agents add core   # o ear
+   git -C ~/workspace/home-agents commit -m "chore: update core submodule — fase N.M"
+   ```
+
+Si la tarea afecta solo el repo umbrella (`masterplan/`, `scripts/`), el branch y PR van en `home-agents` directamente.
+
+---
+
 ## Plan y estado
 
 El plan vive en `masterplan/estado.md`. Al iniciar sesión, leerlo para saber en qué fase
