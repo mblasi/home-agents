@@ -298,7 +298,7 @@ Stack:    whatsapp-web.js (Node 18), LocalAuth, POST /wa/inbound (FastAPI)
 - [x] 3.5.1  Elegir cliente WA: whatsapp-web.js (Node 18) — sesión LocalAuth en disco
 - [x] 3.5.2  Setup del cliente: sesión persistente con QR scan, reconexión automática (wa/index.js)
 - [x] 3.5.3  Webhook receiver en el orquestador (FastAPI endpoint POST /wa/inbound en server.py)
-- [x] 3.5.4  Whitelist de números autorizados: WA_WHITELIST en .env, doble validación cliente+core
+- [x] 3.5.4  Control de acceso por usuario: User.wa_phone resuelve número → speaker_id + RBAC por rol
 - [x] 3.5.5  Routing texto → orquestador → agente → respuesta de vuelta por WA
 - [x] 3.5.6  Manejo de contexto por número: source={channel:whatsapp, phone:...} → source_key único en conversations.py
 
