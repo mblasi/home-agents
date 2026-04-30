@@ -709,10 +709,10 @@ def logs_stream(service: str = "all"):
 
 @app.get("/integrations", response_class=HTMLResponse)
 def integrations_page(request: Request):
-    health = _core("/health") or {}
-    agents = _core("/agents") or {}
+    health    = _core("/health") or {}
+    core_ok   = health is not None and health.get("status") == "ok"
+    ear_state = _ear_state()
 
-    # Test Ollama models
     ollama_models = []
     try:
         r = requests.get(f"{OLLAMA_URL}/api/tags", timeout=3)
@@ -722,7 +722,11 @@ def integrations_page(request: Request):
         pass
 
     return _render(request, "integrations.html", "integrations",
-                   health=health, agents=agents, ollama_models=ollama_models)
+                   health=health,
+                   core_ok=core_ok,
+                   core_url=CORE_URL,
+                   ear_state=ear_state,
+                   ollama_models=ollama_models)
 
 
 # ── Plan ───────────────────────────────────────────────────────────────────────
