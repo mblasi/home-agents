@@ -2,9 +2,11 @@
 /**
  * Canal WhatsApp para la red de agentes Capitán.
  *
- * Recibe mensajes de texto y los envía al orquestador (POST /wa/inbound).
- * El core resuelve el número al usuario registrado (via User.wa_phone) y
- * aplica RBAC según su rol. Números no registrados operan como "guest".
+ * - Texto: POST /wa/inbound → responde texto
+ * - PTT/audio: descarga OGG → POST /wa/inbound/audio → responde nota de voz
+ *
+ * El core resuelve el número al usuario registrado (User.wa_phone) y aplica
+ * RBAC según su rol. Números no registrados operan como "guest".
  *
  * Primera vez: muestra un QR en la terminal para vincular la cuenta.
  * Sesiones siguientes: reanuda sin QR desde ~/.local/share/capitan/wa-session/.
@@ -20,7 +22,7 @@
 
 require("dotenv").config({ path: __dirname + "/.env" });
 
-const { Client, LocalAuth } = require("whatsapp-web.js");
+const { Client, LocalAuth, MessageMedia } = require("whatsapp-web.js");
 const qrcode = require("qrcode-terminal");
 const fs = require("fs");
 const path = require("path");
@@ -67,44 +69,89 @@ client.on("disconnected", (reason) => {
   setTimeout(() => client.initialize(), 10_000);
 });
 
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+async function handleText(msg, phone, text) {
+  const res = await fetch(`${CORE_URL}/wa/inbound`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ from_number: phone, text, message_id: msg.id.id }),
+  });
+
+  if (!res.ok) {
+    console.error(`[WA] Error del core: HTTP ${res.status}`);
+    await msg.reply("Ocurrió un error al procesar tu mensaje.");
+    return;
+  }
+
+  const data = await res.json();
+  if (data.response) {
+    await msg.reply(data.response);
+    console.log(`[WA] → ${phone}: ${data.response.slice(0, 80)}`);
+  }
+}
+
+async function handleAudio(msg, phone) {
+  const media = await msg.downloadMedia();
+  if (!media) {
+    console.error(`[WA] No se pudo descargar el audio de ${phone}`);
+    return;
+  }
+
+  const res = await fetch(`${CORE_URL}/wa/inbound/audio`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      from_number: phone,
+      audio_b64: media.data,
+      message_id: msg.id.id,
+    }),
+  });
+
+  if (!res.ok) {
+    console.error(`[WA] Error del core (audio): HTTP ${res.status}`);
+    await msg.reply("No pude procesar el audio. Intentá con texto.");
+    return;
+  }
+
+  const data = await res.json();
+  console.log(`[WA] STT ${phone}: "${data.transcription}"`);
+
+  if (data.audio_b64) {
+    const voiceNote = new MessageMedia(
+      "audio/ogg; codecs=opus",
+      data.audio_b64,
+      "response.ogg"
+    );
+    const chat = await msg.getChat();
+    await chat.sendMessage(voiceNote, { sendAudioAsVoice: true });
+    console.log(`[WA] → ${phone}: [nota de voz] ${data.response.slice(0, 60)}`);
+  } else if (data.response) {
+    await msg.reply(data.response);
+    console.log(`[WA] → ${phone}: ${data.response.slice(0, 80)}`);
+  }
+}
+
 // ── Mensajes entrantes ─────────────────────────────────────────────────────────
 
 client.on("message", async (msg) => {
   if (msg.isGroupMsg) return;
-  if (msg.type !== "chat") return; // solo texto (Etapa A — PTT en Etapa B)
 
-  // Normalizar número: "5491155xxxxxx@c.us" → "+5491155xxxxxx"
   const phone = "+" + msg.from.replace("@c.us", "");
-  const text = msg.body.trim();
-  if (!text) return;
-
-  console.log(`[WA] ${phone}: ${text}`);
 
   try {
-    const res = await fetch(`${CORE_URL}/wa/inbound`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        from_number: phone,
-        text,
-        message_id: msg.id.id,
-      }),
-    });
-
-    if (!res.ok) {
-      console.error(`[WA] Error del core: HTTP ${res.status}`);
-      await msg.reply("Ocurrió un error al procesar tu mensaje.");
-      return;
-    }
-
-    const data = await res.json();
-    if (data.response) {
-      await msg.reply(data.response);
-      console.log(`[WA] → ${phone}: ${data.response.slice(0, 80)}`);
+    if (msg.type === "chat") {
+      const text = msg.body.trim();
+      if (!text) return;
+      console.log(`[WA] texto ${phone}: ${text}`);
+      await handleText(msg, phone, text);
+    } else if (msg.type === "ptt" || msg.type === "audio") {
+      console.log(`[WA] audio ${phone} (${msg.type})`);
+      await handleAudio(msg, phone);
     }
   } catch (err) {
-    console.error(`[WA] Error de conexión con el core: ${err.message}`);
-    await msg.reply("No pude conectar con el sistema. Intentá de nuevo.");
+    console.error(`[WA] Error inesperado: ${err.message}`);
+    await msg.reply("Ocurrió un error interno. Intentá de nuevo.").catch(() => {});
   }
 });
 
