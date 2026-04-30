@@ -342,14 +342,20 @@ Privacidad: solo números autorizados, todo corre local
 ### FASE 4 - Agente Clima
 ```
 Objetivo: Consultas de clima por voz + integración con domótica
-Estado:   EN CURSO (4/5 completos — queda 4.4)
+Estado:   COMPLETA
 ```
+
+## Completado
+
 - [x] 4.1  Integración Open-Meteo API (libre, sin key, precisa)
 - [x] 4.2  Datos históricos y pronóstico extendido local (7 días + hourly 12h)
 - [x] 4.3  Integración con domótica via shared_state:
            publica weather.is_raining, temp_outside, wind_speed, conditions
            HaosAgent puede leer estas entradas para acciones condicionales
-- [ ] 4.4  Alertas proactivas por voz (background polling)
+- [x] 4.4  Alertas proactivas por voz (mecanismo genérico):
+           alert_queue.py (FIFO thread-safe), server.py poller cada 15min via agent.alerts(),
+           GET /alerts consume-once, ear/_alert_thread daemon (60s, solo en state=listening)
+           Cualquier agente futuro puede implementar alerts() → list[str] sin registro extra
 - [x] 4.5  Contexto geográfico desde .env: LATITUDE, LONGITUDE, LOCATION_NAME
 
 ---
