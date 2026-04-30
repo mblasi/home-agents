@@ -2,7 +2,13 @@
 {% block title %}Usuarios{% endblock %}
 
 {% block content %}
-<h1 class="text-2xl font-bold mb-6">Usuarios</h1>
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-bold">Usuarios</h1>
+  <a href="/users/new"
+     class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors">
+    + Nuevo
+  </a>
+</div>
 
 {% if users %}
 <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
@@ -12,13 +18,14 @@
         <th class="px-4 py-3 text-left">Usuario</th>
         <th class="px-4 py-3 text-left">Rol</th>
         <th class="px-4 py-3 text-left">Relación</th>
+        <th class="px-4 py-3 text-left">WhatsApp</th>
         <th class="px-4 py-3 text-center">Speaker</th>
-        <th class="px-4 py-3 text-right">Registrado</th>
+        <th class="px-4 py-3 text-right">Acciones</th>
       </tr>
     </thead>
     <tbody class="divide-y divide-gray-800">
       {% for uid, u in users.items() %}
-      <tr class="hover:bg-gray-800/50">
+      <tr id="user-row-{{ uid }}" class="hover:bg-gray-800/50">
         <td class="px-4 py-3">
           <div class="font-medium">{{ u.name }}</div>
           <div class="text-xs text-gray-500 font-mono">{{ uid }}</div>
@@ -35,6 +42,9 @@
           {% endif %}
         </td>
         <td class="px-4 py-3 text-gray-300">{{ u.relationship }}</td>
+        <td class="px-4 py-3 font-mono text-xs text-gray-400">
+          {{ u.wa_phone if u.wa_phone else "—" }}
+        </td>
         <td class="px-4 py-3 text-center">
           {% if u.has_embedding %}
           <span class="text-emerald-400 text-base" title="Modelo de voz entrenado">✓</span>
@@ -42,8 +52,20 @@
           <span class="text-gray-600 text-base" title="Sin modelo de voz">—</span>
           {% endif %}
         </td>
-        <td class="px-4 py-3 text-right text-xs text-gray-500">
-          {{ u.created_at | int }}
+        <td class="px-4 py-3 text-right">
+          <div class="flex gap-2 justify-end">
+            <a href="/users/{{ uid }}/edit"
+               class="px-2 py-1 text-xs text-gray-400 hover:text-white hover:bg-gray-700 rounded transition-colors">
+              Editar
+            </a>
+            <button hx-delete="/users/{{ uid }}"
+                    hx-target="#user-row-{{ uid }}"
+                    hx-swap="outerHTML"
+                    hx-confirm="¿Eliminar a {{ u.name }}?"
+                    class="px-2 py-1 text-xs text-red-500 hover:text-red-400 hover:bg-red-900/20 rounded transition-colors">
+              Eliminar
+            </button>
+          </div>
         </td>
       </tr>
       {% endfor %}
@@ -54,7 +76,10 @@
 <div class="text-center py-16 text-gray-600">
   <p class="text-4xl mb-3">👥</p>
   <p>Sin usuarios registrados</p>
-  <p class="text-xs mt-2">Registrate con "Capitán, registrarme" por voz</p>
+  <p class="text-xs mt-2">
+    Registrate con "Capitán, registrarme" por voz, o
+    <a href="/users/new" class="text-blue-500 hover:underline">creá uno aquí</a>.
+  </p>
 </div>
 {% endif %}
 {% endblock %}
