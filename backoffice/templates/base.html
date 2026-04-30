@@ -8,7 +8,7 @@
   <script>tailwind.config = { darkMode: 'class' }</script>
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
   <style>
-    .nav-link { @apply flex items-center gap-3 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors text-sm font-medium; }
+    .nav-link { @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors text-sm font-medium; }
     .nav-link.active { @apply bg-gray-800 text-white; }
     .badge-ok  { @apply inline-flex items-center gap-1 text-xs font-medium text-emerald-400; }
     .badge-err { @apply inline-flex items-center gap-1 text-xs font-medium text-red-400; }
@@ -32,8 +32,8 @@
     <nav class="flex-1 px-3 py-3 overflow-y-auto space-y-5">
 
       <!-- Monitoreo -->
-      <div>
-        <p class="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-gray-600">Monitoreo</p>
+      <div class="space-y-0.5">
+        <p class="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-gray-600">Monitoreo</p>
         <a href="/dashboard"     class="nav-link {% if section == 'dashboard'     %}active{% endif %}">📊 Dashboard</a>
         <a href="/stats"         class="nav-link {% if section == 'stats'         %}active{% endif %}">📈 Estadísticas</a>
         <a href="/alerts"        class="nav-link {% if section == 'alerts'        %}active{% endif %}">🔔 Alertas</a>
@@ -41,16 +41,16 @@
       </div>
 
       <!-- Sistema -->
-      <div>
-        <p class="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-gray-600">Sistema</p>
+      <div class="space-y-0.5">
+        <p class="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-gray-600">Sistema</p>
         <a href="/agents"        class="nav-link {% if section == 'agents'        %}active{% endif %}">🤖 Agentes</a>
         <a href="/conversations" class="nav-link {% if section == 'conversations' %}active{% endif %}">💬 Conversaciones</a>
         <a href="/shared-state"  class="nav-link {% if section == 'shared-state'  %}active{% endif %}">🔗 Shared State</a>
       </div>
 
       <!-- Configuración -->
-      <div>
-        <p class="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-gray-600">Configuración</p>
+      <div class="space-y-0.5">
+        <p class="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-gray-600">Configuración</p>
         <a href="/users"         class="nav-link {% if section == 'users'         %}active{% endif %}">👥 Usuarios</a>
         <a href="/devices"       class="nav-link {% if section == 'devices'       %}active{% endif %}">📡 Dispositivos</a>
         <a href="/integrations"  class="nav-link {% if section == 'integrations'  %}active{% endif %}">🔌 Integraciones</a>
