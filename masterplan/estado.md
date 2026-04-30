@@ -295,18 +295,15 @@ Objetivo: Patrón de extensión para agentes de dominio + estado compartido cros
 Estado:   COMPLETA
 ```
 
-#### Ya implementado
+- [x] 3.1  Contrato de interfaz para agentes de dominio: BaseAgent protocol en código,
+           patrón de registro en agent_registry, guía para agregar FASE 4-7
 - [x] 3.2  Orquestador central → server.py (FastAPI :8765, POST /process)
 - [x] 3.3  Router de intención → agent_registry.dispatch() (keywords + LLM fallback)
+- [x] 3.4  Estado compartido cross-agente: slot de contexto legible/escribible por cualquier
+           agente activo (ej: clima sabe que llueve → haos puede ajustar persianas)
 - [x] 3.5  Logging y observabilidad → /tmp/capitan/*.json + dashboard zellij
 - [x] 3.6  API unificada → POST /process, GET /agents, GET /health, GET /conversations
 - [x] 3.7  Dashboard de estado → panel_agents.py (agente activo, fuente, conversación)
-
-#### Pendiente
-- [x] 3.1  Contrato de interfaz para agentes de dominio: BaseAgent protocol en código,
-           patrón de registro en agent_registry, guía para agregar FASE 4-7
-- [x] 3.4  Estado compartido cross-agente: slot de contexto legible/escribible por cualquier
-           agente activo (ej: clima sabe que llueve → haos puede ajustar persianas)
 
 ---
 

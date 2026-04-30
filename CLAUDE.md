@@ -54,11 +54,17 @@ Al completar cualquier ítem del plan, **siempre** hacer estas dos cosas antes d
 2. **Actualizar el `Estado:` de la FASE** — al marcar el último `[ ]` de una fase,
    cambiar `Estado: Pendiente` / `Estado: EN CURSO (...)` a `Estado: COMPLETA`.
    Si quedan ítems pendientes, actualizar el conteo (ej: `EN CURSO (6/7 — solo queda 3.4)`).
-   Verificar también que los títulos de sección (`#### Completado` / `#### Pendiente`)
-   sean consistentes: mover ítems completados al bloque correcto o eliminar el bloque
-   si ya no aplica.
+   **No usar sub-headers `#### Completado` / `#### Pendiente`** — los marcadores `[x]`/`[ ]`
+   son suficientes y los sub-headers quedan desincronizados. Si existen, eliminarlos.
 
-3. **Correr el sync de issues**:
+3. **Correr el lint de estado.md**:
+   ```zsh
+   python scripts/lint_estado.py
+   ```
+   Detecta tareas `[x]` bajo `#### Pendiente` y otras inconsistencias. Debe pasar sin errores
+   antes de continuar. Si falla, corregir antes del sync de issues.
+
+4. **Correr el sync de issues**:
    ```zsh
    source ~/home-agents-env/bin/activate
    python scripts/sync_issues.py
