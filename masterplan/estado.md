@@ -288,7 +288,7 @@ Estado:   COMPLETA
 ### FASE 3.5 - Integración WhatsApp
 ```
 Objetivo: Canal de texto y audio hacia el orquestador vía WhatsApp
-Estado:   EN CURSO (6/10 — solo queda Etapa B: 3.5.7-3.5.10)
+Estado:   COMPLETA
 Deps:     FASE 3.2 ✓ (orquestador implementado), FASE 1.3 ✓ (STT), FASE 1 TTS ✓
 Privacidad: solo números autorizados, todo corre local
 Stack:    whatsapp-web.js (Node 18), LocalAuth, POST /wa/inbound (FastAPI)
@@ -303,10 +303,10 @@ Stack:    whatsapp-web.js (Node 18), LocalAuth, POST /wa/inbound (FastAPI)
 - [x] 3.5.6  Manejo de contexto por número: source={channel:whatsapp, phone:...} → source_key único en conversations.py
 
 #### Etapa B - Canal de audio (PTT)
-- [ ] 3.5.7  Recibir mensajes de voz (PTT) de WhatsApp → descargar OGG/Opus
-- [ ] 3.5.8  Convertir OGG → WAV 16000Hz (ffmpeg o librosa)
-- [ ] 3.5.9  Pasar por faster-whisper → texto → orquestador (mismo pipeline que mic)
-- [ ] 3.5.10 Respuesta: espejo de entrada — si PTT → responder con nota de voz (Piper)
+- [x] 3.5.7  Recibir mensajes de voz (PTT) de WhatsApp → descargar OGG/Opus (wa/index.js handleAudio)
+- [x] 3.5.8  Convertir OGG → WAV 16000Hz (ffmpeg en wa_audio.transcribe)
+- [x] 3.5.9  Pasar por faster-whisper → texto → orquestador (POST /wa/inbound/audio)
+- [x] 3.5.10 Respuesta: espejo de entrada — PTT → nota de voz OGG/Opus (Piper + libopus); fallback a texto
 
 #### Decisiones tomadas
 - [x] Cliente WA: whatsapp-web.js (Node 18) — más simple, sin Docker
