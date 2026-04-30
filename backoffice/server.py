@@ -266,6 +266,58 @@ def users_page(request: Request):
     return _render(request, "users.html", "users", users=data)
 
 
+@app.get("/users/new", response_class=HTMLResponse)
+def new_user_page(request: Request):
+    return _render(request, "user_form.html", "users", user=None, uid=None, error="")
+
+
+@app.post("/users/create")
+async def create_user_submit(request: Request):
+    form = await request.form()
+    payload = {
+        "id":           str(form.get("id", "")).strip(),
+        "name":         str(form.get("name", "")).strip(),
+        "role":         str(form.get("role", "invitado")),
+        "relationship": str(form.get("relationship", "invitado")),
+        "wa_phone":     str(form.get("wa_phone", "")).strip() or None,
+    }
+    result = _core("/users", method="POST", json=payload)
+    if result is None:
+        return _render(request, "user_form.html", "users",
+                       user=payload, uid=None, error="No se pudo crear el usuario (¿ID ya existe?)")
+    return RedirectResponse("/users", status_code=303)
+
+
+@app.get("/users/{uid}/edit", response_class=HTMLResponse)
+def edit_user_page(request: Request, uid: str):
+    user = _core(f"/users/{uid}")
+    if not user:
+        return RedirectResponse("/users", status_code=303)
+    return _render(request, "user_form.html", "users", user=user, uid=uid, error="")
+
+
+@app.post("/users/{uid}/update")
+async def update_user_submit(request: Request, uid: str):
+    form = await request.form()
+    payload = {
+        "name":         str(form.get("name", "")).strip(),
+        "role":         str(form.get("role", "invitado")),
+        "relationship": str(form.get("relationship", "invitado")),
+        "wa_phone":     str(form.get("wa_phone", "")).strip() or None,
+    }
+    result = _core(f"/users/{uid}", method="PATCH", json=payload)
+    if result is None:
+        return _render(request, "user_form.html", "users",
+                       user={**payload, "id": uid}, uid=uid, error="No se pudo actualizar el usuario")
+    return RedirectResponse("/users", status_code=303)
+
+
+@app.delete("/users/{uid}", response_class=HTMLResponse)
+def delete_user_htmx(uid: str):
+    _core(f"/users/{uid}", method="DELETE")
+    return HTMLResponse("")
+
+
 @app.get("/logs", response_class=HTMLResponse)
 def logs_page(request: Request):
     return _render(request, "logs.html", "logs")
