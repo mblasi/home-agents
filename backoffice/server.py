@@ -160,12 +160,24 @@ def root():
     return RedirectResponse("/dashboard")
 
 
+_EAR_STALE_SECS = 180  # heartbeat cada 60s → 3x es margin seguro
+
+
+def _ear_state() -> dict | None:
+    """Devuelve state.json solo si el heartbeat en devices.json es reciente."""
+    devices = _read_json("devices.json") or {}
+    cutoff = time.time() - _EAR_STALE_SECS
+    if not any(d.get("ts", 0) > cutoff for d in devices.values()):
+        return None
+    return _read_json("state.json") or None
+
+
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request):
     health  = _core("/health") or {}
     history = _read_json("history.json") or []
     alerts  = _core("/alerts") or []
-    state   = _read_json("state.json") or {}
+    state   = _ear_state()
 
     # Latencias promedio de la sesión
     lats = {"stt": [], "llm": [], "total": []}
@@ -318,6 +330,108 @@ def delete_user_htmx(uid: str):
     return HTMLResponse("")
 
 
+@app.get("/ear", response_class=HTMLResponse)
+def ear_page(request: Request):
+    return _render(request, "ear.html", "ear")
+
+
+@app.get("/ear/stream")
+def ear_stream():
+    """SSE: score + estado del ear a ~5Hz."""
+    def _gen():
+        while True:
+            score_data = _read_json("score.json") or {}
+            score = round(score_data.get("score", 0.0), 4)
+            state_obj = _ear_state()
+            state = state_obj.get("state", "stopped") if state_obj else "stopped"
+            yield f"data: {json.dumps({'score': score, 'state': state})}\n\n"
+            time.sleep(0.2)
+    return StreamingResponse(
+        _gen(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.get("/api/ear/history", response_class=HTMLResponse)
+def ear_history_fragment():
+    history = _read_json("history.json") or []
+    recent  = list(reversed(history[-15:]))
+    if not recent:
+        return HTMLResponse(
+            '<tr><td colspan="5" class="px-3 py-4 text-center text-gray-600">Sin comandos aún</td></tr>'
+        )
+
+    def lat_color(v: float) -> str:
+        if v <= 0:  return "text-gray-600"
+        if v < 10:  return "text-green-400"
+        if v < 20:  return "text-yellow-400"
+        return "text-red-400"
+
+    rows: list[str] = []
+    prev_conv = None
+    for e in recent:
+        conv_id = e.get("conversation_id") or ""
+        if prev_conv is not None and conv_id != prev_conv:
+            rows.append('<tr><td colspan="5" class="text-center text-gray-700 py-0.5 text-xs">· · ·</td></tr>')
+        accion = e.get("accion") or "—"
+        if accion and "→" in accion:
+            accion = accion.split("→")[-1].strip()
+        lat = e.get("lat_total", 0)
+        rows.append(
+            f'<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">'
+            f'<td class="px-3 py-1.5 text-gray-500 text-xs whitespace-nowrap">{e.get("ts","")}</td>'
+            f'<td class="px-3 py-1.5 text-blue-500 text-xs font-mono">{conv_id[:6] or "——"}</td>'
+            f'<td class="px-3 py-1.5 text-gray-200 text-xs">{e.get("texto","")}</td>'
+            f'<td class="px-3 py-1.5 text-cyan-400 text-xs">{accion[:45]}</td>'
+            f'<td class="px-3 py-1.5 {lat_color(lat)} text-xs text-right font-mono">{lat:.1f}s</td>'
+            f'</tr>'
+        )
+        prev_conv = conv_id
+    return HTMLResponse("\n".join(rows))
+
+
+@app.get("/api/ear/latency", response_class=HTMLResponse)
+def ear_latency_fragment():
+    history = _read_json("history.json") or []
+    if not history:
+        return HTMLResponse('<p class="text-gray-600 text-sm text-center py-3">Sin datos aún</p>')
+
+    last   = history[-1]
+    valids = [e for e in history if e.get("lat_total", 0) > 0]
+
+    def avg(k: str) -> float:
+        return sum(e.get(k, 0) for e in valids) / len(valids) if valids else 0
+
+    def lat_color(v: float) -> str:
+        if v <= 0:  return "text-gray-600"
+        if v < 5:   return "text-green-400"
+        if v < 10:  return "text-yellow-400"
+        return "text-red-400"
+
+    def fmt(v: float) -> str:
+        return f"{v:.1f}s" if v > 0 else "—"
+
+    rows: list[str] = []
+    for label, key in [("STT (Whisper)", "lat_stt"), ("LLM + HA", "lat_llm"), ("Total", "lat_total")]:
+        lv, av = last.get(key, 0), avg(key)
+        rows.append(
+            f'<div class="flex justify-between items-center py-1.5 border-b border-gray-800/50">'
+            f'<span class="text-gray-400 text-sm">{label}</span>'
+            f'<div class="flex gap-6">'
+            f'<span class="{lat_color(lv)} font-mono text-sm w-12 text-right">{fmt(lv)}</span>'
+            f'<span class="text-gray-600 font-mono text-sm w-12 text-right">{fmt(av)}</span>'
+            f'</div></div>'
+        )
+    rows.append(
+        f'<div class="flex justify-between items-center pt-2">'
+        f'<span class="text-gray-600 text-xs">Comandos (sesión)</span>'
+        f'<span class="text-white font-bold">{len(history)}</span>'
+        f'</div>'
+    )
+    return HTMLResponse("\n".join(rows))
+
+
 @app.get("/logs", response_class=HTMLResponse)
 def logs_page(request: Request):
     return _render(request, "logs.html", "logs")
@@ -365,3 +479,146 @@ def integrations_page(request: Request):
 
     return _render(request, "integrations.html", "integrations",
                    health=health, agents=agents, ollama_models=ollama_models)
+
+
+# ── Plan ───────────────────────────────────────────────────────────────────────
+
+import re as _re
+import yaml as _yaml
+
+_GH_DEFAULT_REPO = "mblasi/home-agents"
+_TASK_ID_RE = _re.compile(r"^\d+(\.\d+)*$")
+
+
+def _load_issue_urls() -> dict[str, tuple[str, int]]:
+    """Return {task_id: (gh_url, issue_number)} from masterplan/issues.yaml."""
+    issues_path = Path.home() / "workspace/home-agents/masterplan/issues.yaml"
+    try:
+        raw = _yaml.safe_load(issues_path.read_text()) or {}
+    except Exception:
+        return {}
+    urls: dict[str, tuple[str, int]] = {}
+    for task_id, v in raw.items():
+        task_id = str(task_id)
+        if isinstance(v, int):
+            urls[task_id] = (f"https://github.com/{_GH_DEFAULT_REPO}/issues/{v}", v)
+        elif isinstance(v, dict):
+            repo = v.get("repo", _GH_DEFAULT_REPO)
+            num  = v.get("number")
+            if num:
+                urls[task_id] = (f"https://github.com/{repo}/issues/{num}", num)
+    return urls
+
+
+def _parse_plan() -> list[dict]:
+    """Parse masterplan/estado.md → phases with per-task detail and GH issue links."""
+    plan_path = Path.home() / "workspace/home-agents/masterplan/estado.md"
+    try:
+        content = plan_path.read_text()
+    except Exception:
+        return []
+
+    issue_urls = _load_issue_urls()
+
+    phases: list[dict] = []
+    current: dict | None = None
+    in_code_block = False
+    in_masterplan = False
+
+    for line in content.splitlines():
+        if line.strip() == "## MASTERPLAN":
+            in_masterplan = True
+            continue
+        if not in_masterplan:
+            continue
+
+        if line.startswith("### FASE"):
+            if current:
+                phases.append(current)
+            rest = line[4:].strip()[5:]  # drop "### " then "FASE "
+            phase_id, _, title = rest.partition(" - ")
+            current = {
+                "id": phase_id.strip(),
+                "title": title.strip() or phase_id.strip(),
+                "objetivo": "",
+                "estado_raw": "Pendiente",
+                "tasks_done": 0,
+                "tasks_total": 0,
+                "tasks": [],
+            }
+            in_code_block = False
+            continue
+
+        if current is None:
+            continue
+
+        if line.strip().startswith("```"):
+            in_code_block = not in_code_block
+            continue
+
+        if in_code_block:
+            stripped = line.strip()
+            if stripped.startswith("Objetivo:"):
+                current["objetivo"] = stripped[9:].strip()
+            elif stripped.startswith("Estado:"):
+                current["estado_raw"] = stripped[7:].strip()
+            continue
+
+        done = None
+        if line.startswith("- [x]"):
+            done = True
+        elif line.startswith("- [ ]"):
+            done = False
+
+        if done is not None:
+            current["tasks_total"] += 1
+            if done:
+                current["tasks_done"] += 1
+            # Extract task id and text: "- [x] 1.9  Elegir voz..."
+            rest = line[6:].strip()
+            parts = rest.split(None, 1)
+            task_id = parts[0] if parts else ""
+            text    = parts[1].strip() if len(parts) > 1 else task_id
+            # Strip markdown bold markers
+            text = text.replace("**", "")
+            # Only treat as linkable id if it looks like N.M[.K...]
+            if not _TASK_ID_RE.match(task_id):
+                task_id = ""
+            gh_url, gh_num = issue_urls.get(task_id, (None, None))
+            current["tasks"].append({
+                "id":      task_id,
+                "text":    text,
+                "done":    done,
+                "gh_url":  gh_url,
+                "gh_num":  gh_num,
+            })
+
+    if current:
+        phases.append(current)
+
+    for p in phases:
+        raw = p["estado_raw"].upper()
+        if "COMPLETA" in raw:
+            p["estado"] = "COMPLETA"
+        elif "EN CURSO" in raw or "PROGRESO" in raw:
+            p["estado"] = "EN CURSO"
+        else:
+            p["estado"] = "Pendiente"
+        if p["tasks_total"] > 0:
+            p["pct"] = round(100 * p["tasks_done"] / p["tasks_total"])
+        else:
+            p["pct"] = 100 if p["estado"] == "COMPLETA" else 0
+
+    return phases
+
+
+@app.get("/plan", response_class=HTMLResponse)
+def plan_page(request: Request):
+    phases = _parse_plan()
+    total_done  = sum(p["tasks_done"]  for p in phases)
+    total_tasks = sum(p["tasks_total"] for p in phases)
+    total_pct   = round(100 * total_done / total_tasks) if total_tasks else 0
+    phases_complete = sum(1 for p in phases if p["estado"] == "COMPLETA")
+    return _render(request, "plan.html", "plan",
+                   phases=phases, total_done=total_done, total_tasks=total_tasks,
+                   total_pct=total_pct, phases_complete=phases_complete)
