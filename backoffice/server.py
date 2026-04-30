@@ -147,7 +147,7 @@ def api_status():
         f'<span>{dot(core_ok)} {"OK" if core_ok else "down"}</span></div>',
         f'<div class="flex justify-between"><span class="text-gray-400">Ollama</span>'
         f'<span>{dot(ollama_ok)} {"OK" if ollama_ok else "down"}</span></div>',
-        f'<div class="flex justify-between"><span class="text-gray-400">HAOS</span>'
+        f'<div class="flex justify-between"><span class="text-gray-400">Domótica</span>'
         f'<span>{dot(haos_ok)} {"OK" if haos_ok else "down"}</span></div>',
     ]
     return HTMLResponse("\n".join(lines))
