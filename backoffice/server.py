@@ -114,6 +114,13 @@ def _core(path: str, method: str = "GET", **kwargs):
         return None
 
 
+def _ollama_ok() -> bool:
+    try:
+        return requests.get(f"{OLLAMA_URL}/api/tags", timeout=2).status_code == 200
+    except Exception:
+        return False
+
+
 def _get_ollama_models() -> list[str]:
     """Devuelve los nombres de modelos disponibles en Ollama."""
     try:
@@ -145,9 +152,8 @@ def _render(request: Request, template: str, section: str, **ctx):
 
 @app.get("/api/status", response_class=HTMLResponse)
 def api_status():
-    health   = _core("/health") or {}
-    ollama_ok = health.get("ollama", False)
-    core_ok   = health is not None
+    core_ok   = _core("/health") is not None
+    ollama_ok = _ollama_ok()
     ear_state = _ear_state()
     ear_ok    = ear_state is not None and ear_state.get("state") != "stopped"
 
@@ -186,10 +192,11 @@ def _ear_state() -> dict | None:
 
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request):
-    health  = _core("/health") or {}
-    history = _read_json("history.json") or []
-    alerts  = _core("/alerts") or []
-    state   = _ear_state()
+    core_ok   = _core("/health") is not None
+    ollama_ok = _ollama_ok()
+    history   = _read_json("history.json") or []
+    alerts    = _core("/alerts") or []
+    state     = _ear_state()
 
     # Latencias promedio de la sesión
     lats = {"stt": [], "llm": [], "total": []}
@@ -203,7 +210,8 @@ def dashboard(request: Request):
     speaker = _read_json("speaker.json") or {}
 
     return _render(request, "dashboard.html", "dashboard",
-                   health=health, history=history[-10:],
+                   core_ok=core_ok, ollama_ok=ollama_ok,
+                   history=history[-10:],
                    alerts=alerts, state=state, speaker=speaker,
                    avg_lat=avg, history_count=len(history))
 
@@ -709,24 +717,17 @@ def logs_stream(service: str = "all"):
 
 @app.get("/integrations", response_class=HTMLResponse)
 def integrations_page(request: Request):
-    health    = _core("/health") or {}
-    core_ok   = health is not None and health.get("status") == "ok"
-    ear_state = _ear_state()
-
-    ollama_models = []
-    try:
-        r = requests.get(f"{OLLAMA_URL}/api/tags", timeout=3)
-        if r.status_code == 200:
-            ollama_models = [m["name"] for m in r.json().get("models", [])]
-    except Exception:
-        pass
+    core_ok       = _core("/health") is not None
+    ollama_models = _get_ollama_models()
+    ollama_ok     = bool(ollama_models) or _ollama_ok()
+    ear_state     = _ear_state()
 
     return _render(request, "integrations.html", "integrations",
-                   health=health,
                    core_ok=core_ok,
                    core_url=CORE_URL,
-                   ear_state=ear_state,
-                   ollama_models=ollama_models)
+                   ollama_ok=ollama_ok,
+                   ollama_models=ollama_models,
+                   ear_state=ear_state)
 
 
 # ── Plan ───────────────────────────────────────────────────────────────────────
