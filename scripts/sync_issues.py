@@ -79,17 +79,22 @@ def main():
     # Agrupar por repo para minimizar llamadas a la API
     repos_needed = {entry["repo"] for entry in mapping.values()}
     states_by_repo = {}
+    skipped_repos = set()
     for repo in repos_needed:
         try:
             states_by_repo[repo] = fetch_issue_states(repo)
         except subprocess.CalledProcessError as e:
-            sys.exit(f"Error fetching issues de {repo}: {e}")
+            print(f"[SKIP] {repo}: sin acceso ({e.returncode}) — issues de este repo omitidos")
+            skipped_repos.add(repo)
 
     changed = 0
     for task_id, entry in sorted(mapping.items(), key=lambda x: x[1]["number"]):
         repo = entry["repo"]
         issue_num = entry["number"]
         done = tasks.get(task_id)
+
+        if repo in skipped_repos:
+            continue
 
         if done is None:
             print(f"[WARN] {task_id} no encontrado en estado.md")
