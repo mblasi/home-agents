@@ -186,10 +186,8 @@ Parche:     acoustics/directivity.py: sph_harm → sph_harm_y (scipy compat)
 ### FASE 1 - Fundación del Agente de Domótica
 ```
 Objetivo: Agente de voz funcionando end-to-end con HAOS
-Estado:   EN CURSO (~70% completo)
+Estado:   COMPLETA
 ```
-
-#### Completado
 - [x] 1.1  Stack base instalado (Ollama, Whisper, Piper, PyAudio)
 - [x] 1.2  Audio pipeline: captura 44100Hz → resampleo 16000Hz
 - [x] 1.3  STT validado: faster-whisper español, 100% confianza
@@ -198,8 +196,6 @@ Estado:   EN CURSO (~70% completo)
 - [x] 1.6  openWakeWord: repo clonado, dependencias OK, train.py importa
 - [x] 1.7  Piper: 4 voces españolas descargadas
 - [x] 1.8  Samples positivos "Capitán" generados (90 samples, voz daniela)
-
-#### Pendiente
 - [x] 1.9  Elegir voz TTS para respuestas → es_AR-daniela-high.onnx
 - [x] 1.10 Regenerar samples con 4 voces → 360 samples (daniela, claude, davefx, sharvard)
 - [x] 1.11 Generar samples negativos con Piper → 1320 samples (45 frases × 6 vel × 4 voces, incl. hard negatives)
@@ -215,7 +211,7 @@ Estado:   EN CURSO (~70% completo)
 - [x] 1.21 Dashboard zellij para el agente → dashboard.sh, 4 paneles: score animado, historial, latencias, logs
 - [x] 1.22 Modularización en submodules → ear (audio/UI) + core (FastAPI :8765, LLM, HAOS); comunicación via HTTP POST /process
 
-#### Decisiones pendientes
+#### Decisiones
 - [x] Voz TTS respuesta: es_AR-daniela-high.onnx (única voz argentina disponible en Piper)
 - [x] Latencia aceptable: 15.7s actual → avanzar con FASE 2, optimizar en FASE 8 con hardware dedicado
 
@@ -296,7 +292,7 @@ Estado:   POSTERGADA — retomar después de FASE 7, prerequisito para FASE 11
 ### FASE 3 - Infraestructura Multi-Agente
 ```
 Objetivo: Patrón de extensión para agentes de dominio + estado compartido cross-agente
-Estado:   EN CURSO (5/7 ya implementados durante FASE 1-2)
+Estado:   EN CURSO (6/7 completos — solo queda 3.4)
 ```
 
 #### Ya implementado
