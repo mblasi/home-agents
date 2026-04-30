@@ -19,6 +19,25 @@
 
 <form method="POST" action="/agents/{{ agent_id }}/edit">
 
+  <!-- Sección 0: Nombre e icono -->
+  <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-5">
+    <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Identidad</h2>
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label class="block text-xs font-medium text-gray-400 mb-1">Nombre visible</label>
+        <input type="text" name="name" value="{{ agent.name }}"
+               class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200
+                      focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-400 mb-1">Icono (emoji)</label>
+        <input type="text" name="icon" value="{{ agent.icon }}"
+               class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 text-center text-lg
+                      focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500">
+      </div>
+    </div>
+  </div>
+
   <!-- Sección 1: Status -->
   <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-5">
     <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Estado</h2>
