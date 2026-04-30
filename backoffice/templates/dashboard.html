@@ -6,23 +6,55 @@
 
 <!-- Estado de servicios -->
 <div class="grid grid-cols-3 gap-4 mb-6">
-  {% set services = [
-    ("Core API",  health.get("status") == "ok",  "localhost:8765"),
-    ("Ollama",    health.get("ollama", false),    "localhost:11434"),
-    ("HAOS",      health.get("haos", false),      "192.168.68.101:8123"),
-  ] %}
-  {% for name, ok, addr in services %}
+
+  <!-- Core API -->
+  {% set core_ok = health.get("status") == "ok" %}
   <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
     <div class="flex items-center justify-between mb-1">
-      <span class="text-sm font-medium text-gray-300">{{ name }}</span>
-      <span class="text-lg">{{ "🟢" if ok else "🔴" }}</span>
+      <span class="text-sm font-medium text-gray-300">Core API</span>
+      <span class="text-lg">{{ "🟢" if core_ok else "🔴" }}</span>
     </div>
-    <div class="text-xs text-gray-500">{{ addr }}</div>
-    <div class="mt-1 text-xs font-semibold {{ 'text-emerald-400' if ok else 'text-red-400' }}">
-      {{ "online" if ok else "offline" }}
+    <div class="text-xs text-gray-500">localhost:8765</div>
+    <div class="mt-1 text-xs font-semibold {{ 'text-emerald-400' if core_ok else 'text-red-400' }}">
+      {{ "online" if core_ok else "offline" }}
     </div>
   </div>
-  {% endfor %}
+
+  <!-- Ollama -->
+  {% set ollama_ok = health.get("ollama", false) %}
+  <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+    <div class="flex items-center justify-between mb-1">
+      <span class="text-sm font-medium text-gray-300">Ollama</span>
+      <span class="text-lg">{{ "🟢" if ollama_ok else "🔴" }}</span>
+    </div>
+    <div class="text-xs text-gray-500">localhost:11434</div>
+    <div class="mt-1 text-xs font-semibold {{ 'text-emerald-400' if ollama_ok else 'text-red-400' }}">
+      {{ "online" if ollama_ok else "offline" }}
+    </div>
+  </div>
+
+  <!-- Ear -->
+  {% set ear_ok = state is not none and state.state != "stopped" %}
+  {% set ear_state_str = state.state if state else "off" %}
+  <a href="/ear" class="block bg-gray-900 border border-gray-800 rounded-xl p-4
+                        hover:border-gray-600 transition-colors">
+    <div class="flex items-center justify-between mb-1">
+      <span class="text-sm font-medium text-gray-300">Ear</span>
+      <span class="text-lg">{{ "🟢" if ear_ok else "🔴" }}</span>
+    </div>
+    <div class="flex items-center justify-between">
+      <div class="text-xs font-semibold {{ 'text-emerald-400' if ear_ok else 'text-red-400' }}">
+        {{ ear_state_str }}
+      </div>
+      {% if speaker and speaker.speaker_id and speaker.speaker_id != "guest" %}
+      {% set conf = speaker.confidence or 0 %}
+      <div class="text-xs {{ 'text-green-400' if conf >= 0.80 else 'text-yellow-400' if conf >= 0.50 else 'text-gray-500' }}">
+        {{ speaker.speaker_id }}{% if conf < 0.80 %}?{% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </a>
+
 </div>
 
 <!-- Latencias + Alertas -->
