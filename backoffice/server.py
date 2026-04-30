@@ -205,8 +205,71 @@ def agents_page(request: Request):
 
 @app.post("/agents/{agent_id}/toggle", response_class=HTMLResponse)
 async def toggle_agent(agent_id: str):
-    # Stub: toggle requiere endpoint en core (tarea futura)
-    return HTMLResponse(f'<span class="text-yellow-400 text-xs">toggle pendiente</span>')
+    info = _core(f"/agents/{agent_id}") or {}
+    current = info.get("status", "planned")
+    new_status = "planned" if current == "active" else "active"
+    _core(f"/agents/{agent_id}/status", method="PATCH", json={"status": new_status})
+
+    if new_status == "active":
+        css = "bg-emerald-900/50 text-emerald-400 hover:bg-emerald-900"
+    else:
+        css = "bg-gray-800 text-gray-500 hover:bg-gray-700"
+
+    return HTMLResponse(
+        f'<button hx-post="/agents/{agent_id}/toggle" '
+        f'hx-target="#status-cell-{agent_id}" hx-swap="innerHTML" '
+        f'title="Click para cambiar estado" '
+        f'class="cursor-pointer px-2 py-1 rounded text-xs font-medium transition-colors {css}">'
+        f'{new_status}</button>'
+    )
+
+
+@app.get("/agents/{agent_id}/edit", response_class=HTMLResponse)
+def agent_edit_page(request: Request, agent_id: str):
+    agent = _core(f"/agents/{agent_id}")
+    if not agent:
+        return RedirectResponse("/agents", status_code=303)
+    return _render(request, "agent_edit.html", "agents",
+                   agent=agent, agent_id=agent_id, error="")
+
+
+@app.post("/agents/{agent_id}/edit")
+async def agent_edit_submit(request: Request, agent_id: str):
+    form = await request.form()
+
+    # Status
+    status = str(form.get("status", "")).strip()
+    if status:
+        _core(f"/agents/{agent_id}/status", method="PATCH", json={"status": status})
+
+    # Keywords: una por línea
+    kw_raw = str(form.get("keywords", ""))
+    keywords = [k.strip() for k in kw_raw.splitlines() if k.strip()]
+    _core(f"/agents/{agent_id}/keywords", method="PATCH", json={"keywords": keywords})
+
+    # Config: campos dinámicos según config_schema del agente
+    agent_info = _core(f"/agents/{agent_id}") or {}
+    schema = agent_info.get("config_schema") or {}
+    config: dict = {}
+    for key, meta in schema.items():
+        raw_val = form.get(f"config_{key}")
+        if raw_val is None:
+            continue
+        val_str = str(raw_val).strip()
+        t = meta.get("type", "str")
+        try:
+            if t == "float":
+                config[key] = float(val_str)
+            elif t == "int":
+                config[key] = int(val_str)
+            else:
+                config[key] = val_str
+        except (ValueError, TypeError):
+            config[key] = val_str
+    if config:
+        _core(f"/agents/{agent_id}/config", method="PATCH", json=config)
+
+    return RedirectResponse("/agents", status_code=303)
 
 
 @app.get("/shared-state", response_class=HTMLResponse)
