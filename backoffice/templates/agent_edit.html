@@ -105,7 +105,13 @@
           {{ meta.label }}
           <span class="text-gray-600 font-normal ml-1">({{ key }})</span>
         </label>
-        {% if meta.type == 'int' or meta.type == 'float' %}
+        {% if meta.type == 'text' %}
+        <textarea
+          name="config_{{ key }}"
+          rows="5"
+          class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 font-mono
+                 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 resize-y">{{ cur_val }}</textarea>
+        {% elif meta.type == 'int' or meta.type == 'float' %}
         <input
           type="number"
           name="config_{{ key }}"

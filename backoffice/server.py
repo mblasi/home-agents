@@ -248,6 +248,7 @@ async def agent_new_submit(request: Request):
         "status":        str(form.get("status", "planned")),
         "keywords":      keywords,
         "default_roles": default_roles,
+        "system_prompt": str(form.get("system_prompt", "")).strip(),
     }
     result = _core("/agents", method="POST", json=payload)
     if result is None:
