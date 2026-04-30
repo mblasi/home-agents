@@ -11,13 +11,13 @@
 </div>
 
 {% if users %}
-<div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+<div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden mb-4">
   <table class="w-full text-sm">
     <thead>
       <tr class="border-b border-gray-800 text-gray-400 text-xs uppercase tracking-wider">
         <th class="px-4 py-3 text-left">Usuario</th>
         <th class="px-4 py-3 text-left">Rol</th>
-        <th class="px-4 py-3 text-left">Agentes</th>
+        <th class="px-4 py-3 text-left">Acceso a agentes</th>
         <th class="px-4 py-3 text-left">WhatsApp</th>
         <th class="px-4 py-3 text-center">Speaker</th>
         <th class="px-4 py-3 text-right">Acciones</th>
@@ -25,13 +25,17 @@
     </thead>
     <tbody class="divide-y divide-gray-800">
       {% for uid, u in users.items() %}
+      {% set role_grants = role_perms.get(u.role, []) %}
+      {% set has_all = "*" in role_grants %}
       {% set user_grants = u.get("agent_ids", []) %}
       {% set user_revokes = u.get("revoked_agents", []) %}
       <tr id="user-row-{{ uid }}" class="hover:bg-gray-800/50">
+
         <td class="px-4 py-3">
           <div class="font-medium">{{ u.name }}</div>
           <div class="text-xs text-gray-500 font-mono">{{ uid }}</div>
         </td>
+
         <td class="px-4 py-3">
           {% if u.role == "admin" %}
           <span class="px-2 py-0.5 bg-purple-900/50 text-purple-400 rounded text-xs">{{ u.role }}</span>
@@ -45,37 +49,48 @@
           <span class="px-2 py-0.5 bg-gray-800 text-gray-400 rounded text-xs">{{ u.role }}</span>
           {% endif %}
         </td>
+
         <td class="px-4 py-3">
-          {# Solo mostrar overrides individuales — el rol ya explica el acceso base #}
-          {% set has_overrides = (user_grants | length > 0) or (user_revokes | length > 0) %}
-          {% if has_overrides %}
           <div class="flex flex-wrap gap-1">
-            {% for aid in user_grants %}
-              {% if aid in agents %}
-              <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-900/40 text-emerald-400
-                           border border-emerald-800/60 rounded text-xs"
-                    title="Acceso otorgado individualmente">
-                {{ agents[aid].icon }} {{ agents[aid].name }}
-              </span>
-              {% endif %}
-            {% endfor %}
-            {% for aid in user_revokes %}
-              {% if aid in agents %}
-              <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-red-900/30 text-red-500
-                           border border-red-900/60 rounded text-xs"
-                    title="Acceso revocado individualmente">
-                {{ agents[aid].icon }} <s>{{ agents[aid].name }}</s>
-              </span>
+            {% for aid, info in agents.items() %}
+              {% set from_role = has_all or aid in role_grants %}
+              {% set explicitly_granted = aid in user_grants %}
+              {% set explicitly_revoked = aid in user_revokes %}
+              {% set can_access = (from_role and not explicitly_revoked) or explicitly_granted %}
+
+              {% if can_access and explicitly_granted and not from_role %}
+                {# Grant individual — verde con + #}
+                <span class="inline-flex items-center gap-1 px-2 py-0.5
+                             bg-emerald-900/30 text-emerald-400 border border-emerald-800/50
+                             rounded text-xs"
+                      title="Otorgado individualmente (no está en el rol {{ u.role }})">
+                  {{ info.icon }} {{ info.name }}
+                  <span class="text-emerald-600">+</span>
+                </span>
+              {% elif can_access %}
+                {# Acceso por rol — gris neutro #}
+                <span class="inline-flex items-center gap-1 px-2 py-0.5
+                             bg-gray-800/60 text-gray-400 rounded text-xs"
+                      title="Incluido en el rol {{ u.role }}">
+                  {{ info.icon }} {{ info.name }}
+                </span>
+              {% elif explicitly_revoked %}
+                {# Revocado individualmente — rojo tachado #}
+                <span class="inline-flex items-center gap-1 px-2 py-0.5
+                             bg-red-900/20 text-red-500 border border-red-900/40
+                             rounded text-xs line-through"
+                      title="Revocado individualmente (el rol {{ u.role }} lo concedería)">
+                  {{ info.icon }} {{ info.name }}
+                </span>
               {% endif %}
             {% endfor %}
           </div>
-          {% else %}
-          <span class="text-gray-600 text-xs">por rol</span>
-          {% endif %}
         </td>
+
         <td class="px-4 py-3 font-mono text-xs text-gray-400">
           {{ u.wa_phone if u.wa_phone else "—" }}
         </td>
+
         <td class="px-4 py-3 text-center">
           {% if u.has_embedding %}
           <span class="text-emerald-400 text-base" title="Modelo de voz entrenado">✓</span>
@@ -83,6 +98,7 @@
           <span class="text-gray-600 text-base" title="Sin modelo de voz">—</span>
           {% endif %}
         </td>
+
         <td class="px-4 py-3 text-right">
           <div class="flex gap-2 justify-end">
             <a href="/users/{{ uid }}/edit"
@@ -98,11 +114,67 @@
             </button>
           </div>
         </td>
+
       </tr>
       {% endfor %}
     </tbody>
   </table>
 </div>
+
+{# ── Matriz de permisos por rol ───────────────────────────────────────────── #}
+<details class="group">
+  <summary class="text-xs text-gray-500 cursor-pointer hover:text-gray-300 select-none
+                  flex items-center gap-1 mb-2">
+    <span class="group-open:rotate-90 transition-transform inline-block">▶</span>
+    Permisos por rol
+  </summary>
+  <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+    <table class="w-full text-xs">
+      <thead>
+        <tr class="border-b border-gray-800">
+          <th class="px-4 py-2 text-left text-gray-500 font-normal w-32">Rol</th>
+          {% for aid, info in agents.items() %}
+          <th class="px-3 py-2 text-center text-gray-500 font-normal"
+              title="{{ info.name }}">
+            {{ info.icon }}
+          </th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-800/50">
+        {% for role in ["admin", "familiar", "adolescente", "niño", "invitado"] %}
+        {% set rperms = role_perms.get(role, []) %}
+        {% set role_has_all = "*" in rperms %}
+        <tr class="hover:bg-gray-800/30">
+          <td class="px-4 py-2">
+            {% if role == "admin" %}
+            <span class="text-purple-400">{{ role }}</span>
+            {% elif role == "familiar" %}
+            <span class="text-blue-400">{{ role }}</span>
+            {% elif role == "adolescente" %}
+            <span class="text-cyan-400">{{ role }}</span>
+            {% elif role == "niño" %}
+            <span class="text-green-400">{{ role }}</span>
+            {% else %}
+            <span class="text-gray-400">{{ role }}</span>
+            {% endif %}
+          </td>
+          {% for aid, info in agents.items() %}
+          {% set has_access = role_has_all or aid in rperms %}
+          <td class="px-3 py-2 text-center">
+            {% if has_access %}
+            <span class="text-emerald-400" title="{{ info.name }} — incluido en {{ role }}">●</span>
+            {% else %}
+            <span class="text-gray-700" title="{{ info.name }} — no incluido en {{ role }}">○</span>
+            {% endif %}
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</details>
 
 {% else %}
 <div class="text-center py-16 text-gray-600">
