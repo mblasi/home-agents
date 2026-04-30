@@ -288,29 +288,30 @@ Estado:   COMPLETA
 ### FASE 3.5 - Integración WhatsApp
 ```
 Objetivo: Canal de texto y audio hacia el orquestador vía WhatsApp
-Estado:   Pendiente (dep satisfecha: orquestador ya existe)
+Estado:   EN CURSO (6/10 — solo queda Etapa B: 3.5.7-3.5.10)
 Deps:     FASE 3.2 ✓ (orquestador implementado), FASE 1.3 ✓ (STT), FASE 1 TTS ✓
 Privacidad: solo números autorizados, todo corre local
+Stack:    whatsapp-web.js (Node 18), LocalAuth, POST /wa/inbound (FastAPI)
 ```
 
 #### Etapa A - Canal de texto
-- [ ] 3.5.1  Elegir cliente WA: whatsapp-web.js (Node 18) vs evolution-api (self-hosted REST)
-- [ ] 3.5.2  Setup del cliente: sesión persistente con QR scan, reconexión automática
-- [ ] 3.5.3  Webhook receiver en el orquestador (FastAPI endpoint /wa/inbound)
-- [ ] 3.5.4  Whitelist de números autorizados (solo responde a contactos configurados)
-- [ ] 3.5.5  Routing texto → orquestador → agente → respuesta de vuelta por WA
-- [ ] 3.5.6  Manejo de contexto por número: historial de conversación en sesión
+- [x] 3.5.1  Elegir cliente WA: whatsapp-web.js (Node 18) — sesión LocalAuth en disco
+- [x] 3.5.2  Setup del cliente: sesión persistente con QR scan, reconexión automática (wa/index.js)
+- [x] 3.5.3  Webhook receiver en el orquestador (FastAPI endpoint POST /wa/inbound en server.py)
+- [x] 3.5.4  Whitelist de números autorizados: WA_WHITELIST en .env, doble validación cliente+core
+- [x] 3.5.5  Routing texto → orquestador → agente → respuesta de vuelta por WA
+- [x] 3.5.6  Manejo de contexto por número: source={channel:whatsapp, phone:...} → source_key único en conversations.py
 
 #### Etapa B - Canal de audio (PTT)
 - [ ] 3.5.7  Recibir mensajes de voz (PTT) de WhatsApp → descargar OGG/Opus
 - [ ] 3.5.8  Convertir OGG → WAV 16000Hz (ffmpeg o librosa)
 - [ ] 3.5.9  Pasar por faster-whisper → texto → orquestador (mismo pipeline que mic)
-- [ ] 3.5.10 Respuesta: opción texto o audio generado con Piper → enviar nota de voz
+- [ ] 3.5.10 Respuesta: espejo de entrada — si PTT → responder con nota de voz (Piper)
 
-#### Decisiones pendientes
-- [ ] Cliente WA: whatsapp-web.js (más simple, Node) vs evolution-api (REST genérico, más robusto)
-- [ ] Respuesta: ¿siempre texto o detectar si el usuario mandó audio → responder audio?
-- [ ] Persistencia de sesión WA: ¿LocalAuth en disco o base de datos?
+#### Decisiones tomadas
+- [x] Cliente WA: whatsapp-web.js (Node 18) — más simple, sin Docker
+- [x] Respuesta: espejo de entrada (texto → texto, PTT → nota de voz)
+- [x] Persistencia de sesión WA: LocalAuth en ~/.local/share/capitan/wa-session/
 
 ---
 
