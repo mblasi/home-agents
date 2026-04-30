@@ -188,9 +188,11 @@ def dashboard(request: Request):
 
     avg = {k: round(sum(v)/len(v), 2) if v else None for k, v in lats.items()}
 
+    speaker = _read_json("speaker.json") or {}
+
     return _render(request, "dashboard.html", "dashboard",
                    health=health, history=history[-10:],
-                   alerts=alerts, state=state,
+                   alerts=alerts, state=state, speaker=speaker,
                    avg_lat=avg, history_count=len(history))
 
 
@@ -353,13 +355,26 @@ def ear_stream():
     )
 
 
+def _speaker_cell(source: dict) -> tuple[str, str]:
+    """Devuelve (texto, clase CSS) para mostrar el speaker en tablas."""
+    sid  = (source or {}).get("speaker_id") or "?"
+    conf = (source or {}).get("speaker_confidence") or 0.0
+    if sid == "guest":
+        return "guest", "text-gray-600"
+    if conf >= 0.80:
+        return sid[:10], "text-green-400"
+    if conf >= 0.50:
+        return sid[:9] + "?", "text-yellow-400"
+    return sid[:9] + "?", "text-gray-500"
+
+
 @app.get("/api/ear/history", response_class=HTMLResponse)
 def ear_history_fragment():
     history = _read_json("history.json") or []
     recent  = list(reversed(history[-15:]))
     if not recent:
         return HTMLResponse(
-            '<tr><td colspan="5" class="px-3 py-4 text-center text-gray-600">Sin comandos aún</td></tr>'
+            '<tr><td colspan="6" class="px-3 py-4 text-center text-gray-600">Sin comandos aún</td></tr>'
         )
 
     def lat_color(v: float) -> str:
@@ -373,15 +388,17 @@ def ear_history_fragment():
     for e in recent:
         conv_id = e.get("conversation_id") or ""
         if prev_conv is not None and conv_id != prev_conv:
-            rows.append('<tr><td colspan="5" class="text-center text-gray-700 py-0.5 text-xs">· · ·</td></tr>')
+            rows.append('<tr><td colspan="6" class="text-center text-gray-700 py-0.5 text-xs">· · ·</td></tr>')
         accion = e.get("accion") or "—"
         if accion and "→" in accion:
             accion = accion.split("→")[-1].strip()
         lat = e.get("lat_total", 0)
+        sp_text, sp_cls = _speaker_cell(e.get("source") or {})
         rows.append(
             f'<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">'
             f'<td class="px-3 py-1.5 text-gray-500 text-xs whitespace-nowrap">{e.get("ts","")}</td>'
             f'<td class="px-3 py-1.5 text-blue-500 text-xs font-mono">{conv_id[:6] or "——"}</td>'
+            f'<td class="px-3 py-1.5 {sp_cls} text-xs font-medium">{sp_text}</td>'
             f'<td class="px-3 py-1.5 text-gray-200 text-xs">{e.get("texto","")}</td>'
             f'<td class="px-3 py-1.5 text-cyan-400 text-xs">{accion[:45]}</td>'
             f'<td class="px-3 py-1.5 {lat_color(lat)} text-xs text-right font-mono">{lat:.1f}s</td>'
