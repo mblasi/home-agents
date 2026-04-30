@@ -252,7 +252,10 @@ FASE 2 COMPLETA
 Objetivo: Sistema de identidad que permite reconocer quién habla, definir su rol y
           parentesco, y personalizar la experiencia. Prerequisito para interacciones
           contextuales como "reproduce mi música preferida" o "¿cómo está mi portfolio?"
-Estado:   Pendiente (puede ejecutarse en paralelo con FASE 2)
+Estado:   POSTERGADA — retomar después de FASE 7, prerequisito para FASE 11
+          No es necesaria para FASE 3-7: el routing no depende de quién habla.
+          Se vuelve relevante cuando los agentes de dominio necesitan personalizar
+          por usuario (FASE 11) o cuando RBAC tiene sentido con múltiples usuarios reales.
 ```
 
 #### Impacto por módulo
@@ -292,24 +295,30 @@ Estado:   Pendiente (puede ejecutarse en paralelo con FASE 2)
 
 ### FASE 3 - Infraestructura Multi-Agente
 ```
-Objetivo: Orquestador que coordina todos los agentes
-Estado:   Pendiente
+Objetivo: Patrón de extensión para agentes de dominio + estado compartido cross-agente
+Estado:   EN CURSO (5/7 ya implementados durante FASE 1-2)
 ```
-- [ ] 3.1  Diseño del protocolo de comunicación entre agentes
-- [ ] 3.2  Orquestador central (FastAPI, enruta por intención)
-- [ ] 3.3  Router de intención (qué agente responde a qué)
-- [ ] 3.4  Memoria compartida (contexto cross-agente)
-- [ ] 3.5  Sistema de logging y observabilidad
-- [ ] 3.6  API unificada para todos los agentes
-- [ ] 3.7  Dashboard de estado de la red de agentes
+
+#### Ya implementado
+- [x] 3.2  Orquestador central → server.py (FastAPI :8765, POST /process)
+- [x] 3.3  Router de intención → agent_registry.dispatch() (keywords + LLM fallback)
+- [x] 3.5  Logging y observabilidad → /tmp/capitan/*.json + dashboard zellij
+- [x] 3.6  API unificada → POST /process, GET /agents, GET /health, GET /conversations
+- [x] 3.7  Dashboard de estado → panel_agents.py (agente activo, fuente, conversación)
+
+#### Pendiente
+- [ ] 3.1  Contrato de interfaz para agentes de dominio: BaseAgent protocol en código,
+           patrón de registro en agent_registry, guía para agregar FASE 4-7
+- [ ] 3.4  Estado compartido cross-agente: slot de contexto legible/escribible por cualquier
+           agente activo (ej: clima sabe que llueve → haos puede ajustar persianas)
 
 ---
 
 ### FASE 3.5 - Integración WhatsApp
 ```
 Objetivo: Canal de texto y audio hacia el orquestador vía WhatsApp
-Estado:   Pendiente (inicia cuando FASE 3 tenga orquestador básico)
-Deps:     FASE 3.2 (orquestador), FASE 1.3 (STT), FASE 1 TTS
+Estado:   Pendiente (dep satisfecha: orquestador ya existe)
+Deps:     FASE 3.2 ✓ (orquestador implementado), FASE 1.3 ✓ (STT), FASE 1 TTS ✓
 Privacidad: solo números autorizados, todo corre local
 ```
 

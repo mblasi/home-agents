@@ -44,12 +44,12 @@
 
 # ── FASE 3 (infraestructura multi-agente) ────────────────────────────────────
 "3.1":   22
-"3.2":   23
-"3.3":   24
+# 3.2 → implementado como server.py (umbrella #23, cerrado)
+# 3.3 → implementado como agent_registry.dispatch() (umbrella #24, cerrado)
 "3.4":   25
-"3.5":   26
-"3.6":   27
-"3.7":   28
+# 3.5 → implementado como /tmp/capitan/ + dashboard (umbrella #26, cerrado)
+# 3.6 → implementado como POST /process + GET /agents (umbrella #27, cerrado)
+# 3.7 → implementado como panel_agents.py (umbrella #28, cerrado)
 
 # ── FASE 3.5 (WhatsApp) ───────────────────────────────────────────────────────
 "3.5.1":  29
