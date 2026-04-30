@@ -575,6 +575,76 @@ simples en <100ms y el LLM entra solo cuando hay ambigüedad real.
 
 ---
 
+### FASE 10 - Infraestructura de Inferencia Distribuida
+```
+Objetivo: Romper la asunción de que todos los modelos corren en un único Ollama local.
+          Abstraer el cliente de inferencia para soportar múltiples nodos/backends dentro
+          de la red, cada uno con hardware y modelos optimizados para distintos agentes.
+Estado:   Pendiente
+Deps:     FASE 8 (servidor dedicado operativo), FASE 3 (orquestador con agentes múltiples)
+Cuándo empezar: cuando el primer servidor dedicado esté funcionando y aparezca la primera
+                necesidad de hardware diferenciado por agente (ej: modelo 32b que no cabe
+                en el mismo nodo que los modelos generales).
+```
+
+#### Por qué un único Ollama es una limitante
+
+Un solo servidor Ollama comparte VRAM/RAM entre todos los modelos. Esto implica:
+- Techo físico: no podés correr simultáneamente un modelo 32b y varios 7b en la misma GPU
+- Acoplamiento de hardware: modelos con necesidades distintas (VRAM alta, CPU offload,
+  quantización diferente) compiten por el mismo recurso
+- Sin escala horizontal: si un agente está saturado, no podés agregar capacidad sin
+  replicar todo el nodo
+- Lock-in de framework: Ollama no es el único runtime; vLLM, llama.cpp server y TGI
+  ofrecen mejor throughput o soporte para modelos específicos
+
+#### Diseño: mesh de inferencia
+
+```
+core/inference_client.py     ← cliente agnóstico, API compatible OpenAI
+core/node_registry.py        ← catálogo de nodos con health check
+
+Nodos posibles en la red:
+  ollama-principal  (RTX 4090, 24GB VRAM)  → modelos generales 7b-14b
+  ollama-secundario (RTX 3060, 12GB VRAM)  → coordinator 3b, fallback
+  vllm-node         (multi-GPU futuro)      → modelos 32b-72b
+  cpu-node          (NAS / RPi)             → modelos livianos, emergencia
+```
+
+Config por agente (YAML o env), reemplaza el hardcoding actual:
+```yaml
+agents:
+  finance:   {endpoint: "http://gpu-2:11434", model: "qwen2.5:32b"}
+  coordinator: {endpoint: "http://gpu-1:8000", model: "qwen2.5:3b"}  # vLLM
+  climate:   {endpoint: "http://gpu-1:11434", model: "qwen2.5:7b"}
+  fallback:  {endpoint: "http://cpu-node:11434", model: "qwen2.5:7b"}
+```
+
+Todos los backends exponen API compatible OpenAI — el cliente es el mismo,
+solo cambia la URL y el modelo.
+
+#### Etapa A — Abstracción del cliente de inferencia
+- [ ] 10.1  inference_client.py: cliente HTTP compatible OpenAI (Ollama, vLLM, llama.cpp server, TGI)
+- [ ] 10.2  Config por agente en YAML: endpoint + model (reemplaza OLLAMA_URL hardcodeado en agent_registry.py)
+- [ ] 10.3  Migrar todos los agentes existentes a inference_client.py sin cambios de lógica
+
+#### Etapa B — Mesh de nodos
+- [ ] 10.4  node_registry.py: catálogo de nodos con URL, modelos disponibles, tipo de hardware y estado
+- [ ] 10.5  Health check periódico por nodo: disponibilidad, latencia media, modelos cargados en memoria
+- [ ] 10.6  Routing agente → nodo: el orquestador consulta node_registry y elige el nodo óptimo disponible
+
+#### Etapa C — Resiliencia
+- [ ] 10.7  Fallback automático: si el nodo primario no responde, redirigir al nodo alternativo configurado
+- [ ] 10.8  Circuit breaker por nodo: marcar como no disponible tras N fallos, recuperación automática con backoff
+- [ ] 10.9  Cola de requests: encolar si todos los nodos del agente están saturados en lugar de devolver error
+
+#### Etapa D — Observabilidad
+- [ ] 10.10 Métricas por nodo: latencia p50/p95, tokens/s, requests en vuelo, errores
+- [ ] 10.11 Panel en dashboard: estado del mesh, nodos activos, modelos cargados, latencia en tiempo real
+- [ ] 10.12 Alerta si un nodo cae: notificación por WhatsApp (vía FASE 3.5) o TTS en el agente de voz
+
+---
+
 ## PIPELINE ACTUAL (para referencia rápida)
 
 ```
