@@ -307,7 +307,7 @@ Estado:   EN CURSO (5/7 ya implementados durante FASE 1-2)
 - [x] 3.7  Dashboard de estado → panel_agents.py (agente activo, fuente, conversación)
 
 #### Pendiente
-- [ ] 3.1  Contrato de interfaz para agentes de dominio: BaseAgent protocol en código,
+- [x] 3.1  Contrato de interfaz para agentes de dominio: BaseAgent protocol en código,
            patrón de registro en agent_registry, guía para agregar FASE 4-7
 - [ ] 3.4  Estado compartido cross-agente: slot de contexto legible/escribible por cualquier
            agente activo (ej: clima sabe que llueve → haos puede ajustar persianas)
