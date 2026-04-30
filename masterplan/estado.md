@@ -823,6 +823,14 @@ Nota:     Cambios de config/keywords aplican en el próximo reinicio del core.
 - [x] 14.17 `backoffice/templates/agent_new.html` — sección System prompt (textarea required);
             agent_edit.html: type='text' en config_schema renderiza como textarea;
             backoffice/server.py: system_prompt en payload de POST /agents
+- [x] 14.18 `core/generic_agent.py` — campo backend (select:[ollama]) en config_schema;
+            model pasa a type='select' con options='ollama_models';
+            process() despacha según backend; agent_config y server.py aceptan y persisten
+            backend y model como config explícita en agents.json
+- [x] 14.19 `backoffice`: sección Backend y modelo en agent_new.html (select Ollama + dropdown
+            de modelos desde API); agent_edit.html: type='select' renderiza <select> con
+            opciones estáticas o dinámicas (ollama_models); /devices redirige a /ear;
+            ear.html: card Dispositivos integrada; base.html: quita nav link Dispositivos
 
 ---
 
