@@ -24,11 +24,6 @@
       {{ "online" if core_ok else "offline" }}
     </span></div>
     <div>URL: <code class="text-gray-400">{{ core_url }}</code></div>
-    {% if core_ok %}
-    <div>Ollama: <span class="{{ 'text-emerald-400' if health.get('ollama') else 'text-red-400' }}">{{ "ok" if health.get('ollama') else "down" }}</span>
-      &nbsp; HAOS: <span class="{{ 'text-emerald-400' if health.get('haos') else 'text-red-400' }}">{{ "ok" if health.get('haos') else "down" }}</span>
-    </div>
-    {% endif %}
   </div>
 </div>
 
@@ -39,11 +34,11 @@
       <h2 class="text-sm font-semibold text-gray-300">Ollama</h2>
       <p class="text-xs text-gray-600 mt-0.5">Motor de inferencia local — LLM para todos los agentes</p>
     </div>
-    <span class="text-lg">{{ "🟢" if health.get("ollama") else "🔴" }}</span>
+    <span class="text-lg">{{ "🟢" if ollama_ok else "🔴" }}</span>
   </div>
   <div class="text-xs text-gray-500 space-y-1">
-    <div>Estado: <span class="{{ 'text-emerald-400' if health.get('ollama') else 'text-red-400' }}">
-      {{ "online" if health.get("ollama") else "offline" }}
+    <div>Estado: <span class="{{ 'text-emerald-400' if ollama_ok else 'text-red-400' }}">
+      {{ "online" if ollama_ok else "offline" }}
     </span></div>
     <div>URL: <code class="text-gray-400">localhost:11434</code></div>
   </div>

@@ -8,7 +8,6 @@
 <div class="grid grid-cols-3 gap-4 mb-6">
 
   <!-- Core API -->
-  {% set core_ok = health.get("status") == "ok" %}
   <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
     <div class="flex items-center justify-between mb-1">
       <span class="text-sm font-medium text-gray-300">Core API</span>
@@ -21,7 +20,6 @@
   </div>
 
   <!-- Ollama -->
-  {% set ollama_ok = health.get("ollama", false) %}
   <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
     <div class="flex items-center justify-between mb-1">
       <span class="text-sm font-medium text-gray-300">Ollama</span>
