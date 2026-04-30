@@ -46,7 +46,7 @@
 
         {# Roles editables #}
         {% for role in roles %}
-        {% if role == "admin" %}{% continue %}{% endif %}
+        {% if role != "admin" %}
         {% set rperms = role_perms.get(role, []) %}
         {% set role_has_all = "*" in rperms %}
         <tr class="hover:bg-gray-800/30">
@@ -73,6 +73,7 @@
           </td>
           {% endfor %}
         </tr>
+        {% endif %}
         {% endfor %}
 
       </tbody>
