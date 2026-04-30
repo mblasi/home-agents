@@ -29,20 +29,34 @@
       <div class="text-gray-500">cargando…</div>
     </div>
 
-    <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-      <a href="/dashboard"      class="nav-link {% if section == 'dashboard'      %}active{% endif %}">📊 Dashboard</a>
-      <a href="/agents"         class="nav-link {% if section == 'agents'         %}active{% endif %}">🤖 Agentes</a>
-      <a href="/shared-state"   class="nav-link {% if section == 'shared-state'   %}active{% endif %}">🔗 Shared State</a>
-      <a href="/conversations"  class="nav-link {% if section == 'conversations'  %}active{% endif %}">💬 Conversaciones</a>
-      <a href="/stats"          class="nav-link {% if section == 'stats'          %}active{% endif %}">📈 Estadísticas</a>
-      <a href="/alerts"         class="nav-link {% if section == 'alerts'         %}active{% endif %}">🔔 Alertas</a>
-      <hr class="border-gray-800 my-2">
-      <a href="/config"         class="nav-link {% if section == 'config'         %}active{% endif %}">⚙️ Configuración</a>
-      <a href="/devices"        class="nav-link {% if section == 'devices'        %}active{% endif %}">📡 Dispositivos</a>
-      <a href="/users"          class="nav-link {% if section == 'users'          %}active{% endif %}">👥 Usuarios</a>
-      <hr class="border-gray-800 my-2">
-      <a href="/logs"           class="nav-link {% if section == 'logs'           %}active{% endif %}">📋 Logs</a>
-      <a href="/integrations"   class="nav-link {% if section == 'integrations'   %}active{% endif %}">🔌 Integraciones</a>
+    <nav class="flex-1 px-3 py-3 overflow-y-auto space-y-5">
+
+      <!-- Monitoreo -->
+      <div>
+        <p class="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-gray-600">Monitoreo</p>
+        <a href="/dashboard"     class="nav-link {% if section == 'dashboard'     %}active{% endif %}">📊 Dashboard</a>
+        <a href="/stats"         class="nav-link {% if section == 'stats'         %}active{% endif %}">📈 Estadísticas</a>
+        <a href="/alerts"        class="nav-link {% if section == 'alerts'        %}active{% endif %}">🔔 Alertas</a>
+        <a href="/logs"          class="nav-link {% if section == 'logs'          %}active{% endif %}">📋 Logs</a>
+      </div>
+
+      <!-- Sistema -->
+      <div>
+        <p class="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-gray-600">Sistema</p>
+        <a href="/agents"        class="nav-link {% if section == 'agents'        %}active{% endif %}">🤖 Agentes</a>
+        <a href="/conversations" class="nav-link {% if section == 'conversations' %}active{% endif %}">💬 Conversaciones</a>
+        <a href="/shared-state"  class="nav-link {% if section == 'shared-state'  %}active{% endif %}">🔗 Shared State</a>
+      </div>
+
+      <!-- Configuración -->
+      <div>
+        <p class="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-gray-600">Configuración</p>
+        <a href="/users"         class="nav-link {% if section == 'users'         %}active{% endif %}">👥 Usuarios</a>
+        <a href="/devices"       class="nav-link {% if section == 'devices'       %}active{% endif %}">📡 Dispositivos</a>
+        <a href="/integrations"  class="nav-link {% if section == 'integrations'  %}active{% endif %}">🔌 Integraciones</a>
+        <a href="/config"        class="nav-link {% if section == 'config'        %}active{% endif %}">⚙️ Config (.env)</a>
+      </div>
+
     </nav>
 
     <div class="px-4 py-3 border-t border-gray-800">
