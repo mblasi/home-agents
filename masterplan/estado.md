@@ -292,7 +292,7 @@ Estado:   POSTERGADA — retomar después de FASE 7, prerequisito para FASE 11
 ### FASE 3 - Infraestructura Multi-Agente
 ```
 Objetivo: Patrón de extensión para agentes de dominio + estado compartido cross-agente
-Estado:   EN CURSO (6/7 completos — solo queda 3.4)
+Estado:   COMPLETA
 ```
 
 #### Ya implementado
@@ -305,7 +305,7 @@ Estado:   EN CURSO (6/7 completos — solo queda 3.4)
 #### Pendiente
 - [x] 3.1  Contrato de interfaz para agentes de dominio: BaseAgent protocol en código,
            patrón de registro en agent_registry, guía para agregar FASE 4-7
-- [ ] 3.4  Estado compartido cross-agente: slot de contexto legible/escribible por cualquier
+- [x] 3.4  Estado compartido cross-agente: slot de contexto legible/escribible por cualquier
            agente activo (ej: clima sabe que llueve → haos puede ajustar persianas)
 
 ---
