@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}Plan{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold mb-2">Plan de desarrollo</h1>
+<p class="text-gray-500 text-sm mb-6">masterplan/estado.md</p>
+
+<!-- Resumen global -->
+<div class="grid grid-cols-4 gap-4 mb-8">
+  <div class="bg-gray-900 border border-gray-800 rounded-xl px-5 py-4">
+    <div class="text-xs text-gray-500 uppercase tracking-wider mb-1">Fases completadas</div>
+    <div class="text-2xl font-bold">{{ phases_complete }}<span class="text-gray-600 text-lg font-normal">/{{ phases|length }}</span></div>
+  </div>
+  <div class="bg-gray-900 border border-gray-800 rounded-xl px-5 py-4">
+    <div class="text-xs text-gray-500 uppercase tracking-wider mb-1">Tareas completadas</div>
+    <div class="text-2xl font-bold">{{ total_done }}<span class="text-gray-600 text-lg font-normal">/{{ total_tasks }}</span></div>
+  </div>
+  <div class="bg-gray-900 border border-gray-800 rounded-xl px-5 py-4 col-span-2">
+    <div class="text-xs text-gray-500 uppercase tracking-wider mb-2">Progreso total</div>
+    <div class="flex items-center gap-3">
+      <div class="flex-1 bg-gray-800 rounded-full h-2.5">
+        <div class="bg-emerald-500 h-2.5 rounded-full" style="width: {{ total_pct }}%"></div>
+      </div>
+      <span class="text-sm font-semibold text-emerald-400 w-10 text-right">{{ total_pct }}%</span>
+    </div>
+  </div>
+</div>
+
+<!-- Fases -->
+<div class="space-y-2">
+  {% for p in phases %}
+  {% set is_complete = p.estado == "COMPLETA" %}
+  {% set is_active   = p.estado == "EN CURSO" %}
+
+  <details class="group bg-gray-900 border rounded-xl overflow-hidden
+    {% if is_complete %}border-gray-800{% elif is_active %}border-blue-800/60{% else %}border-gray-800/60{% endif %}">
+
+    <!-- Header / summary -->
+    <summary class="flex items-center gap-4 px-5 py-4 cursor-pointer select-none
+                    hover:bg-gray-800/40 transition-colors [&::-webkit-details-marker]:hidden list-none">
+
+      <!-- Chevron -->
+      <svg class="w-4 h-4 text-gray-600 shrink-0 transition-transform group-open:rotate-90"
+           fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+      </svg>
+
+      <!-- Phase id + badge -->
+      <div class="flex items-center gap-2 shrink-0 w-40">
+        <span class="text-xs font-mono text-gray-500">FASE {{ p.id }}</span>
+        {% if is_complete %}
+        <span class="px-1.5 py-0.5 bg-emerald-900/40 text-emerald-400 rounded text-xs font-medium">COMPLETA</span>
+        {% elif is_active %}
+        <span class="px-1.5 py-0.5 bg-blue-900/40 text-blue-400 rounded text-xs font-medium">EN CURSO</span>
+        {% else %}
+        <span class="px-1.5 py-0.5 bg-gray-800 text-gray-500 rounded text-xs font-medium">Pendiente</span>
+        {% endif %}
+      </div>
+
+      <!-- Title + objetivo -->
+      <div class="flex-1 min-w-0">
+        <div class="font-medium truncate {% if not is_complete and not is_active %}text-gray-400{% endif %}">{{ p.title }}</div>
+        {% if p.objetivo %}
+        <div class="text-xs text-gray-600 truncate mt-0.5">{{ p.objetivo }}</div>
+        {% endif %}
+      </div>
+
+      <!-- Progress bar -->
+      {% if p.tasks_total > 0 %}
+      <div class="shrink-0 flex items-center gap-2 w-44">
+        <div class="flex-1 bg-gray-800 rounded-full h-1.5">
+          <div class="h-1.5 rounded-full
+            {% if is_complete %}bg-emerald-500{% elif is_active %}bg-blue-500{% else %}bg-gray-600{% endif %}"
+            style="width: {{ p.pct }}%"></div>
+        </div>
+        <span class="text-xs text-gray-500 tabular-nums w-12 text-right">{{ p.tasks_done }}/{{ p.tasks_total }}</span>
+      </div>
+      {% else %}
+      <div class="w-44 text-right text-xs text-gray-700">sin tareas</div>
+      {% endif %}
+
+    </summary>
+
+    <!-- Task list (visible when open) -->
+    {% if p.tasks %}
+    <div class="border-t border-gray-800 divide-y divide-gray-800/60">
+      {% for t in p.tasks %}
+      <div class="flex items-start gap-3 px-5 py-2.5
+                  {% if t.done %}bg-transparent{% else %}bg-gray-900{% endif %}
+                  hover:bg-gray-800/30 transition-colors">
+
+        <!-- Status icon -->
+        {% if t.done %}
+        <span class="shrink-0 mt-0.5 text-emerald-500 text-sm">✓</span>
+        {% else %}
+        <span class="shrink-0 mt-0.5 text-gray-600 text-sm">○</span>
+        {% endif %}
+
+        <!-- Task id -->
+        {% if t.id %}
+        <span class="shrink-0 font-mono text-xs text-gray-600 mt-0.5 w-10">{{ t.id }}</span>
+        {% else %}
+        <span class="shrink-0 w-10"></span>
+        {% endif %}
+
+        <!-- Description -->
+        <span class="flex-1 text-sm {% if t.done %}text-gray-500 line-through decoration-gray-700{% else %}text-gray-300{% endif %}">
+          {{ t.text }}
+        </span>
+
+        <!-- GH issue link -->
+        {% if t.gh_url %}
+        <a href="{{ t.gh_url }}" target="_blank" rel="noopener"
+           class="shrink-0 text-xs px-1.5 py-0.5 rounded
+                  {% if t.done %}text-gray-600 hover:text-gray-400{% else %}text-blue-500 hover:text-blue-400{% endif %}
+                  transition-colors">
+          #{{ t.gh_num }}
+        </a>
+        {% endif %}
+
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+  </details>
+  {% endfor %}
+</div>
+{% endblock %}

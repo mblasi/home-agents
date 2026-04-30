@@ -32,6 +32,7 @@
       <div class="flex flex-col gap-1">
         <p class="px-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-gray-600">Monitoreo</p>
         <a href="/dashboard"    class="{{ link_active if section == 'dashboard'    else link_base }}">📊 Dashboard</a>
+        <a href="/ear"          class="{{ link_active if section == 'ear'          else link_base }}">👂 Ear — Live</a>
         <a href="/stats"        class="{{ link_active if section == 'stats'        else link_base }}">📈 Estadísticas</a>
         <a href="/alerts"       class="{{ link_active if section == 'alerts'       else link_base }}">🔔 Alertas</a>
         <a href="/logs"         class="{{ link_active if section == 'logs'         else link_base }}">📋 Logs</a>
@@ -43,6 +44,7 @@
         <a href="/agents"       class="{{ link_active if section == 'agents'       else link_base }}">🤖 Agentes</a>
         <a href="/conversations"class="{{ link_active if section == 'conversations'else link_base }}">💬 Conversaciones</a>
         <a href="/shared-state" class="{{ link_active if section == 'shared-state' else link_base }}">🔗 Shared State</a>
+        <a href="/plan"         class="{{ link_active if section == 'plan'         else link_base }}">🗺️ Plan</a>
       </div>
 
       <!-- Configuración -->
