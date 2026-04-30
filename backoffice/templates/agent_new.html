@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}Nuevo agente{% endblock %}
+
+{% block content %}
+<div class="flex items-center gap-3 mb-6">
+  <a href="/agents" class="text-gray-500 hover:text-gray-300 text-sm">← Agentes</a>
+  <span class="text-gray-700">/</span>
+  <h1 class="text-2xl font-bold">Nuevo agente</h1>
+</div>
+
+{% if error %}
+<div class="mb-4 bg-red-900/30 border border-red-700 text-red-300 px-4 py-3 rounded-lg text-sm">
+  {{ error }}
+</div>
+{% endif %}
+
+<form method="POST" action="/agents/new">
+
+  <!-- Sección 0: Identidad -->
+  <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-5">
+    <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Identidad</h2>
+    <div class="grid grid-cols-2 gap-4 mb-4">
+      <div>
+        <label class="block text-xs font-medium text-gray-400 mb-1">
+          ID del agente <span class="text-red-400">*</span>
+          <span class="text-gray-600 font-normal ml-1">(snake_case, único, no modificable)</span>
+        </label>
+        <input type="text" name="id" required
+               pattern="[a-z0-9_]+"
+               placeholder="ej: finanzas, recetas"
+               class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200
+                      focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-400 mb-1">Icono (emoji)</label>
+        <input type="text" name="icon" value="🤖"
+               class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 text-center text-lg
+                      focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500">
+      </div>
+    </div>
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label class="block text-xs font-medium text-gray-400 mb-1">Nombre visible <span class="text-red-400">*</span></label>
+        <input type="text" name="name" required
+               placeholder="ej: Finanzas personales"
+               class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200
+                      focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-400 mb-1">Descripción breve</label>
+        <input type="text" name="desc"
+               placeholder="ej: Gastos, presupuesto y ahorro"
+               class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200
+                      focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500">
+      </div>
+    </div>
+  </div>
+
+  <!-- Sección 1: Estado inicial -->
+  <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-5">
+    <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Estado inicial</h2>
+    <div class="flex gap-4">
+      {% for st, label, desc in [
+          ('planned',  'Planificado', 'No responde comandos; visible como próximo agente'),
+          ('active',   'Activo',      'Responde comandos y aparece en el dispatcher'),
+      ] %}
+      <label class="flex-1 cursor-pointer">
+        <input type="radio" name="status" value="{{ st }}"
+               {% if st == 'planned' %}checked{% endif %}
+               class="sr-only peer">
+        <div class="border rounded-lg px-4 py-3 transition-colors
+          peer-checked:border-indigo-500 peer-checked:bg-indigo-900/20
+          border-gray-700 hover:border-gray-500 bg-gray-800/50">
+          <div class="font-medium text-sm
+            {% if st == 'active' %}text-emerald-400{% else %}text-gray-400{% endif %}">{{ label }}</div>
+          <div class="text-xs text-gray-500 mt-0.5">{{ desc }}</div>
+        </div>
+      </label>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Sección 2: Keywords -->
+  <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-5">
+    <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-1">Keywords del dispatcher</h2>
+    <p class="text-xs text-gray-600 mb-3">Una keyword por línea. El dispatcher usará estas palabras para enrutar comandos a este agente.</p>
+    <textarea
+      name="keywords"
+      rows="6"
+      class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 font-mono
+             focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 resize-y"
+      placeholder="una keyword por línea"></textarea>
+  </div>
+
+  <!-- Sección 3: Acceso por rol -->
+  <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-5">
+    <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-1">Acceso por rol</h2>
+    <p class="text-xs text-gray-600 mb-3">Qué roles tendrán acceso a este agente desde el inicio.</p>
+    <div class="grid grid-cols-3 gap-3">
+      <label class="flex items-center gap-2">
+        <input type="checkbox" disabled checked
+               class="rounded border-gray-700 bg-gray-800 text-indigo-500">
+        <span class="text-sm text-gray-300">admin</span>
+        <span class="text-xs text-gray-600">(siempre)</span>
+      </label>
+      {% for role in roles %}
+      {% if role != 'admin' %}
+      <label class="flex items-center gap-2 cursor-pointer">
+        <input type="checkbox" name="role_{{ role }}" value="1"
+               class="rounded border-gray-700 bg-gray-800 text-indigo-500 focus:ring-indigo-500">
+        <span class="text-sm text-gray-300">{{ role }}</span>
+      </label>
+      {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="flex gap-3">
+    <button type="submit"
+            class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors">
+      Crear agente
+    </button>
+    <a href="/agents"
+       class="px-5 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium rounded-lg transition-colors">
+      Cancelar
+    </a>
+  </div>
+
+</form>
+{% endblock %}
