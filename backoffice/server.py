@@ -134,10 +134,11 @@ def _render(request: Request, template: str, section: str, **ctx):
 
 @app.get("/api/status", response_class=HTMLResponse)
 def api_status():
-    health = _core("/health") or {}
+    health   = _core("/health") or {}
     ollama_ok = health.get("ollama", False)
-    haos_ok   = health.get("haos",   False)
     core_ok   = health is not None
+    ear_state = _ear_state()
+    ear_ok    = ear_state is not None and ear_state.get("state") != "stopped"
 
     def dot(ok: bool) -> str:
         return "🟢" if ok else "🔴"
@@ -147,8 +148,8 @@ def api_status():
         f'<span>{dot(core_ok)} {"OK" if core_ok else "down"}</span></div>',
         f'<div class="flex justify-between"><span class="text-gray-400">Ollama</span>'
         f'<span>{dot(ollama_ok)} {"OK" if ollama_ok else "down"}</span></div>',
-        f'<div class="flex justify-between"><span class="text-gray-400">Domótica</span>'
-        f'<span>{dot(haos_ok)} {"OK" if haos_ok else "down"}</span></div>',
+        f'<div class="flex justify-between"><span class="text-gray-400">Ear</span>'
+        f'<span>{dot(ear_ok)} {ear_state["state"] if ear_ok and ear_state else "off"}</span></div>',
     ]
     return HTMLResponse("\n".join(lines))
 
