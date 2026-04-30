@@ -246,46 +246,24 @@ FASE 2 COMPLETA
 ### FASE 2.5 - Gestión de Usuarios
 ```
 Objetivo: Sistema de identidad que permite reconocer quién habla, definir su rol y
-          parentesco, y personalizar la experiencia. Prerequisito para interacciones
-          contextuales como "reproduce mi música preferida" o "¿cómo está mi portfolio?"
-Estado:   POSTERGADA — retomar después de FASE 7, prerequisito para FASE 11
-          No es necesaria para FASE 3-7: el routing no depende de quién habla.
-          Se vuelve relevante cuando los agentes de dominio necesitan personalizar
-          por usuario (FASE 11) o cuando RBAC tiene sentido con múltiples usuarios reales.
+          parentesco, y personalizar la experiencia.
+Estado:   COMPLETA
+Stack:    resemblyzer (GE2E 256-dim), JSON + .npy local, RBAC por rol
 ```
-
-#### Impacto por módulo
-
-**home-agents-core** (nuevos archivos):
-  · users.py          modelo User, registro CRUD, persistencia JSON/SQLite
-  · enrollment.py     workflow de captura de frases y cómputo de embedding
-  · Endpoints nuevos: GET/POST/DELETE /users, GET/PATCH /users/{id}/profile
-  · server.py         recibe speaker_id en POST /process, inyecta perfil al LLM
-  · RBAC middleware   check_role() aplicado por intent
-
-**home-agents-ear** (archivos nuevos/modificados):
-  · listen.py         speaker ID después del wake word, speaker_id en HTTP body
-  · panel_users.py    nuevo panel: usuarios registrados, speaker activo, enrollment progress
-  · dashboard.kdl     agregar panel_users a floating_panes
-
-#### Tareas
-- [ ] 2.5.1  Modelo de usuario: roles (admin/familiar/niño/invitado) y relaciones de parentesco
-             (padre/madre/hijo/hija/pareja/abuelo/invitado/propietario)
-- [ ] 2.5.2  Persistencia del registro: JSON/SQLite en ~/.local/share/capitan/users
-             Embeddings como .npy por separado — datos biométricos, nunca a la nube
-- [ ] 2.5.3  API REST en core: GET/POST/DELETE /users, GET/PATCH /users/{id}/profile
-- [ ] 2.5.4  Bootstrap del admin: enrollment guiado al detectar sistema sin usuarios registrados
-             Sistema anuncia → captura N frases → persiste con role=admin
-- [ ] 2.5.5  Comando de voz para agregar usuario (solo admin):
-             "Capitán, agregar a Gala como hija con acceso familiar"
-- [ ] 2.5.6  Proceso guiado de enrollment por voz: N frases predefinidas, tono de inicio/fin,
-             detección de ruido, confirmación. Nuevo estado en ear: enrolling
-- [ ] 2.5.7  Identificación de speaker en tiempo real: cosine similarity sobre audio ya capturado
-             (< 200ms), speaker_id adjunto al POST /process. Fallback: perfil guest
-- [ ] 2.5.8  RBAC básico: tabla de permisos por rol, check_role() en core,
-             respuesta de voz al denegar acceso
-- [ ] 2.5.9  Panel de usuarios en dashboard ear: lista de usuarios, speaker activo en el último
-             pedido, progress bar de enrollment en curso
+- [x] 2.5.1  Modelo de usuario: roles (admin/familiar/niño/invitado), relaciones de parentesco,
+             preferencias y agentes propios por usuario — users.py
+- [x] 2.5.2  Persistencia: ~/.local/share/capitan/users.json + embeddings/*.npy (biométrico, local)
+- [x] 2.5.3  API REST en core: GET/POST/PATCH/DELETE /users + POST /users/reload
+- [x] 2.5.4  Bootstrap admin: al arrancar sin usuarios, listen.py avisa por voz para registrarse
+- [x] 2.5.5  Comando de voz "Capitán, registrarme" — enrollment guiado iniciado desde listen.py
+- [x] 2.5.6  Enrollment por voz: 5 frases predefinidas, tono inicio/fin, media L2-normalizada
+             guardada como perfil — enrollment.py
+- [x] 2.5.7  Identificación en tiempo real: resemblyzer embed + cosine similarity en el audio
+             post-wake-word, speaker_id + confidence en source del POST /process — speaker_id.py
+- [x] 2.5.8  RBAC: tabla de permisos por rol en rbac.py, allowed() + deny_message(),
+             aplicado en /process antes de delegar al agente
+- [x] 2.5.9  Panel de usuarios: panel_users.py con Rich, lista de usuarios + speaker activo
+             con confidence, lee /tmp/capitan/speaker.json y GET /users
 
 ---
 
