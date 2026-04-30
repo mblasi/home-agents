@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Dispositivos{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold mb-2">Dispositivos</h1>
+<p class="text-sm text-gray-500 mb-6">
+  Instancias de <code class="text-gray-400">ear/listen.py</code> activas — heartbeat cada 60s a <code class="text-gray-400">/tmp/capitan/devices.json</code>.
+</p>
+
+{% if devices %}
+<div class="grid grid-cols-2 gap-4">
+  {% for key, d in devices.items() %}
+  {% set age = (now - d.get("ts", now)) | int %}
+  <div class="bg-gray-900 border {% if age < 90 %}border-emerald-800{% else %}border-gray-700{% endif %} rounded-xl p-4">
+    <div class="flex items-center justify-between mb-2">
+      <div class="flex items-center gap-2">
+        <span class="text-xl">📡</span>
+        <span class="font-medium">{{ d.get("hostname", key) }}</span>
+      </div>
+      <span class="text-xs {% if age < 90 %}text-emerald-400{% else %}text-yellow-400{% endif %}">
+        hace {{ age }}s
+      </span>
+    </div>
+    <div class="space-y-1 text-xs text-gray-400">
+      <div class="flex justify-between">
+        <span>Estado</span>
+        <span class="text-gray-200">{{ d.get("state", "—") }}</span>
+      </div>
+      <div class="flex justify-between">
+        <span>PID</span>
+        <span class="font-mono text-gray-200">{{ d.get("pid", "—") }}</span>
+      </div>
+      <div class="flex justify-between">
+        <span>Última actividad</span>
+        <span class="text-gray-200">{{ d.get("last_activity", "—") }}</span>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-16 text-gray-600">
+  <p class="text-4xl mb-3">📡</p>
+  <p class="mb-2">Sin dispositivos ear registrados</p>
+  <p class="text-xs">El heartbeat se activará cuando <code>listen.py</code> esté corriendo</p>
+</div>
+{% endif %}
+{% endblock %}

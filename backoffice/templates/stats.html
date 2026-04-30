@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Estadísticas{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">Estadísticas</h1>
+
+{% if history %}
+{% set stt_vals  = history | selectattr("lat_stt")   | map(attribute="lat_stt")   | list %}
+{% set llm_vals  = history | selectattr("lat_llm")   | map(attribute="lat_llm")   | list %}
+{% set tot_vals  = history | selectattr("lat_total") | map(attribute="lat_total") | list %}
+
+<!-- Resumen de latencias -->
+<div class="grid grid-cols-3 gap-4 mb-6">
+  {% for label, vals, color in [
+      ("STT",   stt_vals,  "blue"),
+      ("LLM",   llm_vals,  "purple"),
+      ("Total", tot_vals,  "emerald"),
+  ] %}
+  {% if vals %}
+  {% set sorted_vals = vals | sort %}
+  {% set p50 = sorted_vals[(sorted_vals|length * 0.5)|int] %}
+  {% set p95 = sorted_vals[(sorted_vals|length * 0.95)|int] %}
+  <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+    <div class="text-xs text-gray-400 uppercase tracking-wider mb-3">{{ label }}</div>
+    <div class="space-y-2">
+      <div class="flex justify-between">
+        <span class="text-xs text-gray-500">p50</span>
+        <span class="text-sm font-mono font-medium text-{{ color }}-400">{{ "%.2f"|format(p50) }}s</span>
+      </div>
+      <div class="flex justify-between">
+        <span class="text-xs text-gray-500">p95</span>
+        <span class="text-sm font-mono font-medium text-{{ color }}-300">{{ "%.2f"|format(p95) }}s</span>
+      </div>
+      <div class="flex justify-between">
+        <span class="text-xs text-gray-500">mín</span>
+        <span class="text-xs font-mono text-gray-400">{{ "%.2f"|format(sorted_vals|min) }}s</span>
+      </div>
+      <div class="flex justify-between">
+        <span class="text-xs text-gray-500">máx</span>
+        <span class="text-xs font-mono text-gray-400">{{ "%.2f"|format(sorted_vals|max) }}s</span>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+  {% endfor %}
+</div>
+
+<!-- Agentes más usados -->
+<div class="grid grid-cols-2 gap-4 mb-6">
+  <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+    <h2 class="text-sm font-semibold text-gray-400 mb-3">Agentes más usados</h2>
+    {% set agent_counts = {} %}
+    {% for h in history %}
+      {% if h.agent %}
+        {% set _ = agent_counts.update({h.agent: (agent_counts.get(h.agent, 0) + 1)}) %}
+      {% endif %}
+    {% endfor %}
+    {% for agent, count in agent_counts.items()|sort(attribute='1', reverse=true) %}
+    <div class="flex items-center justify-between py-1">
+      <span class="text-sm text-gray-300">{{ agent }}</span>
+      <div class="flex items-center gap-2">
+        <div class="h-1.5 bg-blue-500 rounded" style="width: {{ (count / history|length * 100)|int }}px"></div>
+        <span class="text-xs text-gray-500 w-8 text-right">{{ count }}</span>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Últimos errores -->
+  <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+    <h2 class="text-sm font-semibold text-gray-400 mb-3">Últimos comandos</h2>
+    <div class="space-y-1.5">
+      {% for h in history[-8:]|reverse %}
+      <div class="text-xs">
+        <span class="text-gray-500">{{ h.ts }}</span>
+        <span class="text-gray-300 ml-1">{{ h.texto[:40] }}{% if h.texto|length > 40 %}…{% endif %}</span>
+        <span class="text-gray-500 ml-1">({{ h.lat_total }}s)</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- Total de comandos -->
+<div class="text-xs text-gray-600 text-center">
+  {{ history|length }} comandos en el historial (últimos 50 guardados)
+</div>
+
+{% else %}
+<div class="text-center py-16 text-gray-600">
+  <p class="text-4xl mb-3">📈</p>
+  <p>Sin datos de historial aún</p>
+</div>
+{% endif %}
+{% endblock %}
