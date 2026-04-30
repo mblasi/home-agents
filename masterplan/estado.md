@@ -489,6 +489,92 @@ Total estimado:               ~2-3s        (vs 8s actual warm)
 
 ---
 
+### FASE 9 - Coordinador Basado en Modelo
+```
+Objetivo: Reemplazar el router de reglas por un LLM coordinador capaz de descomponer
+          requests complejos, rutear a múltiples agentes y agregar respuestas.
+Estado:   Pendiente
+Deps:     FASE 3.2 (orquestador), FASE 3.3 (router de reglas como baseline),
+          FASE 2.10 (contexto multi-turno), ≥2 agentes de dominio estables.
+Cuándo empezar: cuando el router de reglas muestre limitaciones reales en uso diario
+                (requests ambiguos, cross-domain, multi-paso). Puede superponerse con
+                las últimas fases de dominio (FASE 6-7) una vez FASE 4-5 estén estables.
+```
+
+#### Por qué un modelo y no solo reglas
+
+El router de reglas (FASE 3.3) funciona bien para intenciones simples y bien definidas.
+Falla o requiere complejidad creciente ante:
+- Ambigüedad: "prepará todo para salir" (¿persianas? ¿luces? ¿agenda?)
+- Cross-domain: "¿debería llevar paraguas y tengo algo en la agenda mañana?"
+- Multi-paso: "cuando llegue a casa, revisá el clima y si hace frío, encendé la calefacción"
+- Contexto implícito: "¿y mañana?" (depende del turno anterior — requiere FASE 2.10)
+
+Un LLM coordinador resuelve esto de forma natural, sin enumerar cada caso en código.
+El beneficio escala con la cantidad de agentes: con 2 agentes, las reglas alcanzan;
+con 5+, se vuelven un cuello de botella de mantenimiento.
+
+#### Diseño del coordinador
+
+El coordinador es un LLM que recibe:
+```
+[contexto de conversación]   ← últimos N turnos (FASE 2.10)
+[utterance del usuario]
+[catálogo de agentes]        ← nombre, descripción, ejemplos de queries válidas
+```
+
+Y produce un plan de ejecución estructurado:
+```json
+{
+  "steps": [
+    {"agent": "clima",  "query": "pronóstico mañana Buenos Aires", "depends_on": []},
+    {"agent": "agenda", "query": "eventos de mañana",              "depends_on": []}
+  ],
+  "aggregation": "combinar pronóstico y agenda en una recomendación"
+}
+```
+
+El orquestador (FASE 3.2) ejecuta los pasos (en paralelo cuando no hay dependencias),
+recolecta los resultados y los devuelve al coordinador, que genera la respuesta final.
+
+#### Opciones de modelo para el coordinador
+
+| Opción | Modelo               | Latencia extra | Tradeoff                                      |
+|--------|----------------------|---------------|-----------------------------------------------|
+| A      | qwen2.5:7b (ya instalado) | +3-4s    | cero setup; puede sobrepensar en casos simples |
+| B      | qwen2.5:3b (instalar)| +1-2s          | más rápido; validar calidad de routing         |
+| C      | clasificador sklearn | <100ms         | limitado a intenciones vistas, no generaliza   |
+| D      | híbrido C+B          | <100ms / +1-2s | mejor tradeoff; clasificador para casos simples, LLM para el resto |
+
+Recomendación de arranque: **opción A** (reusa lo instalado, latencia conocida).
+Objetivo de largo plazo: **opción D** — el clasificador absorbe el 80% de requests
+simples en <100ms y el LLM entra solo cuando hay ambigüedad real.
+
+#### Etapa A — Coordinador como router
+- [ ] 9.1  Definir formato del catálogo de agentes: nombre, descripción, 3-5 ejemplos de queries válidas
+- [ ] 9.2  Prompt del coordinador v1: utterance + catálogo → elige un agente + reformula query para ese agente
+- [ ] 9.3  Reemplazar router de reglas (FASE 3.3) con llamada al coordinador LLM
+- [ ] 9.4  A/B test: precisión de routing coordinador vs. reglas sobre queries del historial real
+- [ ] 9.5  Medir overhead de latencia del coordinador; objetivo: que no supere 4s extra en warm
+
+#### Etapa B — Queries multi-agente
+- [ ] 9.6  Extender el plan de ejecución a N pasos con dependencias opcionales entre pasos
+- [ ] 9.7  Orquestador ejecuta pasos sin dependencias en paralelo (asyncio / ThreadPool)
+- [ ] 9.8  Coordinador recibe resultados de todos los agentes y genera respuesta unificada
+- [ ] 9.9  Prompt de agregación: sintetizar respuestas parciales en texto coherente, sin repetir cada una
+
+#### Etapa C — Descomposición y corrección
+- [ ] 9.10 Detección de requests condicionales ("cuando X, hacé Y"): el coordinador genera un plan con condición explícita
+- [ ] 9.11 Manejo de falla de agente: el coordinador detecta error en resultado y reintenta o responde con degradación elegante
+- [ ] 9.12 Ciclo de clarificación: si el coordinador detecta ambigüedad irresoluble, genera una pregunta al usuario en vez de asumir
+
+#### Etapa D — Optimización de latencia
+- [ ] 9.13 Evaluar qwen2.5:3b como coordinador: instalar, benchmark de routing vs. 7b
+- [ ] 9.14 Clasificador rápido para intenciones simples: entrenar con historial de requests reales (sklearn o reglas con score de confianza)
+- [ ] 9.15 Híbrido: usar clasificador cuando confianza > umbral configurable, coordinador LLM para el resto
+
+---
+
 ## PIPELINE ACTUAL (para referencia rápida)
 
 ```

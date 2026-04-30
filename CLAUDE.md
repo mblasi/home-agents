@@ -15,6 +15,12 @@ python scripts/sync_issues.py           # aplica cambios
 python scripts/sync_issues.py --dry-run # solo muestra qué haría
 ```
 
+**Fuente de verdad: `estado.md` → GitHub, nunca al revés.**
+El script lee el plan y ajusta GitHub para que coincida: `- [x]` cierra el issue,
+`- [ ]` lo reabre. Nunca leer el estado de GitHub para modificar el plan.
+Agregar tareas nuevas: primero en `estado.md`, luego crear el issue en GH con
+`gh issue create`, y finalmente registrar el número en `masterplan/issues.yaml`.
+
 ## Hardware
 
 ```
