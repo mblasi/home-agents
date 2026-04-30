@@ -2,14 +2,15 @@
 /**
  * Canal WhatsApp para la red de agentes Capitán.
  *
- * Recibe mensajes de texto de números autorizados, los envía al orquestador
- * (POST /wa/inbound) y responde en el mismo chat con el texto devuelto.
+ * Recibe mensajes de texto y los envía al orquestador (POST /wa/inbound).
+ * El core resuelve el número al usuario registrado (via User.wa_phone) y
+ * aplica RBAC según su rol. Números no registrados operan como "guest".
  *
  * Primera vez: muestra un QR en la terminal para vincular la cuenta.
  * Sesiones siguientes: reanuda sin QR desde ~/.local/share/capitan/wa-session/.
  *
  * Uso:
- *   cp .env.example .env   # configurar CORE_URL y WA_WHITELIST
+ *   cp .env.example .env   # configurar CORE_URL
  *   npm install
  *   node index.js
  *
@@ -27,10 +28,6 @@ const path = require("path");
 // ── Configuración ──────────────────────────────────────────────────────────────
 
 const CORE_URL = process.env.CORE_URL || "http://localhost:8765";
-const WHITELIST = (process.env.WA_WHITELIST || "")
-  .split(",")
-  .map((n) => n.trim())
-  .filter(Boolean);
 const SESSION_PATH =
   process.env.WA_SESSION_PATH ||
   path.join(process.env.HOME, ".local/share/capitan/wa-session");
@@ -57,9 +54,7 @@ client.on("authenticated", () => {
 });
 
 client.on("ready", () => {
-  const whitelist =
-    WHITELIST.length > 0 ? WHITELIST.join(", ") : "(sin restricción)";
-  console.log(`[WA] Cliente listo. Whitelist: ${whitelist}`);
+  console.log(`[WA] Cliente listo. Core: ${CORE_URL}`);
 });
 
 client.on("auth_failure", (msg) => {
@@ -80,12 +75,6 @@ client.on("message", async (msg) => {
 
   // Normalizar número: "5491155xxxxxx@c.us" → "+5491155xxxxxx"
   const phone = "+" + msg.from.replace("@c.us", "");
-
-  if (WHITELIST.length > 0 && !WHITELIST.includes(phone)) {
-    console.log(`[WA] Ignorando número no autorizado: ${phone}`);
-    return;
-  }
-
   const text = msg.body.trim();
   if (!text) return;
 
@@ -102,12 +91,6 @@ client.on("message", async (msg) => {
       }),
     });
 
-    if (res.status === 403) {
-      // Número rechazado por el core (segunda línea de defensa)
-      console.log(`[WA] Core rechazó número: ${phone}`);
-      return;
-    }
-
     if (!res.ok) {
       console.error(`[WA] Error del core: HTTP ${res.status}`);
       await msg.reply("Ocurrió un error al procesar tu mensaje.");
@@ -117,7 +100,7 @@ client.on("message", async (msg) => {
     const data = await res.json();
     if (data.response) {
       await msg.reply(data.response);
-      console.log(`[WA] → ${phone}: ${data.response.slice(0, 80)}...`);
+      console.log(`[WA] → ${phone}: ${data.response.slice(0, 80)}`);
     }
   } catch (err) {
     console.error(`[WA] Error de conexión con el core: ${err.message}`);
