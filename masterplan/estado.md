@@ -620,8 +620,9 @@ automática según el contexto del pedido.
             "prende la luz" (haos) de "che, cómo estás" o "necesito un consejo" (amigo).
 - [ ] 11.4  Perfiles múltiples: registro de perfiles en YAML, selección por nombre
             explícito ("hablo con el coach") o por detección de tema.
-- [ ] 11.5  Memoria persistente entre sesiones: SQLite con historial de conversaciones
-            previas por perfil. El amigo "recuerda" lo que hablaron antes.
+- [x] 11.5  Memoria persistente entre sesiones: historial de conversaciones por
+            (agent_id, user_id) en ~/.local/share/capitan/history_*.json, max 40 turnos,
+            escritura atómica. GenericAgent inyecta historial al primer turno de cada sesión.
             Los datos nunca salen de la red local.
 - [ ] 11.6  Asesores especializados: perfiles con expertise marcado y prompt enriquecido
             con contexto del área (finanzas, nutrición, coach de vida, etc.).
