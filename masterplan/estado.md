@@ -339,41 +339,49 @@ Estado:   COMPLETA
 ### FASE 5 - Agente Agenda
 ```
 Objetivo: Gestión de agenda por voz, privada y local
-Estado:   Pendiente
+Estado:   COMPLETA (5.2 postergada, google-free; alarma luces → HAOS nativo)
 ```
-- [ ] 5.1  CalDAV local (Radicale en HAOS o servidor dedicado)
+- [x] 5.1  CalDAV local (Radicale en HAOS o servidor dedicado)
 - [ ] 5.2  Sincronización opcional con Google Calendar
-- [ ] 5.3  Consultas por voz:
+- [x] 5.3  Consultas por voz:
            "¿qué tengo mañana?"
            "agendá reunión el viernes a las 10"
-           "¿cuándo es el próximo feriado?"
-- [ ] 5.4  Integración con domótica:
-           alarma de agenda → encender luces gradualmente
-           reunión en 15min → recordatorio por voz
-- [ ] 5.5  Recordatorios proactivos sin trigger de voz
-- [ ] 5.6  Vista de agenda en panel de HAOS
+           "¿cuándo es el próximo feriado?" — feriados UY via Nager.Date API
+- [x] 5.4  Integración con domótica:
+           alarma de agenda → encender luces gradualmente [postergado → HAOS nativo]
+           reunión en 15min → recordatorio por voz ✓ (thread 1min, reminder_minutes configurable)
+- [x] 5.5  Recordatorios proactivos sin trigger de voz (briefing matutino + resumen vespertino, hora configurable)
+- [x] 5.6  Vista de agenda en panel de HAOS
+           Radicale expuesto en LAN (0.0.0.0:5232); integración CalDAV en HA via config flow API;
+           entidades: calendar.personal + calendar.feriados; tarjeta Calendar en el dashboard de HA
 
 ---
 
 ### FASE 6 - Agente Inversiones
 ```
 Objetivo: Consultas financieras por voz, datos privados locales
-Estado:   Pendiente
-Nota:     Datos sensibles, nunca salen de la red local
+Estado:   EN CURSO (6/7 — solo queda 6.6)
+Nota:     Modo dummy (recomendaciones + P&L hipotética). Portfolio por usuario (FASE 2.5).
+          Fuentes: yfinance (acciones/crypto/FX) + dolarapi.com (dólar oficial/blue/MEP/CCL).
 ```
-- [ ] 6.1  Definir fuentes de datos:
-           Yahoo Finance (acciones internacionales)
-           BCRA API (dólar, tasas Argentina)
-           Ambito/Infobae scraping (mercado local)
-- [ ] 6.2  Scraper/poller de cotizaciones (actualización periódica)
-- [ ] 6.3  Portfolio local (tus activos, cifras, completamente privado)
-- [ ] 6.4  Consultas por voz:
-           "¿cómo está el dólar?"
-           "¿cómo va mi portfolio hoy?"
-           "¿cuánto subió GGAL esta semana?"
-- [ ] 6.5  Alertas configurables (precio objetivo, variación %)
+- [x] 6.1  Definir fuentes de datos:
+           yfinance (acciones internacionales, crypto, pares FX)
+           dolarapi.com (dólar oficial/blue/MEP/CCL/tarjeta)
+           yfinance UYU=X (peso uruguayo)
+- [x] 6.2  Cliente de cotizaciones con cache (finance_client.py):
+           get_quote(), get_history(), get_price_at_date(), get_dollar_rates(), get_uyu_rate()
+           Cache 10min por símbolo, 15min para dólar
+- [x] 6.3  Portfolio por usuario en modo dummy (portfolio.py):
+           Watchlist por usuario, registro de recomendaciones (buy/sell/hold/watch),
+           P&L hipotética calculada con precio actual, persistencia ~/.local/share/capitan/
+- [x] 6.4  Consultas por voz (finance_agent.py):
+           "¿cómo está el dólar?" "¿cuánto vale GGAL?" "¿qué me recomendás?"
+           "¿cómo fueron tus recomendaciones?" — etiqueta [REC:accion:TICKER] registra automáticamente
+- [x] 6.5  Alertas configurables (finance_alerts.py):
+           Brecha blue/oficial > 10%, BTC ±5%, watchlist ±5%. Umbrales via .env.
 - [ ] 6.6  RAG sobre noticias financieras (scraping + embeddings)
-- [ ] 6.7  Resumen diario automático al llegar a casa
+- [x] 6.7  Resumen diario automático (en finance_alerts.check()):
+           Dólar oficial/blue, UYU, movimientos de watchlist. Emite a FINANCE_BRIEFING_HOUR (8am).
 
 ---
 
