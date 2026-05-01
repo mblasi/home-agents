@@ -920,6 +920,46 @@ Nota:     Cambios de config/keywords aplican en el próximo reinicio del core.
 
 ---
 
+### FASE 15 - Agente Multimedia
+```
+Objetivo: Control de música y video por voz en cualquier dispositivo del hogar.
+          Fuente principal: YouTube Music (ytmusicapi + yt-dlp).
+          Dispositivos: Smart TV y parlantes WiFi vía HAOS media_player;
+          parlantes Bluetooth conectados a la laptop vía mpv + PipeWire.
+Estado:   Pendiente
+Deps:     FASE 3 (agent_registry), FASE 12 (backoffice)
+Stack:    ytmusicapi (OAuth), yt-dlp (stream resolver), HAOS media_player service,
+          mpv (local), PipeWire/pactl (BT sink routing)
+```
+- [ ] 15.1  `core/music_search.py` — integración ytmusicapi con OAuth persistente en
+            `~/.local/share/capitan/ytmusic_oauth.json`. Funciones: search_tracks(query),
+            search_albums(query), get_playlist(id). One-time OAuth flow documentado.
+            Config en .env: `YTMUSIC_OAUTH_PATH`.
+- [ ] 15.2  `core/stream_resolver.py` — dado un YouTube Music URL o video ID, usa yt-dlp
+            en modo programático para obtener la mejor URL de stream de audio (para parlantes)
+            o video+audio (para TV). Cachea el resultado 30min para evitar re-resolución.
+- [ ] 15.3  Registro de dispositivos multimedia: `~/.local/share/capitan/media_devices.json`.
+            Cada entrada: `{id, name, aliases, type: "haos"|"local", entity_id?, sink?}`.
+            Ejemplos: tv del living (haos, media_player.samsung_tv), parlante cocina (local, sink BT).
+            API CRUD: `GET/POST/PATCH/DELETE /media/devices`.
+- [ ] 15.4  `core/multimedia_agent.py` — agente con intents: play(query, device),
+            pause(device), resume(device), stop(device), volume(level, device), next_track(device),
+            what_playing(device). Para tipo "haos": HAOS media_player service. Para tipo "local":
+            mpv subprocess con `--audio-device=pipewire/<sink>` y control via IPC socket.
+            Alias "todos" / "todo" → broadcast a todos los dispositivos activos.
+- [ ] 15.5  Parsing de lenguaje natural: extraer intent + búsqueda + dispositivo destino de
+            frases como "poné cumbia en el living", "subí el volumen de la tele", "qué está
+            sonando", "pausá todo", "siguiente canción", "poné el playlist de los sábados".
+            Dispositivo opcional: si falta, usar el último activo o el primero disponible.
+- [ ] 15.6  Backoffice `/media`: estado actual por dispositivo (qué suena, volumen, progreso),
+            controles rápidos por tarjeta (play/pause/vol/next), lista de dispositivos con
+            estado online/offline. Actualización vía HTMX polling.
+- [ ] 15.7  Backoffice configuración YouTube Music: sección en `/config` o `/integrations`
+            con estado del token OAuth (válido / expirado / no configurado), botón para
+            iniciar/renovar el flujo OAuth, instrucciones step-by-step.
+
+---
+
 ## PIPELINE ACTUAL (para referencia rápida)
 
 ```
