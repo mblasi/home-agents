@@ -546,8 +546,12 @@ def edit_user_page(request: Request, uid: str):
     if not user:
         return RedirectResponse("/users", status_code=303)
     agents, role_perms = _load_rbac_context()
+    ww_samples = _core(f"/users/{uid}/wakeword/samples") or {"count": 0, "required": 30, "samples": []}
+    ww_metrics = _core(f"/users/{uid}/wakeword/metrics") or {"tp": 0, "fp": 0, "rbac_deny": 0}
+    train_status = _core("/wakeword/train/status") or {"status": "idle"}
     return _render(request, "user_form.html", "users",
-                   user=user, uid=uid, error="", agents=agents, role_perms=role_perms)
+                   user=user, uid=uid, error="", agents=agents, role_perms=role_perms,
+                   ww_samples=ww_samples, ww_metrics=ww_metrics, train_status=train_status)
 
 
 @app.post("/users/{uid}/update")
@@ -568,10 +572,14 @@ async def update_user_submit(request: Request, uid: str):
     }
     result = _core(f"/users/{uid}", method="PATCH", json=payload)
     if result is None:
+        ww_samples   = _core(f"/users/{uid}/wakeword/samples") or {"count": 0, "required": 30, "samples": []}
+        ww_metrics   = _core(f"/users/{uid}/wakeword/metrics") or {"tp": 0, "fp": 0, "rbac_deny": 0}
+        train_status = _core("/wakeword/train/status") or {"status": "idle"}
         return _render(request, "user_form.html", "users",
                        user={**payload, "id": uid}, uid=uid,
                        error="No se pudo actualizar el usuario",
-                       agents=agents, role_perms=role_perms)
+                       agents=agents, role_perms=role_perms,
+                       ww_samples=ww_samples, ww_metrics=ww_metrics, train_status=train_status)
     return RedirectResponse("/users", status_code=303)
 
 
@@ -579,6 +587,47 @@ async def update_user_submit(request: Request, uid: str):
 def delete_user_htmx(uid: str):
     _core(f"/users/{uid}", method="DELETE")
     return HTMLResponse("")
+
+
+_POLLING_SPAN = (
+    '<span class="text-blue-400 text-xs animate-pulse"'
+    ' hx-get="/wakeword/train/status"'
+    ' hx-trigger="every 3s"'
+    ' hx-target="#train-status"'
+    ' hx-swap="innerHTML">⟳ Entrenando…</span>'
+)
+
+
+@app.post("/wakeword/train/start", response_class=HTMLResponse)
+def start_wakeword_train():
+    """Proxy para lanzar reentrenamiento desde el backoffice (HTMX)."""
+    result = _core("/wakeword/train", method="POST") or {}
+    status = result.get("status", "error")
+    if status == "started":
+        return HTMLResponse(_POLLING_SPAN)
+    elif status == "conflict":
+        return HTMLResponse('<span class="text-orange-400 text-xs">Ya hay un entrenamiento en curso</span>')
+    return HTMLResponse('<span class="text-red-400 text-xs">Error al iniciar entrenamiento</span>')
+
+
+@app.get("/wakeword/train/status", response_class=HTMLResponse)
+def wakeword_train_status_fragment():
+    """Fragmento HTMX (innerHTML de #train-status) con el estado actual del entrenamiento."""
+    result = _core("/wakeword/train/status") or {"status": "idle"}
+    status = result.get("status", "idle")
+    if status == "running":
+        return HTMLResponse(_POLLING_SPAN)
+    elif status == "done":
+        n_pos = result.get("n_positive", "?")
+        n_real = result.get("n_positive_real", 0)
+        dur = result.get("duration_s", "?")
+        return HTMLResponse(
+            f'<span class="text-emerald-400 text-xs">✓ Listo — {n_pos} positivos ({n_real} reales), {dur}s</span>'
+        )
+    elif status == "error":
+        err = result.get("error", "desconocido")
+        return HTMLResponse(f'<span class="text-red-400 text-xs">✗ Error: {err[:60]}</span>')
+    return HTMLResponse('<span class="text-gray-600 text-xs">Sin entrenamientos recientes</span>')
 
 
 # ── RBAC roles ─────────────────────────────────────────────────────────────────
