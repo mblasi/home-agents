@@ -101,6 +101,13 @@
 
         <td class="px-4 py-3 text-right">
           <div class="flex gap-2 justify-end">
+            {% if u.onboarding_step is defined and u.onboarding_step != "completo" %}
+            <a href="/users/{{ uid }}/onboard"
+               class="px-2 py-1 text-xs text-blue-400 hover:text-blue-300 hover:bg-blue-900/20 rounded transition-colors"
+               title="Onboarding pendiente: {{ u.onboarding_step }}">
+              Onboarding
+            </a>
+            {% endif %}
             <a href="/users/{{ uid }}/edit"
                class="px-2 py-1 text-xs text-gray-400 hover:text-white hover:bg-gray-700 rounded transition-colors">
               Editar
