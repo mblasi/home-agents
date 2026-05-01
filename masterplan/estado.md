@@ -247,7 +247,7 @@ FASE 2 COMPLETA
 ```
 Objetivo: Sistema de identidad que permite reconocer quién habla, definir su rol y
           parentesco, y personalizar la experiencia.
-Estado:   COMPLETA
+Estado:   COMPLETA (2.5.10 incluida — ProfileAgent)
 Stack:    resemblyzer (GE2E 256-dim), JSON + .npy local, RBAC por rol
 ```
 - [x] 2.5.1  Modelo de usuario: roles (admin/familiar/niño/invitado), relaciones de parentesco,
@@ -264,7 +264,7 @@ Stack:    resemblyzer (GE2E 256-dim), JSON + .npy local, RBAC por rol
              aplicado en /process antes de delegar al agente
 - [x] 2.5.9  Panel de usuarios: panel_users.py con Rich, lista de usuarios + speaker activo
              con confidence, lee /tmp/capitan/speaker.json y GET /users
-- [ ] 2.5.10 Gestión de información personal por voz: comandos para actualizar campos del
+- [x] 2.5.10 Gestión de información personal por voz: comandos para actualizar campos del
              propio perfil sin tocar el backoffice.
              Ej: "mi pasaporte vence el 15 de marzo de 2027", "mi nombre es Matías",
              "tengo 38 años", "prefiero respuestas cortas".
@@ -333,6 +333,29 @@ Stack:    openwakeword (ya existe), resemblyzer (ya existe), SSE backoffice, HTM
              "FP > 15% — grabá muestras en condiciones de ruido",
              "modelo no incluye tu voz — entrená el modelo",
              "muestras de hace más de 90 días — considera re-enrollarte".
+
+---
+
+### FASE 2.7 - Agentes de Administración
+```
+Objetivo: Agentes de voz exclusivos para el rol admin que exponen por voz las mismas
+          capacidades que el backoffice web: gestión de usuarios y gestión del sistema.
+          Siguen el mismo patrón que ProfileAgent: LLM extrae acción estructurada → se aplica.
+Estado:   EN CURSO
+Deps:     FASE 2.5 (users.py, RBAC), FASE 3 (orquestador, RBAC en /process)
+RBAC:     Solo el rol admin tiene acceso (* en PERMISSIONS). El resto recibe deny_message.
+```
+- [ ] 2.7.1  UserMgmtAgent (user_mgmt_agent.py): gestión de usuarios por voz.
+             Acciones: listar usuarios, ver perfil de usuario, crear usuario (name+role+relationship),
+             borrar usuario, cambiar rol, otorgar/revocar acceso a agentes.
+             Al crear: crea el registro y guía al nuevo usuario a decir "Capitán, registrarme"
+             para completar el enrollment de speaker ID.
+             availability_url → GET /users del core.
+- [ ] 2.7.2  SystemAgent (system_agent.py): gestión del sistema por voz.
+             Acciones: estado del sistema (core/HAOS/Ollama/ear), reiniciar servicios
+             (systemctl --user restart capitan-core/capitan), listar modelos Ollama,
+             uso de memoria RAM, agentes activos.
+             availability_url → GET /health del core.
 
 ---
 
