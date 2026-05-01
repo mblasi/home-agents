@@ -104,10 +104,10 @@ app.add_middleware(AuthMiddleware)
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
-def _core(path: str, method: str = "GET", **kwargs):
+def _core(path: str, method: str = "GET", timeout: int = 3, **kwargs):
     """Llama al core con timeout corto; devuelve None si falla."""
     try:
-        r = requests.request(method, f"{CORE_URL}{path}", timeout=3, **kwargs)
+        r = requests.request(method, f"{CORE_URL}{path}", timeout=timeout, **kwargs)
         r.raise_for_status()
         return r.json()
     except Exception:
@@ -208,12 +208,15 @@ def dashboard(request: Request):
     avg = {k: round(sum(v)/len(v), 2) if v else None for k, v in lats.items()}
 
     speaker = _read_json("speaker.json") or {}
+    agents_data = _core("/agents", timeout=10) or {}
+    active_agents = {k: v for k, v in agents_data.items() if v.get("status") == "active"}
 
     return _render(request, "dashboard.html", "dashboard",
                    core_ok=core_ok, ollama_ok=ollama_ok,
                    history=history[-10:],
                    alerts=alerts, state=state, speaker=speaker,
-                   avg_lat=avg, history_count=len(history))
+                   avg_lat=avg, history_count=len(history),
+                   active_agents=active_agents)
 
 
 @app.get("/agents", response_class=HTMLResponse)
