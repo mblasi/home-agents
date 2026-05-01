@@ -221,8 +221,8 @@ def dashboard(request: Request):
 
 @app.get("/agents", response_class=HTMLResponse)
 def agents_page(request: Request):
-    data = _core("/agents", timeout=15)
-    core_ok = data is not None
+    core_ok = _core("/health", timeout=3) is not None
+    data    = _core("/agents", timeout=30) if core_ok else None
     return _render(request, "agents.html", "agents", agents=data or {}, core_ok=core_ok)
 
 
