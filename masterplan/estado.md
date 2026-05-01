@@ -629,6 +629,43 @@ simples en <100ms y el LLM entra solo cuando hay ambigüedad real.
 - [ ] 9.14 Clasificador rápido para intenciones simples: entrenar con historial de requests reales (sklearn o reglas con score de confianza)
 - [ ] 9.15 Híbrido: usar clasificador cuando confianza > umbral configurable, coordinador LLM para el resto
 
+#### Etapa E — Contexto por usuario por agente
+```
+Cada agente puede mantener un perfil de datos por usuario: preferencias aprendidas,
+patrones de uso, información contextual persistente. El administrador define qué campos
+recolecta cada agente y por cuánto tiempo. Cada usuario puede ver y gestionar la
+información que cada agente guarda sobre él.
+```
+- [ ] 9.16 `core/user_context.py` — almacena contexto estructurado en
+           `~/.local/share/capitan/user_context/{user_id}/{agent_id}.json`.
+           Cada campo: `{value, updated_at, ttl_days}`. Auto-expira campos en lectura.
+           API interna: get_context(user_id, agent_id) / set_field(field, value) /
+           delete_field(field) / get_all_for_user(user_id).
+- [ ] 9.17 Extensión de `agent_config.py` — campo `user_context_schema` por agente:
+           lista de `{field, desc, type, ttl_days}` que define qué datos puede registrar
+           el agente sobre cada usuario y por cuánto tiempo. Configurable en backoffice.
+           Los tipos soportados: string, number, boolean, enum (con options).
+- [ ] 9.18 Inyección de contexto en dispatch: antes de llamar al agente, `server.py`
+           carga el contexto vigente (campos no expirados) del usuario para ese agente
+           y lo prepende al prompt como bloque estructurado. Sin contexto = sin overhead.
+- [ ] 9.19 Actualización de contexto post-interacción: el agente puede incluir
+           `context_updates: [{field, value}]` en su respuesta estructurada.
+           `server.py` persiste esas actualizaciones vía `user_context.py`.
+           Cada agente decide qué aprende de la interacción (ej: clima aprende
+           la ubicación preferida, inversiones aprende el perfil de riesgo).
+- [ ] 9.20 API REST para contexto de usuario:
+           `GET /users/{id}/context` — contexto de todos los agentes (para backoffice),
+           `GET/PATCH /users/{id}/context/{agent_id}` — contexto de un agente específico,
+           `DELETE /users/{id}/context/{agent_id}/{field}` — eliminar un campo puntual.
+- [ ] 9.21 Backoffice `/agents/{id}/edit` — sección "Esquema de contexto de usuario":
+           tabla editable de campos (nombre, descripción, tipo, TTL en días),
+           botones agregar/eliminar campo, guardado vía PATCH al core.
+           Un campo eliminado del schema no borra datos existentes (solo deja de inyectarse).
+- [ ] 9.22 Backoffice perfil de usuario `/users/{id}` — sección "Contexto en agentes":
+           acordeón por agente, muestra campos vigentes con valor / última actualización /
+           TTL restante en días. Botón editar valor (PATCH) y botón eliminar campo (DELETE).
+           El propio usuario puede ver y controlar exactamente qué recuerda cada agente de él.
+
 ---
 
 ### FASE 11 - Agente Amigo / Asesores Personales
