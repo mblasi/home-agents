@@ -97,7 +97,7 @@
   {% if active_agents %}
   <div class="flex flex-wrap gap-2">
     {% for aid, info in active_agents.items() %}
-    <a href="/agents/{{ aid }}/edit"
+    <a href="/agents/{{ aid }}/detail"
        class="flex items-center gap-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700
               hover:border-gray-500 rounded-lg px-3 py-1.5 transition-colors group">
       <span class="text-base leading-none">{{ info.icon or "🤖" }}</span>
