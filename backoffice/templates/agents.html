@@ -15,6 +15,14 @@
   </div>
 </div>
 
+{% if not core_ok %}
+<div class="mb-4 bg-red-900/30 border border-red-700 text-red-300 text-sm px-4 py-3 rounded-xl flex items-center gap-2">
+  <span>⚠️</span>
+  <span>No se pudo conectar al core (<code>localhost:8765</code>). Los agentes no están disponibles.</span>
+  <a href="/agents" class="ml-auto text-xs underline hover:text-red-200">Reintentar</a>
+</div>
+{% endif %}
+
 <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
   <table class="w-full text-sm">
     <thead>

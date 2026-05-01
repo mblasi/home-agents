@@ -221,8 +221,9 @@ def dashboard(request: Request):
 
 @app.get("/agents", response_class=HTMLResponse)
 def agents_page(request: Request):
-    data = _core("/agents") or {}
-    return _render(request, "agents.html", "agents", agents=data)
+    data = _core("/agents", timeout=15)
+    core_ok = data is not None
+    return _render(request, "agents.html", "agents", agents=data or {}, core_ok=core_ok)
 
 
 @app.get("/agents/{agent_id}/detail", response_class=HTMLResponse)
