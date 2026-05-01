@@ -282,7 +282,7 @@ Objetivo: Unificar la creación de usuario y el perfeccionamiento del reconocimi
           de wake word. Resuelve falsos positivos y baja detección reemplazando el modelo
           TTS-only por uno entrenado con muestras reales de cada usuario.
           Métricas de precisión visibles en el perfil + sugerencias de mejora continua.
-Estado:   EN CURSO (7/8 — queda 2.6.4)
+Estado:   COMPLETA
 Deps:     FASE 2.5 (users.py, enrollment.py, speaker_id.py), FASE 12.13 (sección Usuarios)
 Stack:    openwakeword (ya existe), resemblyzer (ya existe), SSE backoffice, HTMX wizard
 ```
@@ -303,7 +303,7 @@ Stack:    openwakeword (ya existe), resemblyzer (ya existe), SSE backoffice, HTM
              usuario responde por voz. Luego guía las frases de speaker ID (ya existentes en
              enrollment.py de 2.5.6) y las muestras de wake word (2.6.5). Al completar,
              POST /users crea el usuario y POST /users/{id}/wakeword/enroll cierra el flujo.
-- [ ] 2.6.4  Onboarding por web: wizard multi-paso en backoffice `/users/new`:
+- [x] 2.6.4  Onboarding por web: wizard multi-paso en backoffice `/users/new`:
              Paso 1: nombre, rol, parentesco (form HTMX).
              Paso 2: frases de speaker ID — botón "Iniciar grabación" activa el mic del
              dispositivo ear vía SSE, progress bar en tiempo real.
