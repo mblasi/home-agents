@@ -264,6 +264,13 @@ Stack:    resemblyzer (GE2E 256-dim), JSON + .npy local, RBAC por rol
              aplicado en /process antes de delegar al agente
 - [x] 2.5.9  Panel de usuarios: panel_users.py con Rich, lista de usuarios + speaker activo
              con confidence, lee /tmp/capitan/speaker.json y GET /users
+- [ ] 2.5.10 Gestión de información personal por voz: comandos para actualizar campos del
+             propio perfil sin tocar el backoffice.
+             Ej: "mi pasaporte vence el 15 de marzo de 2027", "mi nombre es Matías",
+             "tengo 38 años", "prefiero respuestas cortas".
+             El agente extrae el campo y el valor, valida, y hace PATCH /users/{id}.
+             Prerequisito natural: cualquier agente que necesite datos personales del usuario
+             (fase 7 usa documentos de viaje, fase 11 usa preferencias del usuario).
 
 ---
 
@@ -387,18 +394,26 @@ Nota:     Modo dummy (recomendaciones + P&L hipotética). Portfolio por usuario 
 
 ### FASE 7 - Agente Viajes
 ```
-Objetivo: Asistente de planificación y consulta de viajes
-Estado:   Pendiente
+Objetivo: Asistente de planificación activa de viajes futuros
+Estado:   COMPLETA (7.2 postergada por falta de docs centralizados)
+Foco:     Planificación activa (itinerarios, qué llevar, visa, clima en destino).
+          Grupo viajero variable por conversación (individual, pareja, familia).
+          Documentos de viaje en modelo de usuario (ver 2.5.10 para gestión por voz).
 ```
-- [ ] 7.1  Definir casos de uso concretos con tu familia
+- [x] 7.1  Casos de uso definidos: planificación activa de viajes futuros, grupo familiar
+           variable, documentos en user model, clima en destino via geocoding
 - [ ] 7.2  RAG sobre documentos de viaje (pasaportes, reservas, PDFs)
-- [ ] 7.3  Integración con APIs de clima en destinos
-- [ ] 7.4  Consultas por voz:
-           "¿qué clima hace en Roma en octubre?"
-           "¿tengo el pasaporte vigente?"
-           "¿cuándo es el próximo viaje?"
-- [ ] 7.5  Planificación con LLM (itinerarios, sugerencias)
-- [ ] 7.6  Alertas de documentos por vencer
+           Postergada: no hay documentos centralizados aún. Retomar cuando el usuario
+           empiece a digitalizar reservas (emails, PDFs de hoteles/vuelos).
+- [x] 7.3  Geocoding (geocoding.py): nombre de ciudad → lat/lon via Open-Meteo Geocoding API
+           (gratuito, sin key, cache 24h). format_location() para contexto LLM.
+- [x] 7.4  Documentos de viaje en User: campo documents [{type,country,expires,number,notes}],
+           upsert_document(), remove_document(), expiring_documents(). API REST nueva.
+- [x] 7.5  TravelAgent (travel_agent.py): geocoding → clima → documentos grupo → LLM.
+           _extract_destination(): micro-LLM para extraer ciudad del texto.
+           Grupo viajero resuelto por texto o todos los usuarios registrados.
+- [x] 7.6  Alertas de documentos (travel_alerts.py): 3 tiers (30/90/180 días),
+           cooldowns por (user, tipo, país, tier) via shared_state.
 
 ---
 

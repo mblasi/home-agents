@@ -40,7 +40,8 @@
 "2.5.6": {number: 2,  repo: mblasi/home-agents-ear}
 "2.5.7": {number: 15, repo: mblasi/home-agents-core}
 "2.5.8": {number: 16, repo: mblasi/home-agents-core}
-"2.5.9": {number: 3,  repo: mblasi/home-agents-ear}
+"2.5.9":  {number: 3,  repo: mblasi/home-agents-ear}
+"2.5.10": 228
 
 # ── FASE 3 (infraestructura multi-agente) ────────────────────────────────────
 "3.1":   22
