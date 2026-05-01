@@ -55,14 +55,18 @@
 </div>
 
 <!-- Ear -->
-<div class="bg-gray-900 border border-gray-800 rounded-xl p-4 mb-4">
+<a href="/ear" class="block">
+<div class="bg-gray-900 border border-gray-800 rounded-xl p-4 mb-4 hover:border-gray-600 transition-colors cursor-pointer">
   {% set ear_ok = ear_state is not none %}
   <div class="flex items-center justify-between mb-3">
     <div>
       <h2 class="text-sm font-semibold text-gray-300">Ear</h2>
       <p class="text-xs text-gray-600 mt-0.5">Pipeline de voz — wake word → STT → TTS</p>
     </div>
-    <span class="text-lg">{{ "🟢" if ear_ok else "🔴" }}</span>
+    <div class="flex items-center gap-2">
+      <span class="text-lg">{{ "🟢" if ear_ok else "🔴" }}</span>
+      <span class="text-xs text-gray-600">Ver en vivo →</span>
+    </div>
   </div>
   <div class="text-xs text-gray-500 space-y-1">
     <div>Estado: <span class="{{ 'text-emerald-400' if ear_ok else 'text-red-400' }}">
@@ -73,5 +77,6 @@
     {% endif %}
   </div>
 </div>
+</a>
 
 {% endblock %}
