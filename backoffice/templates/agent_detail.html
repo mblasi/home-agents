@@ -26,6 +26,7 @@
   "dolarapi":  {"icon": "💹", "name": "DolarAPI"},
   "caldav":    {"icon": "📅", "name": "CalDAV / Radicale"},
   "core":      {"icon": "⚙️", "name": "Core REST API"},
+  "windy":     {"icon": "🌬", "name": "Windy API"},
   "custom":    {"icon": "🔌", "name": "Backend externo"},
 } %}
 
@@ -74,13 +75,20 @@
             <div class="flex-1 min-w-0">
               <div class="flex items-center justify-between gap-2">
                 <span class="text-sm font-medium text-gray-200">{{ b.label or meta.name }}</span>
-                {% if b.reachable is none %}
-                  <span class="text-xs text-gray-600 shrink-0">sin check</span>
-                {% elif b.reachable %}
-                  <span class="flex items-center gap-1 text-xs text-emerald-400 shrink-0">● online</span>
-                {% else %}
-                  <span class="flex items-center gap-1 text-xs text-red-400 shrink-0">● offline</span>
-                {% endif %}
+                <div class="flex items-center gap-1.5 shrink-0">
+                  {% if b.active is defined and b.active %}
+                    <span class="text-xs bg-blue-900/50 text-blue-400 border border-blue-700/50 px-1.5 py-0.5 rounded">activo</span>
+                  {% elif b.active is defined %}
+                    <span class="text-xs text-gray-700 px-1.5 py-0.5">disponible</span>
+                  {% endif %}
+                  {% if b.reachable is none %}
+                    <span class="text-xs text-gray-600">sin check</span>
+                  {% elif b.reachable %}
+                    <span class="flex items-center gap-1 text-xs text-emerald-400">● online</span>
+                  {% else %}
+                    <span class="flex items-center gap-1 text-xs text-red-400">● offline</span>
+                  {% endif %}
+                </div>
               </div>
               <div class="text-xs text-gray-600 mt-0.5">{{ meta.name }}</div>
               {% if b.model %}
