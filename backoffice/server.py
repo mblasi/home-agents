@@ -225,6 +225,48 @@ def agents_page(request: Request):
     return _render(request, "agents.html", "agents", agents=data)
 
 
+@app.get("/agents/{agent_id}/detail", response_class=HTMLResponse)
+def agent_detail_page(request: Request, agent_id: str):
+    agent = _core(f"/agents/{agent_id}")
+    if not agent:
+        return RedirectResponse("/agents", status_code=302)
+
+    history = _read_json("history.json") or []
+    agent_history = [h for h in history if h.get("agent") == agent_id]
+
+    lats = {"stt": [], "llm": [], "total": []}
+    for h in agent_history:
+        if h.get("lat_stt"):   lats["stt"].append(h["lat_stt"])
+        if h.get("lat_llm"):   lats["llm"].append(h["lat_llm"])
+        if h.get("lat_total"): lats["total"].append(h["lat_total"])
+
+    def _pct(vals, p):
+        if not vals:
+            return None
+        s = sorted(vals)
+        idx = int(len(s) * p / 100)
+        return round(s[min(idx, len(s) - 1)], 2)
+
+    stats = {
+        "count":   len(agent_history),
+        "p50_stt": _pct(lats["stt"], 50),   "p95_stt": _pct(lats["stt"], 95),
+        "p50_llm": _pct(lats["llm"], 50),   "p95_llm": _pct(lats["llm"], 95),
+        "p50_total": _pct(lats["total"], 50), "p95_total": _pct(lats["total"], 95),
+    }
+
+    role_perms = _core("/rbac/roles") or {}
+    roles_with_access = [r for r, agents in role_perms.items() if agent_id in agents]
+
+    conversations = _core("/conversations") or []
+
+    return _render(request, "agent_detail.html", "agents",
+                   agent_id=agent_id, agent=agent,
+                   recent_history=agent_history[-15:],
+                   stats=stats,
+                   roles_with_access=roles_with_access,
+                   conversations=conversations)
+
+
 @app.post("/agents/{agent_id}/toggle", response_class=HTMLResponse)
 async def toggle_agent(agent_id: str):
     info = _core(f"/agents/{agent_id}") or {}

@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+{% block title %}{{ agent.name }} — Detalle{% endblock %}
+
+{% block content %}
+<div class="flex items-center gap-3 mb-6">
+  <a href="/agents" class="text-gray-500 hover:text-gray-300 text-sm">← Agentes</a>
+  <span class="text-gray-700">/</span>
+  <h1 class="text-2xl font-bold">
+    {{ agent.icon }} {{ agent.name }}
+    <span class="text-gray-500 text-base font-normal ml-1">{{ agent_id }}</span>
+    {% if agent.dynamic %}<span class="ml-2 text-xs text-indigo-400 bg-indigo-900/30 border border-indigo-800 px-2 py-0.5 rounded-full">dinámico</span>{% endif %}
+  </h1>
+  <div class="ml-auto flex gap-2">
+    <a href="/agents/{{ agent_id }}/edit"
+       class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm rounded-lg transition-colors">
+      Editar
+    </a>
+  </div>
+</div>
+
+<div class="grid grid-cols-2 gap-4 mb-4">
+
+  <!-- Estado y conectividad -->
+  <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+    <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Estado</h2>
+    <div class="space-y-3">
+      <div class="flex items-center justify-between">
+        <span class="text-sm text-gray-400">Status</span>
+        <span class="px-2 py-0.5 rounded text-xs font-medium
+          {% if agent.status == 'active' %}bg-emerald-900/50 text-emerald-400
+          {% elif agent.status == 'planned' %}bg-gray-800 text-gray-500
+          {% else %}bg-red-900/50 text-red-400{% endif %}">
+          {{ agent.status }}
+        </span>
+      </div>
+      <div class="flex items-center justify-between">
+        <span class="text-sm text-gray-400">Conectividad</span>
+        {% if agent.reachable is none %}
+          <span class="text-gray-600 text-xs">sin health check</span>
+        {% elif agent.reachable %}
+          <span class="flex items-center gap-1.5 text-emerald-400 text-sm"><span>●</span> accesible</span>
+        {% else %}
+          <span class="flex items-center gap-1.5 text-red-400 text-sm"><span>●</span> no accesible</span>
+        {% endif %}
+      </div>
+      <div class="flex items-center justify-between">
+        <span class="text-sm text-gray-400">Descripción</span>
+        <span class="text-sm text-gray-300 text-right max-w-xs">{{ agent.desc }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Backend -->
+  <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+    <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Backend</h2>
+    {% set cfg = agent.config or {} %}
+    {% if cfg or agent.config_schema %}
+      <div class="space-y-2">
+        {% if cfg.get("backend") or cfg.get("model") %}
+        <div class="flex items-center justify-between">
+          <span class="text-sm text-gray-400">Motor</span>
+          <span class="text-sm text-gray-300 font-mono">{{ cfg.get("backend", "ollama") }}</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-sm text-gray-400">Modelo</span>
+          <code class="text-xs bg-gray-800 text-indigo-300 px-2 py-0.5 rounded">{{ cfg.get("model", "—") }}</code>
+        </div>
+        {% endif %}
+        {% for key, schema in (agent.config_schema or {}).items() %}
+          {% if key not in ["backend", "model"] %}
+          <div class="flex items-center justify-between">
+            <span class="text-sm text-gray-400">{{ schema.get("label", key) }}</span>
+            <span class="text-sm text-gray-300 font-mono">{{ cfg.get(key, schema.get("default", "—")) }}</span>
+          </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="text-sm text-gray-600">Sin backend configurable (agente estático).</p>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- Keywords -->
+<div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-4">
+  <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Keywords de activación</h2>
+  {% if agent.keywords %}
+  <div class="flex flex-wrap gap-2">
+    {% for kw in agent.keywords %}
+    <span class="px-2 py-1 bg-gray-800 rounded-lg text-xs text-gray-300">{{ kw }}</span>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="text-sm text-gray-600">Sin keywords definidas.</p>
+  {% endif %}
+</div>
+
+<!-- RBAC -->
+<div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-4">
+  <div class="flex items-center justify-between mb-3">
+    <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Acceso por rol</h2>
+    <a href="/agents/{{ agent_id }}/edit#rbac" class="text-xs text-indigo-400 hover:text-indigo-300">Editar →</a>
+  </div>
+  {% if roles_with_access %}
+  <div class="flex flex-wrap gap-2">
+    {% for role in roles_with_access %}
+    <span class="px-2 py-1 bg-indigo-900/30 border border-indigo-800 rounded-lg text-xs text-indigo-300">{{ role }}</span>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="text-sm text-gray-600">Sin roles asignados (solo admin implícito).</p>
+  {% endif %}
+</div>
+
+<!-- Estadísticas -->
+<div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-4">
+  <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Estadísticas de la sesión</h2>
+  {% if stats.count > 0 %}
+  <div class="grid grid-cols-4 gap-4 mb-5">
+    <div class="text-center">
+      <div class="text-2xl font-bold text-white">{{ stats.count }}</div>
+      <div class="text-xs text-gray-500 mt-1">comandos</div>
+    </div>
+    <div class="text-center">
+      <div class="text-2xl font-bold {% if stats.p50_total and stats.p50_total > 10 %}text-yellow-400{% else %}text-emerald-400{% endif %}">
+        {{ stats.p50_total or "—" }}s
+      </div>
+      <div class="text-xs text-gray-500 mt-1">latencia p50</div>
+    </div>
+    <div class="text-center">
+      <div class="text-2xl font-bold text-gray-300">{{ stats.p95_total or "—" }}s</div>
+      <div class="text-xs text-gray-500 mt-1">latencia p95</div>
+    </div>
+    <div class="text-center">
+      <div class="text-2xl font-bold text-gray-300">{{ stats.p50_llm or "—" }}s</div>
+      <div class="text-xs text-gray-500 mt-1">LLM p50</div>
+    </div>
+  </div>
+
+  <table class="w-full text-xs">
+    <thead>
+      <tr class="text-gray-500 border-b border-gray-800">
+        <th class="text-left pb-2">Hora</th>
+        <th class="text-left pb-2">Texto</th>
+        <th class="text-left pb-2">Acción</th>
+        <th class="text-right pb-2">Total</th>
+        <th class="text-right pb-2">STT</th>
+        <th class="text-right pb-2">LLM</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-800">
+      {% for h in recent_history | reverse %}
+      <tr class="text-gray-400">
+        <td class="py-1.5 text-gray-600">{{ h.ts }}</td>
+        <td class="py-1.5 max-w-xs truncate">{{ h.texto }}</td>
+        <td class="py-1.5 text-gray-500 font-mono">{{ h.accion or "—" }}</td>
+        <td class="py-1.5 text-right">{{ h.lat_total or "—" }}s</td>
+        <td class="py-1.5 text-right">{{ h.lat_stt or "—" }}s</td>
+        <td class="py-1.5 text-right">{{ h.lat_llm or "—" }}s</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="text-sm text-gray-600">Sin actividad registrada para este agente en la sesión actual.</p>
+  {% endif %}
+</div>
+
+<!-- Contextos activos -->
+{% set agent_convs = conversations | selectattr("source_key", "defined") | list %}
+<div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-4">
+  <div class="flex items-center justify-between mb-3">
+    <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Contextos / Conversaciones</h2>
+    <a href="/conversations" class="text-xs text-indigo-400 hover:text-indigo-300">Ver todas →</a>
+  </div>
+  {% if conversations %}
+  <div class="space-y-2">
+    {% for conv in conversations[:10] %}
+    <div class="flex items-center justify-between py-1.5 border-b border-gray-800 last:border-0">
+      <div class="text-xs">
+        <code class="text-gray-500">{{ conv.id[:16] }}…</code>
+        <span class="ml-2 text-gray-600">{{ conv.source_key or "—" }}</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="text-xs text-gray-600">{{ conv.turns | length if conv.turns is defined else "?" }} turns</span>
+        <span class="px-1.5 py-0.5 rounded text-xs
+          {% if conv.state == 'active' %}bg-emerald-900/40 text-emerald-400
+          {% elif conv.state == 'closed' %}bg-gray-800 text-gray-500
+          {% else %}bg-yellow-900/40 text-yellow-400{% endif %}">
+          {{ conv.state }}
+        </span>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="text-sm text-gray-600">Sin conversaciones activas.</p>
+  {% endif %}
+</div>
+
+{% endblock %}
