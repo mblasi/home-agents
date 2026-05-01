@@ -282,23 +282,23 @@ Objetivo: Unificar la creación de usuario y el perfeccionamiento del reconocimi
           de wake word. Resuelve falsos positivos y baja detección reemplazando el modelo
           TTS-only por uno entrenado con muestras reales de cada usuario.
           Métricas de precisión visibles en el perfil + sugerencias de mejora continua.
-Estado:   Pendiente
+Estado:   EN CURSO (4/8 — quedan 2.6.4, 2.6.6–2.6.8)
 Deps:     FASE 2.5 (users.py, enrollment.py, speaker_id.py), FASE 12.13 (sección Usuarios)
 Stack:    openwakeword (ya existe), resemblyzer (ya existe), SSE backoffice, HTMX wizard
 ```
 
 #### Fix inmediato (sin reentrenamiento)
-- [ ] 2.6.1  Gate post-wake-word: si speaker_id == "unknown" y confidence < umbral
+- [x] 2.6.1  Gate post-wake-word: si speaker_id == "unknown" y confidence < umbral
              configurable (`WAKEWORD_REQUIRE_KNOWN_SPEAKER=true` en .env), descarta el comando
              y emite tono "no reconocido". Usa resemblyzer existente de 2.5.7.
              Reduce falsos positivos de terceros al instante, sin tocar el modelo ONNX.
 
 #### Flujo de onboarding unificado
-- [ ] 2.6.2  `core/onboarding.py` — máquina de estados del flujo de onboarding: pasos
+- [x] 2.6.2  `core/onboarding.py` — máquina de estados del flujo de onboarding: pasos
              (datos_basicos → frases_speaker_id → muestras_wake_word → completo).
              Estado persistido en users.json por usuario (onboarding_step, onboarding_complete).
              Mismo flujo consumido por voz y por web.
-- [ ] 2.6.3  Onboarding por voz: comando "Capitán, agregar usuario" inicia el flujo guiado
+- [x] 2.6.3  Onboarding por voz: comando "Capitán, agregar usuario" inicia el flujo guiado
              desde `ear/listen.py`. TTS pregunta nombre, rol y relación de parentesco;
              usuario responde por voz. Luego guía las frases de speaker ID (ya existentes en
              enrollment.py de 2.5.6) y las muestras de wake word (2.6.5). Al completar,
@@ -311,7 +311,7 @@ Stack:    openwakeword (ya existe), resemblyzer (ya existe), SSE backoffice, HTM
              Admin puede lanzar el flujo para cualquier usuario desde la lista de usuarios.
 
 #### Almacenamiento y reentrenamiento
-- [ ] 2.6.5  `core/wakeword_samples.py` — almacena WAVs de muestras reales por usuario en
+- [x] 2.6.5  `core/wakeword_samples.py` — almacena WAVs de muestras reales por usuario en
              `~/.local/share/capitan/wakeword_samples/{user_id}/` (máx 200 samples),
              metadata en JSON: fecha, duración, aceptado/rechazado, canal (voz/web).
              Endpoint `POST /users/{id}/wakeword/enroll` acepta inicio del flujo guiado;
@@ -688,6 +688,41 @@ información que cada agente guarda sobre él.
            acordeón por agente, muestra campos vigentes con valor / última actualización /
            TTL restante en días. Botón editar valor (PATCH) y botón eliminar campo (DELETE).
            El propio usuario puede ver y controlar exactamente qué recuerda cada agente de él.
+
+#### Etapa F — Intenciones persistentes y continuación proactiva
+
+```
+Los agentes detectan intenciones "en curso" que el usuario no completó
+(una inversión a evaluar, un viaje en planificación, etc.) y las guardan
+como intent_state en user_context. Cuando el usuario vuelve a hablar con
+ese agente, se le recuerda dónde quedó. Si pasa demasiado tiempo, el agente
+lo propone proactivamente via el mecanismo de alertas.
+```
+- [ ] 9.23 `core/intent_state.py` — estructura de intención persistente:
+           `{intent_id, agent_id, user_id, action, context: dict, status: pending|in_progress|done,
+           created_at, updated_at, expires_at, last_reminded_at}`.
+           Almacenada en `user_context` bajo la clave `intent:{intent_id}` (TTL configurable).
+           API interna: `upsert_intent()`, `get_pending_intents(user_id, agent_id)`,
+           `complete_intent()`, `all_pending(user_id)`.
+- [ ] 9.24 Detección de intenciones en agentes — cada agente que aplique (finance, travel,
+           scheduler, haos) puede devolver en su respuesta estructurada un campo
+           `intent_updates: [{intent_id, action, context, status}]`.
+           `server.py` persiste esas actualizaciones vía `intent_state.upsert_intent()`.
+           Ejemplos: FinanceAgent detecta "quiero analizar GGAL cuando baje" → intent pending.
+           TravelAgent detecta "estoy pensando un viaje a Tokio en septiembre" → intent pending.
+- [ ] 9.25 Retoma proactiva al inicio de sesión — cuando un usuario conocido inicia interacción,
+           el dispatcher consulta `intent_state.get_pending_intents()` del agente activado.
+           Si hay intenciones pendientes, el agente las menciona naturalmente al inicio:
+           "Por cierto, ¿cómo terminó lo de GGAL que estabas analizando?"
+           Umbral configurable: solo retoma si la intención tiene más de N días sin actividad.
+- [ ] 9.26 Alertas proactivas de intenciones — si una intención lleva más de `remind_after_days`
+           sin actividad y el estado sigue `pending`, se agrega a la cola de alertas del agente
+           (mismo mecanismo que clima o finanzas usa hoy). El usuario recibe por voz o WA:
+           "Tenés una planificación de viaje a Tokio sin completar. ¿Querés retomar?"
+           `last_reminded_at` previene spam — una alerta por intención por día como máximo.
+- [ ] 9.27 Backoffice `/users/{id}` — sección "Intenciones activas": tabla de intenciones
+           pendientes/en_curso por agente (acción, contexto resumido, fecha, días sin actividad),
+           botones para marcar como completa o descartar. El usuario controla qué el sistema recuerda.
 
 ---
 
