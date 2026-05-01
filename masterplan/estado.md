@@ -341,17 +341,17 @@ Stack:    openwakeword (ya existe), resemblyzer (ya existe), SSE backoffice, HTM
 Objetivo: Agentes de voz exclusivos para el rol admin que exponen por voz las mismas
           capacidades que el backoffice web: gestión de usuarios y gestión del sistema.
           Siguen el mismo patrón que ProfileAgent: LLM extrae acción estructurada → se aplica.
-Estado:   EN CURSO
+Estado:   COMPLETA
 Deps:     FASE 2.5 (users.py, RBAC), FASE 3 (orquestador, RBAC en /process)
 RBAC:     Solo el rol admin tiene acceso (* en PERMISSIONS). El resto recibe deny_message.
 ```
-- [ ] 2.7.1  UserMgmtAgent (user_mgmt_agent.py): gestión de usuarios por voz.
+- [x] 2.7.1  UserMgmtAgent (user_mgmt_agent.py): gestión de usuarios por voz.
              Acciones: listar usuarios, ver perfil de usuario, crear usuario (name+role+relationship),
              borrar usuario, cambiar rol, otorgar/revocar acceso a agentes.
              Al crear: crea el registro y guía al nuevo usuario a decir "Capitán, registrarme"
              para completar el enrollment de speaker ID.
              availability_url → GET /users del core.
-- [ ] 2.7.2  SystemAgent (system_agent.py): gestión del sistema por voz.
+- [x] 2.7.2  SystemAgent (system_agent.py): gestión del sistema por voz.
              Acciones: estado del sistema (core/HAOS/Ollama/ear), reiniciar servicios
              (systemctl --user restart capitan-core/capitan), listar modelos Ollama,
              uso de memoria RAM, agentes activos.
