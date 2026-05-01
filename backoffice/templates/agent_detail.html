@@ -18,9 +18,20 @@
   </div>
 </div>
 
+{# ── Mapa de iconos y nombres por tipo de backend ───────────────────────────── #}
+{% set BACKEND_META = {
+  "ollama":    {"icon": "🤖", "name": "Ollama (LLM)"},
+  "haos":      {"icon": "🏠", "name": "Home Assistant OS"},
+  "openmeteo": {"icon": "🌤", "name": "Open-Meteo API"},
+  "dolarapi":  {"icon": "💹", "name": "DolarAPI"},
+  "caldav":    {"icon": "📅", "name": "CalDAV / Radicale"},
+  "core":      {"icon": "⚙️", "name": "Core REST API"},
+  "custom":    {"icon": "🔌", "name": "Backend externo"},
+} %}
+
 <div class="grid grid-cols-2 gap-4 mb-4">
 
-  <!-- Estado y conectividad -->
+  <!-- Estado -->
   <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
     <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Estado</h2>
     <div class="space-y-3">
@@ -38,49 +49,87 @@
         {% if agent.reachable is none %}
           <span class="text-gray-600 text-xs">sin health check</span>
         {% elif agent.reachable %}
-          <span class="flex items-center gap-1.5 text-emerald-400 text-sm"><span>●</span> accesible</span>
+          <span class="flex items-center gap-1.5 text-emerald-400 text-sm">● accesible</span>
         {% else %}
-          <span class="flex items-center gap-1.5 text-red-400 text-sm"><span>●</span> no accesible</span>
+          <span class="flex items-center gap-1.5 text-red-400 text-sm">● no accesible</span>
         {% endif %}
       </div>
-      <div class="flex items-center justify-between">
-        <span class="text-sm text-gray-400">Descripción</span>
-        <span class="text-sm text-gray-300 text-right max-w-xs">{{ agent.desc }}</span>
+      <div class="flex items-start justify-between gap-4">
+        <span class="text-sm text-gray-400 shrink-0">Descripción</span>
+        <span class="text-sm text-gray-300 text-right">{{ agent.desc }}</span>
       </div>
     </div>
   </div>
 
-  <!-- Backend -->
+  <!-- Backends -->
   <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
-    <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Backend</h2>
-    {% set cfg = agent.config or {} %}
-    {% if cfg or agent.config_schema %}
-      <div class="space-y-2">
-        {% if cfg.get("backend") or cfg.get("model") %}
-        <div class="flex items-center justify-between">
-          <span class="text-sm text-gray-400">Motor</span>
-          <span class="text-sm text-gray-300 font-mono">{{ cfg.get("backend", "ollama") }}</span>
-        </div>
-        <div class="flex items-center justify-between">
-          <span class="text-sm text-gray-400">Modelo</span>
-          <code class="text-xs bg-gray-800 text-indigo-300 px-2 py-0.5 rounded">{{ cfg.get("model", "—") }}</code>
-        </div>
-        {% endif %}
-        {% for key, schema in (agent.config_schema or {}).items() %}
-          {% if key not in ["backend", "model"] %}
-          <div class="flex items-center justify-between">
-            <span class="text-sm text-gray-400">{{ schema.get("label", key) }}</span>
-            <span class="text-sm text-gray-300 font-mono">{{ cfg.get(key, schema.get("default", "—")) }}</span>
+    <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Backends</h2>
+    {% set backends = agent.backends if agent.backends is defined else [] %}
+    {% if backends %}
+      <div class="space-y-3">
+        {% for b in backends %}
+          {% set meta = BACKEND_META.get(b.type, {"icon": "🔌", "name": b.type}) %}
+          <div class="flex items-start gap-3 py-2 border-b border-gray-800 last:border-0">
+            <span class="text-lg leading-none mt-0.5">{{ meta.icon }}</span>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-sm font-medium text-gray-200">{{ b.label or meta.name }}</span>
+                {% if b.reachable is none %}
+                  <span class="text-xs text-gray-600 shrink-0">sin check</span>
+                {% elif b.reachable %}
+                  <span class="flex items-center gap-1 text-xs text-emerald-400 shrink-0">● online</span>
+                {% else %}
+                  <span class="flex items-center gap-1 text-xs text-red-400 shrink-0">● offline</span>
+                {% endif %}
+              </div>
+              <div class="text-xs text-gray-600 mt-0.5">{{ meta.name }}</div>
+              {% if b.model %}
+                <code class="text-xs bg-gray-800 text-indigo-300 px-1.5 py-0.5 rounded mt-1 inline-block">
+                  {{ b.model }}
+                </code>
+              {% endif %}
+              {% if b.url %}
+                <div class="text-xs text-gray-700 truncate mt-0.5 font-mono">{{ b.url }}</div>
+              {% endif %}
+            </div>
           </div>
-          {% endif %}
         {% endfor %}
       </div>
     {% else %}
-      <p class="text-sm text-gray-600">Sin backend configurable (agente estático).</p>
+      <p class="text-sm text-gray-600">Sin backends declarados.</p>
     {% endif %}
   </div>
 
 </div>
+
+<!-- Configuración -->
+{% set cfg = agent.config or {} %}
+{% set schema_keys = (agent.config_schema or {}).keys() | list %}
+{% set config_keys = schema_keys | reject("equalto", "backend") | reject("equalto", "model") | list %}
+{% if config_keys %}
+<div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-4">
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Configuración</h2>
+    <a href="/agents/{{ agent_id }}/edit" class="text-xs text-indigo-400 hover:text-indigo-300">Editar →</a>
+  </div>
+  <div class="space-y-2">
+    {% for key in config_keys %}
+      {% set schema = (agent.config_schema or {})[key] %}
+      {% set val = cfg.get(key, schema.get("default", "—")) %}
+      <div class="flex items-center justify-between py-0.5">
+        <span class="text-sm text-gray-400">{{ schema.get("label", key) }}</span>
+        {% if schema.get("type") in ["str", "text"] and ("token" in key.lower() or "password" in key.lower() or "key" in key.lower()) %}
+          <span class="text-xs text-gray-600 font-mono">{{ "•••" if val else "—" }}</span>
+        {% elif val == "" or val is none %}
+          <span class="text-xs text-gray-600">—</span>
+        {% else %}
+          <code class="text-xs bg-gray-800 text-gray-300 px-2 py-0.5 rounded font-mono max-w-xs truncate">{{ val }}</code>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
 
 <!-- Keywords -->
 <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-4">
