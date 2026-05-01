@@ -274,6 +274,68 @@ Stack:    resemblyzer (GE2E 256-dim), JSON + .npy local, RBAC por rol
 
 ---
 
+### FASE 2.6 - Onboarding de Usuario y Wake Word Personalizado
+```
+Objetivo: Unificar la creación de usuario y el perfeccionamiento del reconocimiento en
+          un único flujo coherente accesible por dos canales: comando de voz y dashboard web.
+          En ambos casos el flujo cubre: datos básicos → speaker ID (resemblyzer) → muestras
+          de wake word. Resuelve falsos positivos y baja detección reemplazando el modelo
+          TTS-only por uno entrenado con muestras reales de cada usuario.
+          Métricas de precisión visibles en el perfil + sugerencias de mejora continua.
+Estado:   Pendiente
+Deps:     FASE 2.5 (users.py, enrollment.py, speaker_id.py), FASE 12.13 (sección Usuarios)
+Stack:    openwakeword (ya existe), resemblyzer (ya existe), SSE backoffice, HTMX wizard
+```
+
+#### Fix inmediato (sin reentrenamiento)
+- [ ] 2.6.1  Gate post-wake-word: si speaker_id == "unknown" y confidence < umbral
+             configurable (`WAKEWORD_REQUIRE_KNOWN_SPEAKER=true` en .env), descarta el comando
+             y emite tono "no reconocido". Usa resemblyzer existente de 2.5.7.
+             Reduce falsos positivos de terceros al instante, sin tocar el modelo ONNX.
+
+#### Flujo de onboarding unificado
+- [ ] 2.6.2  `core/onboarding.py` — máquina de estados del flujo de onboarding: pasos
+             (datos_basicos → frases_speaker_id → muestras_wake_word → completo).
+             Estado persistido en users.json por usuario (onboarding_step, onboarding_complete).
+             Mismo flujo consumido por voz y por web.
+- [ ] 2.6.3  Onboarding por voz: comando "Capitán, agregar usuario" inicia el flujo guiado
+             desde `ear/listen.py`. TTS pregunta nombre, rol y relación de parentesco;
+             usuario responde por voz. Luego guía las frases de speaker ID (ya existentes en
+             enrollment.py de 2.5.6) y las muestras de wake word (2.6.5). Al completar,
+             POST /users crea el usuario y POST /users/{id}/wakeword/enroll cierra el flujo.
+- [ ] 2.6.4  Onboarding por web: wizard multi-paso en backoffice `/users/new`:
+             Paso 1: nombre, rol, parentesco (form HTMX).
+             Paso 2: frases de speaker ID — botón "Iniciar grabación" activa el mic del
+             dispositivo ear vía SSE, progress bar en tiempo real.
+             Paso 3: muestras de wake word — igual que paso 2 pero con instrucciones "di Capitán".
+             Admin puede lanzar el flujo para cualquier usuario desde la lista de usuarios.
+
+#### Almacenamiento y reentrenamiento
+- [ ] 2.6.5  `core/wakeword_samples.py` — almacena WAVs de muestras reales por usuario en
+             `~/.local/share/capitan/wakeword_samples/{user_id}/` (máx 200 samples),
+             metadata en JSON: fecha, duración, aceptado/rechazado, canal (voz/web).
+             Endpoint `POST /users/{id}/wakeword/enroll` acepta inicio del flujo guiado;
+             SSE stream de progreso para el cliente (sample N/30 ok/rechazado).
+- [ ] 2.6.6  `POST /users/{id}/wakeword/train` — retrain con muestras reales de todos los
+             usuarios enrolled + TTS base; exporta nuevo ONNX a ~/.local/share/wakeword/;
+             recarga modelo en listen.py sin reiniciar. Responde con val_accuracy y FP rate.
+
+#### Métricas y sugerencias
+- [ ] 2.6.7  Métricas de precisión en operación — `listen.py` registra por usuario:
+             detecciones (TP), falsos positivos (wake word + speaker desconocido), rechazos RBAC.
+             Persiste en `~/.local/share/capitan/wakeword_metrics.json`.
+             API: `GET /users/{id}/wakeword/metrics`.
+- [ ] 2.6.8  Backoffice perfil de usuario — sección "Reconocimiento de voz":
+             estado del onboarding (completo / incompleto / en progreso), precisión (TP/(TP+FP)),
+             samples grabados, fecha último enrollment y último reentrenamiento.
+             Sugerencias automáticas renderizadas como alertas:
+             "menos de 20 muestras — completá el enrollment",
+             "FP > 15% — grabá muestras en condiciones de ruido",
+             "modelo no incluye tu voz — entrená el modelo",
+             "muestras de hace más de 90 días — considera re-enrollarte".
+
+---
+
 ### FASE 3 - Infraestructura Multi-Agente
 ```
 Objetivo: Patrón de extensión para agentes de dominio + estado compartido cross-agente

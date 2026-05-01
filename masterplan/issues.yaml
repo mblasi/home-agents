@@ -43,6 +43,16 @@
 "2.5.9":  {number: 3,  repo: mblasi/home-agents-ear}
 "2.5.10": 228
 
+# ── FASE 2.6 (onboarding + wake word personalizado) ───────────────────────────
+"2.6.1": 233
+"2.6.2": 234
+"2.6.3": 235
+"2.6.4": 236
+"2.6.5": 237
+"2.6.6": 238
+"2.6.7": 239
+"2.6.8": 240
+
 # ── FASE 3 (infraestructura multi-agente) ────────────────────────────────────
 "3.1":   22
 # 3.2 → implementado como server.py (umbrella #23, cerrado)
