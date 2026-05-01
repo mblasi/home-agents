@@ -282,7 +282,7 @@ Objetivo: Unificar la creación de usuario y el perfeccionamiento del reconocimi
           de wake word. Resuelve falsos positivos y baja detección reemplazando el modelo
           TTS-only por uno entrenado con muestras reales de cada usuario.
           Métricas de precisión visibles en el perfil + sugerencias de mejora continua.
-Estado:   EN CURSO (4/8 — quedan 2.6.4, 2.6.6–2.6.8)
+Estado:   EN CURSO (7/8 — queda 2.6.4)
 Deps:     FASE 2.5 (users.py, enrollment.py, speaker_id.py), FASE 12.13 (sección Usuarios)
 Stack:    openwakeword (ya existe), resemblyzer (ya existe), SSE backoffice, HTMX wizard
 ```
@@ -316,16 +316,16 @@ Stack:    openwakeword (ya existe), resemblyzer (ya existe), SSE backoffice, HTM
              metadata en JSON: fecha, duración, aceptado/rechazado, canal (voz/web).
              Endpoint `POST /users/{id}/wakeword/enroll` acepta inicio del flujo guiado;
              SSE stream de progreso para el cliente (sample N/30 ok/rechazado).
-- [ ] 2.6.6  `POST /users/{id}/wakeword/train` — retrain con muestras reales de todos los
+- [x] 2.6.6  `POST /wakeword/train` (global) — retrain con muestras reales de todos los
              usuarios enrolled + TTS base; exporta nuevo ONNX a ~/.local/share/wakeword/;
-             recarga modelo en listen.py sin reiniciar. Responde con val_accuracy y FP rate.
+             recarga modelo en listen.py sin reiniciar. BackgroundTask en core/server.py.
 
 #### Métricas y sugerencias
-- [ ] 2.6.7  Métricas de precisión en operación — `listen.py` registra por usuario:
+- [x] 2.6.7  Métricas de precisión en operación — `listen.py` registra por usuario:
              detecciones (TP), falsos positivos (wake word + speaker desconocido), rechazos RBAC.
              Persiste en `~/.local/share/capitan/wakeword_metrics.json`.
              API: `GET /users/{id}/wakeword/metrics`.
-- [ ] 2.6.8  Backoffice perfil de usuario — sección "Reconocimiento de voz":
+- [x] 2.6.8  Backoffice perfil de usuario — sección "Reconocimiento de voz":
              estado del onboarding (completo / incompleto / en progreso), precisión (TP/(TP+FP)),
              samples grabados, fecha último enrollment y último reentrenamiento.
              Sugerencias automáticas renderizadas como alertas:
