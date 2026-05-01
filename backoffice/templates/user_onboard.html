@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}Onboarding — {{ user.name if user else uid }}{% endblock %}
+
+{% block content %}
+<div class="flex items-center gap-3 mb-6">
+  <a href="/users" class="text-gray-500 hover:text-white text-sm">← Usuarios</a>
+  <span class="text-gray-700">/</span>
+  <a href="/users/{{ uid }}/edit" class="text-gray-500 hover:text-white text-sm">
+    {{ user.name if user else uid }}
+  </a>
+  <span class="text-gray-700">/</span>
+  <h1 class="text-2xl font-bold">Onboarding</h1>
+</div>
+
+{% set current_step = step %}
+
+{# ── Indicador de pasos ────────────────────────────────────────────────────────── #}
+<div class="flex items-center gap-4 mb-8">
+  {% set steps_order = ["frases_speaker_id", "muestras_wake_word", "completo"] %}
+  {% set step_names = {
+      "frases_speaker_id":  "Identificación de voz",
+      "muestras_wake_word": "Wake word",
+      "completo":           "Listo"
+  } %}
+  {% for s in steps_order %}
+    {% set is_done = (
+        (s == "frases_speaker_id" and current_step in ["muestras_wake_word", "completo"]) or
+        (s == "muestras_wake_word" and current_step == "completo") or
+        (s == "completo" and current_step == "completo")
+    ) %}
+    {% set is_current = s == current_step %}
+
+    <div class="flex items-center gap-2">
+      <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold
+        {% if is_done %}bg-emerald-600 text-white
+        {% elif is_current %}bg-blue-600 text-white ring-2 ring-blue-400/40
+        {% else %}bg-gray-800 text-gray-500 border border-gray-700{% endif %}">
+        {% if is_done %}✓{% else %}{{ loop.index }}{% endif %}
+      </div>
+      <span class="text-sm
+        {% if is_done %}text-emerald-400
+        {% elif is_current %}text-white font-medium
+        {% else %}text-gray-600{% endif %}">
+        {{ step_names[s] }}
+      </span>
+    </div>
+
+    {% if not loop.last %}
+    <div class="flex-1 h-px {% if is_done %}bg-emerald-700{% else %}bg-gray-800{% endif %} max-w-12"></div>
+    {% endif %}
+  {% endfor %}
+</div>
+
+{# ── Contenido por paso ────────────────────────────────────────────────────────── #}
+
+{% if current_step == "completo" %}
+<div class="bg-gray-900 border border-emerald-800/50 rounded-xl p-6 max-w-lg">
+  <div class="flex items-center gap-3 mb-4">
+    <span class="text-2xl">✓</span>
+    <div>
+      <h2 class="text-lg font-semibold text-emerald-400">Onboarding completado</h2>
+      <p class="text-sm text-gray-400">{{ user.name if user else uid }} está listo para usar Capitán.</p>
+    </div>
+  </div>
+  <div class="flex gap-2">
+    <a href="/users/{{ uid }}/edit"
+       class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm font-medium transition-colors">
+      Ver perfil
+    </a>
+    <a href="/users"
+       class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors">
+      Volver a usuarios
+    </a>
+  </div>
+</div>
+
+{% elif current_step in ["frases_speaker_id", "muestras_wake_word"] %}
+{% set step_label = enroll_labels[current_step][0] %}
+{% set step_total = enroll_labels[current_step][1] %}
+{% set next = next_step[current_step] %}
+
+<div class="bg-gray-900 border border-gray-800 rounded-xl p-6 max-w-lg">
+  <h2 class="text-base font-semibold text-gray-200 mb-1">{{ step_label }}</h2>
+
+  {% if current_step == "frases_speaker_id" %}
+  <p class="text-sm text-gray-400 mb-4">
+    El dispositivo ear va a pedir a <strong class="text-gray-300">{{ user.name if user else uid }}</strong>
+    que repita {{ step_total }} frases cortas. El sistema analiza su voz para reconocerla luego.
+  </p>
+  {% else %}
+  <p class="text-sm text-gray-400 mb-4">
+    El dispositivo ear va a pedir a <strong class="text-gray-300">{{ user.name if user else uid }}</strong>
+    que diga «Capitán» {{ step_total }} veces. Estas muestras mejoran el reconocimiento de la wake word.
+  </p>
+  {% endif %}
+
+  <div class="bg-gray-800/60 border border-gray-700/50 rounded-lg p-3 mb-4 text-xs text-gray-400 space-y-1">
+    <div class="flex items-start gap-2">
+      <span class="text-blue-400 shrink-0 mt-0.5">①</span>
+      <span>Asegurate que el dispositivo ear esté activo y el usuario esté cerca del micrófono.</span>
+    </div>
+    <div class="flex items-start gap-2">
+      <span class="text-blue-400 shrink-0 mt-0.5">②</span>
+      <span>Hacé clic en «Iniciar grabación». El ear comenzará la guía por voz automáticamente.</span>
+    </div>
+    <div class="flex items-start gap-2">
+      <span class="text-blue-400 shrink-0 mt-0.5">③</span>
+      <span>El progreso se actualiza aquí en tiempo real. No cerrés la página.</span>
+    </div>
+  </div>
+
+  {# ── Botón de inicio + fragmento de progreso ─────────────────────────────── #}
+  <form hx-post="/users/{{ uid }}/enroll/start"
+        hx-target="#enroll-fragment"
+        hx-swap="innerHTML">
+    <input type="hidden" name="step" value="{{ current_step }}">
+    <button type="submit"
+            class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm
+                   font-medium transition-colors mb-4">
+      Iniciar grabación
+    </button>
+  </form>
+
+  <div id="enroll-fragment" class="min-h-[48px]">
+    <p class="text-xs text-gray-600">Presioná el botón para comenzar.</p>
+  </div>
+</div>
+
+{% else %}
+{# Paso desconocido — datos_basicos o similar #}
+<div class="bg-gray-900 border border-gray-800 rounded-xl p-6 max-w-lg">
+  <p class="text-sm text-gray-400 mb-3">
+    El usuario aún no completó el paso de datos básicos. Editá el perfil primero.
+  </p>
+  <a href="/users/{{ uid }}/edit"
+     class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm font-medium transition-colors">
+    Editar perfil
+  </a>
+</div>
+{% endif %}
+
+{% endblock %}
