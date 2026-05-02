@@ -40,6 +40,15 @@ TEMPLATES_DIR = Path(__file__).parent / "templates"
 app = FastAPI(title="capitan-backoffice", version="1.0")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
+import datetime as _dt
+def _datetimefmt(ts: float | int) -> str:
+    try:
+        return _dt.datetime.fromtimestamp(float(ts)).strftime("%d/%m %H:%M")
+    except Exception:
+        return "—"
+
+templates.env.filters["datetimefmt"] = _datetimefmt
+
 # ── Auth ───────────────────────────────────────────────────────────────────────
 
 _SESSION_COOKIE = "capitan_session"
@@ -265,13 +274,17 @@ def agent_detail_page(request: Request, agent_id: str):
     all_intents = _core("/intents") or []
     agent_intents = [i for i in all_intents if i.get("agent_id") == agent_id]
 
+    proactive_status = _core("/proactive/status", timeout=3) or {}
+    proactive_info   = proactive_status.get(agent_id)
+
     return _render(request, "agent_detail.html", "agents",
                    agent_id=agent_id, agent=agent,
                    recent_history=agent_history[-15:],
                    stats=stats,
                    roles_with_access=roles_with_access,
                    conversations=conversations,
-                   agent_intents=agent_intents)
+                   agent_intents=agent_intents,
+                   proactive_info=proactive_info)
 
 
 @app.post("/agents/{agent_id}/toggle", response_class=HTMLResponse)
@@ -292,6 +305,21 @@ async def toggle_agent(agent_id: str):
         f'title="Click para cambiar estado" '
         f'class="cursor-pointer px-2 py-1 rounded text-xs font-medium transition-colors {css}">'
         f'{new_status}</button>'
+    )
+
+
+@app.post("/agents/{agent_id}/proactive/run", response_class=HTMLResponse)
+async def proactive_run(agent_id: str, request: Request):
+    result = _core(f"/proactive/{agent_id}/run", method="POST", timeout=120)
+    if not result:
+        return HTMLResponse(
+            '<span class="text-red-400">Error al ejecutar — el agente no está registrado o el core no responde.</span>'
+        )
+    users_checked   = result.get("users_checked", 0)
+    intents_created = result.get("intents_created", 0)
+    return HTMLResponse(
+        f'<span class="text-violet-300">✓ Ejecutado — {users_checked} usuario(s) evaluado(s), '
+        f'{intents_created} intento(s) creado(s).</span>'
     )
 
 
