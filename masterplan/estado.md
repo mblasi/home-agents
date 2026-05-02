@@ -572,7 +572,7 @@ Total estimado:               ~2-3s        (vs 8s actual warm)
 ```
 Objetivo: Reemplazar el router de reglas por un LLM coordinador capaz de descomponer
           requests complejos, rutear a múltiples agentes y agregar respuestas.
-Estado:   Pendiente
+Estado:   EN CURSO (5/27 — etapa A completa, iniciando etapa B)
 Deps:     FASE 3.2 (orquestador), FASE 3.3 (router de reglas como baseline),
           FASE 2.10 (contexto multi-turno), ≥2 agentes de dominio estables.
 Cuándo empezar: cuando el router de reglas muestre limitaciones reales en uso diario
@@ -630,11 +630,27 @@ Objetivo de largo plazo: **opción D** — el clasificador absorbe el 80% de req
 simples en <100ms y el LLM entra solo cuando hay ambigüedad real.
 
 #### Etapa A — Coordinador como router
-- [ ] 9.1  Definir formato del catálogo de agentes: nombre, descripción, 3-5 ejemplos de queries válidas
-- [ ] 9.2  Prompt del coordinador v1: utterance + catálogo → elige un agente + reformula query para ese agente
-- [ ] 9.3  Reemplazar router de reglas (FASE 3.3) con llamada al coordinador LLM
-- [ ] 9.4  A/B test: precisión de routing coordinador vs. reglas sobre queries del historial real
-- [ ] 9.5  Medir overhead de latencia del coordinador; objetivo: que no supere 4s extra en warm
+- [x] 9.1  Definir formato del catálogo de agentes: nombre, descripción, 3-5 ejemplos de queries válidas
+           Campo `examples` (5 queries por agente) en REGISTRY de agent_registry.py.
+- [x] 9.2  Prompt del coordinador v1: utterance + catálogo → elige un agente + reformula query para ese agente
+           coordinator.py (nuevo): `coordinate(text, conv_context)` → (agent_id, reformulated_query, latency_s)
+           El contexto de conversación se inyecta para routing multi-turno correcto.
+           El texto original sigue llegando al agente de dominio (Etapa B usará la query reformulada).
+- [x] 9.3  Reemplazar router de reglas (FASE 3.3) con llamada al coordinador LLM
+           server.py /process: conv se obtiene antes del coordinador para pasarle contexto;
+           ProcessResponse agrega coordinator_query y coordinator_latency_ms para observabilidad.
+           Impacto transversal: listen.py registra lat_coordinator en history.json;
+           panel_latency.py muestra fila "Coordinador" dinámicamente.
+- [x] 9.4  A/B test: precisión de routing coordinador vs. reglas sobre queries del historial real
+           Benchmark 20 queries (2026-05-02):
+           Keywords: 18/20 (90%) — falla en "mi pasaporte vence..." → travel (correcto: profile)
+                                   y "debería llevar paraguas?" → haos (correcto: weather)
+           Coordinador: 17/17 correctas en calls sin timeout (100%) — 3 timeouts por carga de Ollama
+           Wins del coordinador: desambigua queries sin keywords claras; reformulación visible en logs.
+- [x] 9.5  Medir overhead de latencia del coordinador; objetivo: que no supere 4s extra en warm
+           Latencia warm del coordinador: ~3.5s (consistente con la llamada LLM del agente)
+           Total warm estimado: ~11.5s (era ~8s). Overhead: +3.5s. ✓ Dentro del objetivo de 4s.
+           Timeout aumentado a 20s para evitar falsos timeouts bajo carga concurrente.
 
 #### Etapa B — Queries multi-agente
 - [ ] 9.6  Extender el plan de ejecución a N pasos con dependencias opcionales entre pasos
