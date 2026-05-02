@@ -572,7 +572,7 @@ Total estimado:               ~2-3s        (vs 8s actual warm)
 ```
 Objetivo: Reemplazar el router de reglas por un LLM coordinador capaz de descomponer
           requests complejos, rutear a múltiples agentes y agregar respuestas.
-Estado:   EN CURSO (5/27 — etapa A completa, iniciando etapa B)
+Estado:   EN CURSO (9/27 — etapas A+B completas, iniciando etapa C)
 Deps:     FASE 3.2 (orquestador), FASE 3.3 (router de reglas como baseline),
           FASE 2.10 (contexto multi-turno), ≥2 agentes de dominio estables.
 Cuándo empezar: cuando el router de reglas muestre limitaciones reales en uso diario
@@ -653,10 +653,10 @@ simples en <100ms y el LLM entra solo cuando hay ambigüedad real.
            Timeout aumentado a 20s para evitar falsos timeouts bajo carga concurrente.
 
 #### Etapa B — Queries multi-agente
-- [ ] 9.6  Extender el plan de ejecución a N pasos con dependencias opcionales entre pasos
-- [ ] 9.7  Orquestador ejecuta pasos sin dependencias en paralelo (asyncio / ThreadPool)
-- [ ] 9.8  Coordinador recibe resultados de todos los agentes y genera respuesta unificada
-- [ ] 9.9  Prompt de agregación: sintetizar respuestas parciales en texto coherente, sin repetir cada una
+- [x] 9.6  Extender el plan de ejecución a N pasos con dependencias opcionales entre pasos
+- [x] 9.7  Orquestador ejecuta pasos sin dependencias en paralelo (asyncio / ThreadPool)
+- [x] 9.8  Coordinador recibe resultados de todos los agentes y genera respuesta unificada
+- [x] 9.9  Prompt de agregación: sintetizar respuestas parciales en texto coherente, sin repetir cada una
 
 #### Etapa C — Descomposición y corrección
 - [ ] 9.10 Detección de requests condicionales ("cuando X, hacé Y"): el coordinador genera un plan con condición explícita
