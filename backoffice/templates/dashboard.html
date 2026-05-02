@@ -115,6 +115,26 @@
   {% endif %}
 </div>
 
+<!-- Intenciones activas -->
+{% if active_intents %}
+<div class="bg-gray-900 border border-gray-800 rounded-xl p-4 mb-6">
+  <div class="flex items-center justify-between mb-3">
+    <h2 class="text-sm font-semibold text-gray-400">Intenciones activas</h2>
+    <a href="/intents" class="text-xs text-indigo-400 hover:text-indigo-300">Ver todas →</a>
+  </div>
+  <div class="space-y-2">
+    {% for intent in active_intents %}
+    <div class="flex items-center gap-3 text-xs py-1.5 border-b border-gray-800/50 last:border-0">
+      <span class="w-2 h-2 rounded-full shrink-0 {{ 'bg-yellow-400' if intent.status == 'pending' else 'bg-blue-400' }}"></span>
+      <span class="flex-1 text-gray-300 truncate">{{ intent.title }}</span>
+      <span class="text-gray-600 shrink-0">{{ intent.agent_id }}</span>
+      <span class="text-gray-600 shrink-0">{{ intent.user_id }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
 <!-- Últimos comandos -->
 <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
   <h2 class="text-sm font-semibold text-gray-400 mb-3">Últimos comandos</h2>

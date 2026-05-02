@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}Intenciones{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <div>
+    <h1 class="text-2xl font-bold">Intenciones activas</h1>
+    <p class="text-xs text-gray-500 mt-1">
+      Acciones pendientes detectadas por los agentes — persisten entre sesiones y pueden disparar recordatorios.
+    </p>
+  </div>
+  <span class="text-xs text-gray-600">{{ intents | length }} activa{{ 's' if intents | length != 1 }}</span>
+</div>
+
+{% if not intents %}
+<div class="bg-gray-900 border border-gray-800 rounded-xl p-8 text-center">
+  <div class="text-4xl mb-3">🎯</div>
+  <p class="text-gray-400 text-sm">No hay intenciones activas.</p>
+  <p class="text-gray-600 text-xs mt-1">
+    Los agentes crean intenciones cuando detectan que el usuario tiene algo pendiente.
+  </p>
+</div>
+{% else %}
+
+{% set status_colors = {
+  'pending':     'bg-yellow-900/40 text-yellow-400 border-yellow-800/50',
+  'in_progress': 'bg-blue-900/40 text-blue-400 border-blue-800/50',
+  'done':        'bg-emerald-900/40 text-emerald-400 border-emerald-800/50',
+  'cancelled':   'bg-gray-800 text-gray-500 border-gray-700/50',
+} %}
+{% set status_labels = {
+  'pending':     'pendiente',
+  'in_progress': 'en curso',
+  'done':        'completada',
+  'cancelled':   'cancelada',
+} %}
+
+<div class="space-y-3">
+{% for intent in intents %}
+{% set agent_info  = agents.get(intent.agent_id, {}) %}
+{% set user_info   = users.get(intent.user_id, {}) %}
+{% set scolor      = status_colors.get(intent.status, 'bg-gray-800 text-gray-400 border-gray-700') %}
+{% set slabel      = status_labels.get(intent.status, intent.status) %}
+{% set days_old    = ((now - intent.updated_at) / 86400) | round(0, 'floor') | int %}
+
+<div class="bg-gray-900 border border-gray-800 rounded-xl p-4
+            hover:border-gray-700 transition-colors"
+     id="intent-row-{{ intent.intent_id }}">
+
+  <div class="flex items-start gap-3">
+    <!-- Icono agente -->
+    <div class="text-2xl shrink-0 pt-0.5">{{ agent_info.get('icon', '🤖') }}</div>
+
+    <!-- Contenido -->
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center gap-2 flex-wrap mb-1">
+        <span class="text-sm font-semibold text-gray-100">{{ intent.title }}</span>
+        <span class="px-2 py-0.5 rounded-full text-[10px] font-medium border {{ scolor }}">
+          {{ slabel }}
+        </span>
+      </div>
+
+      {% if intent.description %}
+      <p class="text-xs text-gray-400 mb-2">{{ intent.description }}</p>
+      {% endif %}
+
+      {% if intent.context %}
+      <div class="flex flex-wrap gap-2 mb-2">
+        {% for k, v in intent.context.items() %}
+        <span class="text-[10px] bg-gray-800 text-gray-400 px-2 py-0.5 rounded font-mono">
+          {{ k }}: {{ v }}
+        </span>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <div class="flex items-center gap-3 text-[10px] text-gray-600">
+        <span>{{ agent_info.get('name', intent.agent_id) }}</span>
+        <span>·</span>
+        <a href="/users/{{ intent.user_id }}/edit" class="hover:text-gray-400 transition-colors">
+          {{ user_info.get('name', intent.user_id) }}
+        </a>
+        <span>·</span>
+        <span>actualizado hace {{ days_old }}d</span>
+        {% if intent.remind_after_days %}
+        <span>·</span>
+        <span>recordatorio cada {{ intent.remind_after_days }}d</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Acciones -->
+    <div class="shrink-0 flex gap-2">
+      {% if intent.status in ['pending', 'in_progress'] %}
+      <button
+        hx-patch="/users/{{ intent.user_id }}/intents/{{ intent.intent_id }}"
+        hx-vals='{"status": "done"}'
+        hx-target="#intent-row-{{ intent.intent_id }}"
+        hx-swap="outerHTML"
+        hx-headers='{"Content-Type": "application/json"}'
+        title="Marcar como completada"
+        class="px-2 py-1 text-xs text-emerald-400 hover:text-emerald-300 hover:bg-emerald-900/20
+               rounded transition-colors border border-emerald-800/50">
+        ✓ completar
+      </button>
+      {% endif %}
+      <button
+        hx-delete="/users/{{ intent.user_id }}/intents/{{ intent.intent_id }}"
+        hx-target="#intent-row-{{ intent.intent_id }}"
+        hx-swap="outerHTML"
+        hx-confirm="¿Eliminar esta intención?"
+        title="Eliminar intención"
+        class="px-2 py-1 text-xs text-gray-600 hover:text-red-400 hover:bg-red-900/20
+               rounded transition-colors">
+        ✕
+      </button>
+    </div>
+  </div>
+</div>
+{% endfor %}
+</div>
+{% endif %}
+{% endblock %}

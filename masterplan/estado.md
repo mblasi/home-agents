@@ -572,7 +572,7 @@ Total estimado:               ~2-3s        (vs 8s actual warm)
 ```
 Objetivo: Reemplazar el router de reglas por un LLM coordinador capaz de descomponer
           requests complejos, rutear a múltiples agentes y agregar respuestas.
-Estado:   EN CURSO (22/27 — etapas A+B+C+D+E completas, iniciando etapa F)
+Estado:   COMPLETA
 Deps:     FASE 3.2 (orquestador), FASE 3.3 (router de reglas como baseline),
           FASE 2.10 (contexto multi-turno), ≥2 agentes de dominio estables.
 Cuándo empezar: cuando el router de reglas muestre limitaciones reales en uso diario
@@ -708,37 +708,32 @@ información que cada agente guarda sobre él.
 #### Etapa F — Intenciones persistentes y continuación proactiva
 
 ```
-Los agentes detectan intenciones "en curso" que el usuario no completó
-(una inversión a evaluar, un viaje en planificación, etc.) y las guardan
-como intent_state en user_context. Cuando el usuario vuelve a hablar con
-ese agente, se le recuerda dónde quedó. Si pasa demasiado tiempo, el agente
-lo propone proactivamente via el mecanismo de alertas.
+Las intenciones son una entidad de primer nivel (separada del user_context): representan
+acciones que el usuario quiere hacer, monitoreadas por un agente entre sesiones.
+Tienen ciclo de vida (pending → in_progress → done/cancelled), pueden disparar alertas
+proactivas y son visibles en el backoffice como página propia (/intents).
+Storage: ~/.local/share/capitan/intents/{user_id}.json
 ```
-- [ ] 9.23 `core/intent_state.py` — estructura de intención persistente:
-           `{intent_id, agent_id, user_id, action, context: dict, status: pending|in_progress|done,
-           created_at, updated_at, expires_at, last_reminded_at}`.
-           Almacenada en `user_context` bajo la clave `intent:{intent_id}` (TTL configurable).
-           API interna: `upsert_intent()`, `get_pending_intents(user_id, agent_id)`,
-           `complete_intent()`, `all_pending(user_id)`.
-- [ ] 9.24 Detección de intenciones en agentes — cada agente que aplique (finance, travel,
-           scheduler, haos) puede devolver en su respuesta estructurada un campo
-           `intent_updates: [{intent_id, action, context, status}]`.
-           `server.py` persiste esas actualizaciones vía `intent_state.upsert_intent()`.
-           Ejemplos: FinanceAgent detecta "quiero analizar GGAL cuando baje" → intent pending.
-           TravelAgent detecta "estoy pensando un viaje a Tokio en septiembre" → intent pending.
-- [ ] 9.25 Retoma proactiva al inicio de sesión — cuando un usuario conocido inicia interacción,
-           el dispatcher consulta `intent_state.get_pending_intents()` del agente activado.
-           Si hay intenciones pendientes, el agente las menciona naturalmente al inicio:
-           "Por cierto, ¿cómo terminó lo de GGAL que estabas analizando?"
-           Umbral configurable: solo retoma si la intención tiene más de N días sin actividad.
-- [ ] 9.26 Alertas proactivas de intenciones — si una intención lleva más de `remind_after_days`
-           sin actividad y el estado sigue `pending`, se agrega a la cola de alertas del agente
-           (mismo mecanismo que clima o finanzas usa hoy). El usuario recibe por voz o WA:
-           "Tenés una planificación de viaje a Tokio sin completar. ¿Querés retomar?"
-           `last_reminded_at` previene spam — una alerta por intención por día como máximo.
-- [ ] 9.27 Backoffice `/users/{id}` — sección "Intenciones activas": tabla de intenciones
-           pendientes/en_curso por agente (acción, contexto resumido, fecha, días sin actividad),
-           botones para marcar como completa o descartar. El usuario controla qué el sistema recuerda.
+- [x] 9.23 `core/intent_state.py` — módulo propio (no anidado en user_context):
+           `{intent_id, agent_id, user_id, title, description, status, context: dict,
+           created_at, updated_at, expires_at, last_reminded_at, remind_after_days}`.
+           API: `upsert()`, `get()`, `get_active()`, `get_active_for_agent()`,
+           `update_status()`, `update_context()`, `delete()`, `get_all_needing_reminder()`,
+           `get_all_active_across_users()` (vista admin).
+- [x] 9.24 Detección de intenciones en agentes — agentes pueden devolver
+           `(resp, action, {"context_updates": [...], "intent_updates": [...]})`.
+           `_apply_agent_updates()` en `server.py` persiste ambos tipos.
+           Backwards compatible: 3-tuple con lista directa sigue siendo context_updates.
+- [x] 9.25 Retoma proactiva al inicio de sesión — `_build_agent_prefix()` en `server.py`
+           inyecta contexto + intenciones activas como system message antes de cada llamada
+           al agente (single-step y multi-step). El LLM las ve y las retoma naturalmente.
+- [x] 9.26 Alertas proactivas de intenciones — `_alert_poller()` verifica
+           `get_all_needing_reminder()` en cada ciclo; genera alerta y actualiza
+           `last_reminded_at` para evitar spam.
+- [x] 9.27 Backoffice: `/intents` como página de primer nivel con vista de todas las
+           intenciones activas de todos los usuarios; widget en dashboard; acordeón en
+           `/users/{id}` con intenciones activas por agente. Acciones: completar / eliminar
+           vía HTMX. Nav link "🎯 Intenciones" en la barra lateral.
 
 ---
 

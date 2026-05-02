@@ -256,6 +256,62 @@
 </div>
 {% endif %}
 
+{% if uid and user_intents %}
+<div class="bg-gray-900 border border-gray-800 rounded-xl p-6 max-w-lg mt-6">
+  <div class="flex items-center justify-between mb-1">
+    <h2 class="text-sm font-semibold text-gray-300 uppercase tracking-wider">Intenciones activas</h2>
+    <a href="/intents" class="text-xs text-indigo-400 hover:text-indigo-300">Ver todas →</a>
+  </div>
+  <p class="text-xs text-gray-600 mb-4">
+    Acciones pendientes que los agentes recuerdan para este usuario.
+  </p>
+
+  {% set status_colors = {
+    'pending':     'text-yellow-400',
+    'in_progress': 'text-blue-400',
+    'done':        'text-emerald-400',
+    'cancelled':   'text-gray-500',
+  } %}
+  {% set status_labels = {
+    'pending':     'pendiente',
+    'in_progress': 'en curso',
+    'done':        'completada',
+    'cancelled':   'cancelada',
+  } %}
+
+  <div class="space-y-2">
+  {% for intent in user_intents %}
+  {% set agent_info = agents.get(intent.agent_id, {}) %}
+  <div class="flex items-start gap-3 py-2 border-b border-gray-800/50"
+       id="intent-user-row-{{ intent.intent_id }}">
+    <span class="text-base shrink-0">{{ agent_info.get('icon', '🤖') }}</span>
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center gap-2 flex-wrap">
+        <span class="text-sm text-gray-200">{{ intent.title }}</span>
+        <span class="text-[10px] {{ status_colors.get(intent.status, 'text-gray-500') }}">
+          {{ status_labels.get(intent.status, intent.status) }}
+        </span>
+      </div>
+      {% if intent.description %}
+      <div class="text-xs text-gray-500 mt-0.5">{{ intent.description }}</div>
+      {% endif %}
+      <div class="text-[10px] text-gray-600 mt-0.5">{{ agent_info.get('name', intent.agent_id) }}</div>
+    </div>
+    <button
+      hx-delete="/users/{{ uid }}/intents/{{ intent.intent_id }}"
+      hx-target="#intent-user-row-{{ intent.intent_id }}"
+      hx-swap="outerHTML"
+      class="shrink-0 text-xs text-gray-600 hover:text-red-400 transition-colors px-2 py-1">
+      ✕
+    </button>
+  </div>
+  {% else %}
+  <p class="text-xs text-gray-600">Sin intenciones activas.</p>
+  {% endfor %}
+  </div>
+</div>
+{% endif %}
+
 {% if uid and user_context %}
 <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 max-w-lg mt-6">
   <h2 class="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-1">Contexto aprendido</h2>
