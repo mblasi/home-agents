@@ -1071,6 +1071,61 @@ Stack:    ytmusicapi (OAuth), yt-dlp (stream resolver), HAOS media_player servic
 
 ---
 
+### FASE 16 - Red de Nodos de Audio Multi-Ambiente
+
+```
+Objetivo: Distribuir la interfaz de voz por toda la casa sin centralizar el audio
+          en un único dispositivo. Nodos ligeros capturan voz por habitación y
+          delegan todo el procesamiento (STT, LLM, TTS) al servidor central en la laptop.
+          Output alternativo via los Echos ya instalados (HAOS media_player) sin
+          necesidad de hardware nuevo para empezar.
+Estado:   Pendiente
+Deps:     FASE 1 (ear/listen.py, STT, TTS), FASE 3 (core/server.py, /process),
+          FASE 2.5 (speaker_id — los nodos lo propagan), FASE 12 (backoffice)
+Hardware: Etapa A requiere Raspberry Pi Zero 2W + micrófono USB + parlante 3.5mm.
+          Etapa B funciona con hardware existente (Echos via HAOS).
+Nota:     Ver también Anexo A.2 (origen de esta fase).
+```
+
+#### Etapa A — Protocolo y nodo satélite básico
+- [ ] 16.1  Protocolo nodo↔servidor: especificación de mensajes WebSocket para streaming
+            de audio en chunks. Estructura: `{node_id, room, chunk_b64, sample_rate}`.
+            El nodo envía chunks post-wake-word; el core responde con texto de respuesta.
+            Fallback: POST HTTP con el audio completo si WebSocket no disponible.
+- [ ] 16.2  `ear/satellite.py` — cliente ligero para el nodo satélite: detecta wake word
+            con openWakeWord (modelo capitan.onnx), captura el comando, envía chunks al
+            core vía WebSocket, recibe texto de respuesta y sintetiza TTS local con Piper.
+            Sin STT ni LLM locales — toda la inferencia pesada queda en la laptop central.
+            Configurable: CORE_WS_URL, ROOM, DEVICE_INDEX_MIC, DEVICE_INDEX_SPK.
+- [ ] 16.3  `core/audio_nodes.py` + `GET /audio-nodes` — registro en memoria de nodos
+            conectados: `{node_id, room, ip, last_seen, state: active|offline}`.
+            Auto-registro al conectar vía WebSocket; limpieza de nodos expirados.
+- [ ] 16.4  `core/ws_audio.py` — servidor WebSocket `/ws/audio` en el core: recibe chunks
+            del nodo, acumula y pasa al STT local (faster-whisper), llama internamente a
+            `process()` con `source.room` del nodo, devuelve el texto de respuesta al nodo.
+- [ ] 16.5  Propagación de `source.room` en el pipeline completo: historial,
+            backoffice y dashboard muestran el ambiente de origen de cada comando.
+            El campo ya existe en `source`; esta tarea lo hace obligatorio para nodos.
+
+#### Etapa B — Output via Echo (sin hardware nuevo)
+- [ ] 16.6  `core/response_router.py` — routear la respuesta al speaker correcto según
+            `source.room`. Si el room tiene un Echo asignado: sintetizar TTS a WAV y
+            reproducir via HAOS `media_player.play_media`. Si no: TTS local como ahora.
+            Tabla de routing: `room → entity_id` configurable en `.env` o agents.json.
+- [ ] 16.7  Backoffice `/rooms` — CRUD de ambientes: nombre, entity_id del Echo asignado,
+            node_id del satélite si hay uno conectado. Tabla editable con estado en tiempo real.
+
+#### Etapa C — Observabilidad y robustez
+- [ ] 16.8  Health check periódico por nodo de audio: ping cada 30s desde el core,
+            marcar offline si no responde en 3 intentos. Backoffice muestra estado en tiempo real.
+- [ ] 16.9  Panel en dashboard zellij (`panel_nodes.py`): nodos de audio activos, ambiente
+            del último comando, latencia STT+LLM por nodo, estado online/offline.
+- [ ] 16.10 Guía de instalación del nodo satélite en Raspberry Pi Zero 2W: dependencias
+            (Python, openWakeWord, Piper, pyaudio), configuración de audio (ALSA),
+            systemd service con auto-reconexión, verificación end-to-end.
+
+---
+
 ## PIPELINE ACTUAL (para referencia rápida)
 
 ```
@@ -1208,7 +1263,7 @@ u otro runtime local) como cliente MCP.
 
 ---
 
-### A.2 Red de nodos de audio multi-ambiente
+### ~~A.2 Red de nodos de audio multi-ambiente~~ → FASE 16
 
 **Contexto**: La arquitectura actual tiene un único punto de acceso (la laptop con
 micrófono y parlantes). Para hacer el agente realmente útil en toda la casa, se
