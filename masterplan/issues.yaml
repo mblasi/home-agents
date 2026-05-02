@@ -258,6 +258,18 @@
 "9.26":  265
 "9.27":  266
 
+# ── FASE 16 (red de nodos de audio multi-ambiente) ───────────────────────────
+"16.1":  272
+"16.2":  {number: 20, repo: mblasi/home-agents-ear}
+"16.3":  {number: 85, repo: mblasi/home-agents-core}
+"16.4":  {number: 86, repo: mblasi/home-agents-core}
+"16.5":  273
+"16.6":  {number: 87, repo: mblasi/home-agents-core}
+"16.7":  {number: 88, repo: mblasi/home-agents-core}
+"16.8":  {number: 89, repo: mblasi/home-agents-core}
+"16.9":  {number: 21, repo: mblasi/home-agents-ear}
+"16.10": 274
+
 # ── Anexos (iteraciones futuras) ──────────────────────────────────────────────
 "A.1":   118
 "A.2":   121

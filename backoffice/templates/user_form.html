@@ -256,6 +256,50 @@
 </div>
 {% endif %}
 
+{% if uid and user_context %}
+<div class="bg-gray-900 border border-gray-800 rounded-xl p-6 max-w-lg mt-6">
+  <h2 class="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-1">Contexto aprendido</h2>
+  <p class="text-xs text-gray-600 mb-4">
+    Datos que los agentes recuerdan de este usuario. Se inyectan automáticamente en cada conversación.
+  </p>
+
+  {% for agent_id, fields in user_context.items() %}
+  {% set agent_info = agents.get(agent_id, {}) %}
+  <details class="mb-2 group">
+    <summary class="flex items-center gap-2 cursor-pointer py-2 border-b border-gray-800 hover:border-gray-700 list-none select-none">
+      <span class="text-base">{{ agent_info.get('icon', '🤖') }}</span>
+      <span class="text-sm font-medium text-gray-300">{{ agent_info.get('name', agent_id) }}</span>
+      <span class="text-xs text-gray-600 ml-1">{{ fields | length }} campo{{ 's' if fields | length != 1 }}</span>
+      <span class="ml-auto text-gray-600 text-xs">▾</span>
+    </summary>
+    <div class="pt-2 space-y-1">
+      {% for field_name, fd in fields.items() %}
+      {% set updated_days = ((now - fd.updated_at) / 86400) | round(0, 'floor') | int %}
+      {% set ttl_remaining = [fd.ttl_days - updated_days, 0] | max %}
+      <div class="flex items-start gap-3 py-2 border-b border-gray-800/50"
+           id="ctx-row-{{ agent_id }}-{{ field_name }}">
+        <div class="flex-1 min-w-0">
+          <div class="text-xs font-mono text-gray-500">{{ field_name }}</div>
+          <div class="text-sm text-gray-200 mt-0.5 break-words">{{ fd.value }}</div>
+          <div class="text-xs text-gray-600 mt-0.5">
+            actualizado hace {{ updated_days }}d — expira en {{ ttl_remaining }}d
+          </div>
+        </div>
+        <button
+          hx-delete="/users/{{ uid }}/context/{{ agent_id }}/{{ field_name }}"
+          hx-target="#ctx-row-{{ agent_id }}-{{ field_name }}"
+          hx-swap="outerHTML"
+          class="shrink-0 text-xs text-gray-600 hover:text-red-400 transition-colors px-2 py-1">
+          ✕
+        </button>
+      </div>
+      {% endfor %}
+    </div>
+  </details>
+  {% endfor %}
+</div>
+{% endif %}
+
 <script>
 // Permisos por rol (inyectados desde el servidor)
 const ROLE_PERMS = {{ role_perms | tojson }};

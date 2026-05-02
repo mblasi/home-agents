@@ -186,7 +186,48 @@
   </div>
   {% endif %}
 
-  <!-- Sección 5: Acceso por rol -->
+  <!-- Sección 5: Contexto de usuario -->
+  {% set ctx_schema = agent.get('user_context_schema') %}
+  {% if ctx_schema is not none %}
+  <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-5">
+    <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-1">Contexto de usuario</h2>
+    <p class="text-xs text-gray-600 mb-4">
+      Campos que este agente puede recordar por usuario. Se inyectan automáticamente como contexto en cada conversación.
+    </p>
+
+    <div id="ctx-schema-table" class="space-y-2 mb-3">
+      {% for fd in (ctx_schema or []) %}
+      <div class="ctx-row flex gap-2 items-center">
+        <input type="text" placeholder="campo" value="{{ fd.get('field', '') }}"
+               class="ctx-field w-32 bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-gray-200
+                      focus:outline-none focus:ring-1 focus:ring-indigo-500">
+        <input type="text" placeholder="descripción" value="{{ fd.get('desc', '') }}"
+               class="ctx-desc flex-1 bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-gray-200
+                      focus:outline-none focus:ring-1 focus:ring-indigo-500">
+        <select class="ctx-type w-24 bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-gray-200
+                       focus:outline-none focus:ring-1 focus:ring-indigo-500">
+          {% for t in ["string","number","boolean","enum"] %}
+          <option value="{{ t }}" {% if fd.get('type') == t %}selected{% endif %}>{{ t }}</option>
+          {% endfor %}
+        </select>
+        <input type="number" placeholder="TTL días" value="{{ fd.get('ttl_days', 365) }}"
+               class="ctx-ttl w-20 bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-gray-200
+                      focus:outline-none focus:ring-1 focus:ring-indigo-500">
+        <button type="button" onclick="this.closest('.ctx-row').remove()"
+                class="px-2 py-1.5 text-xs text-gray-600 hover:text-red-400 transition-colors">✕</button>
+      </div>
+      {% endfor %}
+    </div>
+
+    <button type="button" onclick="addCtxRow()"
+            class="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">
+      + Agregar campo
+    </button>
+    <input type="hidden" name="user_context_schema_json" id="ctx-schema-json">
+  </div>
+  {% endif %}
+
+  <!-- Sección 6: Acceso por rol -->
   <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-5">
     <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-1">Acceso por rol</h2>
     <p class="text-xs text-gray-600 mb-3">Qué roles tienen acceso a este agente por defecto.</p>
@@ -218,4 +259,42 @@
   </div>
 
 </form>
+
+<script>
+function addCtxRow() {
+  const table = document.getElementById('ctx-schema-table');
+  if (!table) return;
+  const row = document.createElement('div');
+  row.className = 'ctx-row flex gap-2 items-center';
+  row.innerHTML =
+    '<input type="text" placeholder="campo" class="ctx-field w-32 bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-500">' +
+    '<input type="text" placeholder="descripción" class="ctx-desc flex-1 bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-500">' +
+    '<select class="ctx-type w-24 bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-500">' +
+    '<option value="string">string</option><option value="number">number</option>' +
+    '<option value="boolean">boolean</option><option value="enum">enum</option></select>' +
+    '<input type="number" placeholder="TTL días" value="365" class="ctx-ttl w-20 bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-500">' +
+    '<button type="button" onclick="this.closest(\'.ctx-row\').remove()" class="px-2 py-1.5 text-xs text-gray-600 hover:text-red-400 transition-colors">✕</button>';
+  table.appendChild(row);
+}
+
+const _ctxForm = document.querySelector('form');
+if (_ctxForm) {
+  _ctxForm.addEventListener('submit', function() {
+    const jsonInput = document.getElementById('ctx-schema-json');
+    if (!jsonInput) return;
+    const schema = [];
+    document.querySelectorAll('.ctx-row').forEach(function(row) {
+      const field = row.querySelector('.ctx-field').value.trim();
+      if (!field) return;
+      schema.push({
+        field:    field,
+        desc:     row.querySelector('.ctx-desc').value.trim(),
+        type:     row.querySelector('.ctx-type').value,
+        ttl_days: parseInt(row.querySelector('.ctx-ttl').value) || 365,
+      });
+    });
+    jsonInput.value = JSON.stringify(schema);
+  });
+}
+</script>
 {% endblock %}
