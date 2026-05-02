@@ -572,7 +572,7 @@ Total estimado:               ~2-3s        (vs 8s actual warm)
 ```
 Objetivo: Reemplazar el router de reglas por un LLM coordinador capaz de descomponer
           requests complejos, rutear a múltiples agentes y agregar respuestas.
-Estado:   EN CURSO (15/27 — etapas A+B+C+D completas, iniciando etapa E)
+Estado:   EN CURSO (22/27 — etapas A+B+C+D+E completas, iniciando etapa F)
 Deps:     FASE 3.2 (orquestador), FASE 3.3 (router de reglas como baseline),
           FASE 2.10 (contexto multi-turno), ≥2 agentes de dominio estables.
 Cuándo empezar: cuando el router de reglas muestre limitaciones reales en uso diario
@@ -675,32 +675,32 @@ patrones de uso, información contextual persistente. El administrador define qu
 recolecta cada agente y por cuánto tiempo. Cada usuario puede ver y gestionar la
 información que cada agente guarda sobre él.
 ```
-- [ ] 9.16 `core/user_context.py` — almacena contexto estructurado en
+- [x] 9.16 `core/user_context.py` — almacena contexto estructurado en
            `~/.local/share/capitan/user_context/{user_id}/{agent_id}.json`.
            Cada campo: `{value, updated_at, ttl_days}`. Auto-expira campos en lectura.
            API interna: get_context(user_id, agent_id) / set_field(field, value) /
            delete_field(field) / get_all_for_user(user_id).
-- [ ] 9.17 Extensión de `agent_config.py` — campo `user_context_schema` por agente:
+- [x] 9.17 Extensión de `agent_config.py` — campo `user_context_schema` por agente:
            lista de `{field, desc, type, ttl_days}` que define qué datos puede registrar
            el agente sobre cada usuario y por cuánto tiempo. Configurable en backoffice.
            Los tipos soportados: string, number, boolean, enum (con options).
-- [ ] 9.18 Inyección de contexto en dispatch: antes de llamar al agente, `server.py`
+- [x] 9.18 Inyección de contexto en dispatch: antes de llamar al agente, `server.py`
            carga el contexto vigente (campos no expirados) del usuario para ese agente
            y lo prepende al prompt como bloque estructurado. Sin contexto = sin overhead.
-- [ ] 9.19 Actualización de contexto post-interacción: el agente puede incluir
+- [x] 9.19 Actualización de contexto post-interacción: el agente puede incluir
            `context_updates: [{field, value}]` en su respuesta estructurada.
            `server.py` persiste esas actualizaciones vía `user_context.py`.
            Cada agente decide qué aprende de la interacción (ej: clima aprende
            la ubicación preferida, inversiones aprende el perfil de riesgo).
-- [ ] 9.20 API REST para contexto de usuario:
+- [x] 9.20 API REST para contexto de usuario:
            `GET /users/{id}/context` — contexto de todos los agentes (para backoffice),
            `GET/PATCH /users/{id}/context/{agent_id}` — contexto de un agente específico,
            `DELETE /users/{id}/context/{agent_id}/{field}` — eliminar un campo puntual.
-- [ ] 9.21 Backoffice `/agents/{id}/edit` — sección "Esquema de contexto de usuario":
+- [x] 9.21 Backoffice `/agents/{id}/edit` — sección "Esquema de contexto de usuario":
            tabla editable de campos (nombre, descripción, tipo, TTL en días),
            botones agregar/eliminar campo, guardado vía PATCH al core.
            Un campo eliminado del schema no borra datos existentes (solo deja de inyectarse).
-- [ ] 9.22 Backoffice perfil de usuario `/users/{id}` — sección "Contexto en agentes":
+- [x] 9.22 Backoffice perfil de usuario `/users/{id}` — sección "Contexto en agentes":
            acordeón por agente, muestra campos vigentes con valor / última actualización /
            TTL restante en días. Botón editar valor (PATCH) y botón eliminar campo (DELETE).
            El propio usuario puede ver y controlar exactamente qué recuerda cada agente de él.
