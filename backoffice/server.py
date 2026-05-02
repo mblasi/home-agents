@@ -390,6 +390,17 @@ async def agent_edit_submit(request: Request, agent_id: str):
     if config:
         _core(f"/agents/{agent_id}/config", method="PATCH", json=config)
 
+    # User context schema (9.21)
+    schema_json = str(form.get("user_context_schema_json", "")).strip()
+    if schema_json:
+        try:
+            schema = json.loads(schema_json)
+            if isinstance(schema, list):
+                _core(f"/agents/{agent_id}/user-context-schema", method="PATCH",
+                      json={"schema": schema})
+        except Exception:
+            pass
+
     # RBAC: actualizar roles según checkboxes
     role_perms_current = _core("/rbac/roles") or {}
     for role in _ROLES_AGENTS:
@@ -554,12 +565,14 @@ def edit_user_page(request: Request, uid: str):
     if not user:
         return RedirectResponse("/users", status_code=303)
     agents, role_perms = _load_rbac_context()
-    ww_samples = _core(f"/users/{uid}/wakeword/samples") or {"count": 0, "required": 30, "samples": []}
-    ww_metrics = _core(f"/users/{uid}/wakeword/metrics") or {"tp": 0, "fp": 0, "rbac_deny": 0}
+    ww_samples   = _core(f"/users/{uid}/wakeword/samples") or {"count": 0, "required": 30, "samples": []}
+    ww_metrics   = _core(f"/users/{uid}/wakeword/metrics") or {"tp": 0, "fp": 0, "rbac_deny": 0}
     train_status = _core("/wakeword/train/status") or {"status": "idle"}
+    user_context = _core(f"/users/{uid}/context/raw") or {}
     return _render(request, "user_form.html", "users",
                    user=user, uid=uid, error="", agents=agents, role_perms=role_perms,
-                   ww_samples=ww_samples, ww_metrics=ww_metrics, train_status=train_status)
+                   ww_samples=ww_samples, ww_metrics=ww_metrics, train_status=train_status,
+                   user_context=user_context)
 
 
 @app.post("/users/{uid}/update")
@@ -594,6 +607,12 @@ async def update_user_submit(request: Request, uid: str):
 @app.delete("/users/{uid}", response_class=HTMLResponse)
 def delete_user_htmx(uid: str):
     _core(f"/users/{uid}", method="DELETE")
+    return HTMLResponse("")
+
+
+@app.delete("/users/{uid}/context/{agent_id}/{field}", response_class=HTMLResponse)
+def delete_user_context_field_proxy(uid: str, agent_id: str, field: str):
+    _core(f"/users/{uid}/context/{agent_id}/{field}", method="DELETE")
     return HTMLResponse("")
 
 
