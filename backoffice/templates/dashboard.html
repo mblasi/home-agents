@@ -22,12 +22,12 @@
   <!-- Ollama -->
   <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
     <div class="flex items-center justify-between mb-1">
-      <span class="text-sm font-medium text-gray-300">Ollama</span>
-      <span class="text-lg">{{ "🟢" if ollama_ok else "🔴" }}</span>
+      <span class="text-sm font-medium text-gray-300">LLM</span>
+      <span class="text-lg">{{ "🟢" if llm_ok else "🔴" }}</span>
     </div>
     <div class="text-xs text-gray-500">localhost:11434</div>
-    <div class="mt-1 text-xs font-semibold {{ 'text-emerald-400' if ollama_ok else 'text-red-400' }}">
-      {{ "online" if ollama_ok else "offline" }}
+    <div class="mt-1 text-xs font-semibold {{ 'text-emerald-400' if llm_ok else 'text-red-400' }}">
+      {{ "online" if llm_ok else "offline" }}
     </div>
   </div>
 

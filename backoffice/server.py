@@ -32,7 +32,7 @@ from fastapi.templating import Jinja2Templates
 # ── Configuración ──────────────────────────────────────────────────────────────
 
 CORE_URL   = os.environ.get("CORE_URL",   "http://localhost:8765")
-OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
+_LLM_BASE_URL = (os.environ.get("LLM_BASE_URL") or os.environ.get("OLLAMA_URL") or "http://localhost:11434")
 BACKOFFICE_TOKEN = os.environ.get("BACKOFFICE_TOKEN", "")
 METRICS_DIR   = Path("/tmp/capitan")
 TEMPLATES_DIR = Path(__file__).parent / "templates"
@@ -114,17 +114,17 @@ def _core(path: str, method: str = "GET", timeout: int = 3, **kwargs):
         return None
 
 
-def _ollama_ok() -> bool:
+def _llm_ok() -> bool:
     try:
-        return requests.get(f"{OLLAMA_URL}/api/tags", timeout=2).status_code == 200
+        return requests.get(f"{_LLM_BASE_URL}/api/tags", timeout=2).status_code == 200
     except Exception:
         return False
 
 
-def _get_ollama_models() -> list[str]:
-    """Devuelve los nombres de modelos disponibles en Ollama."""
+def _get_llm_models() -> list[str]:
+    """Devuelve los nombres de modelos disponibles en el backend LLM."""
     try:
-        r = requests.get(f"{OLLAMA_URL}/api/tags", timeout=3)
+        r = requests.get(f"{_LLM_BASE_URL}/api/tags", timeout=3)
         if r.status_code == 200:
             return [m["name"] for m in r.json().get("models", [])]
     except Exception:
@@ -153,7 +153,7 @@ def _render(request: Request, template: str, section: str, **ctx):
 @app.get("/api/status", response_class=HTMLResponse)
 def api_status():
     core_ok   = _core("/health") is not None
-    ollama_ok = _ollama_ok()
+    llm_ok = _llm_ok()
     ear_state = _ear_state()
     ear_ok    = ear_state is not None and ear_state.get("state") != "stopped"
 
@@ -164,7 +164,7 @@ def api_status():
         f'<div class="flex justify-between"><span class="text-gray-400">Core</span>'
         f'<span>{dot(core_ok)} {"OK" if core_ok else "down"}</span></div>',
         f'<div class="flex justify-between"><span class="text-gray-400">Ollama</span>'
-        f'<span>{dot(ollama_ok)} {"OK" if ollama_ok else "down"}</span></div>',
+        f'<span>{dot(llm_ok)} {"OK" if llm_ok else "down"}</span></div>',
         f'<div class="flex justify-between"><span class="text-gray-400">Ear</span>'
         f'<span>{dot(ear_ok)} {ear_state["state"] if ear_ok and ear_state else "off"}</span></div>',
     ]
@@ -193,7 +193,7 @@ def _ear_state() -> dict | None:
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request):
     core_ok   = _core("/health") is not None
-    ollama_ok = _ollama_ok()
+    llm_ok = _llm_ok()
     history   = _read_json("history.json") or []
     alerts    = _core("/alerts") or []
     state     = _ear_state()
@@ -213,7 +213,7 @@ def dashboard(request: Request):
     active_intents = _core("/intents") or []
 
     return _render(request, "dashboard.html", "dashboard",
-                   core_ok=core_ok, ollama_ok=ollama_ok,
+                   core_ok=core_ok, llm_ok=llm_ok,
                    history=history[-10:],
                    alerts=alerts, state=state, speaker=speaker,
                    avg_lat=avg, history_count=len(history),
@@ -303,7 +303,7 @@ def agent_new_page(request: Request):
     role_perms = _core("/rbac/roles") or {}
     return _render(request, "agent_new.html", "agents",
                    error="", role_perms=role_perms, roles=_ROLES_AGENTS,
-                   ollama_models=_get_ollama_models())
+                   llm_models=_get_llm_models())
 
 
 @app.post("/agents/new")
@@ -330,7 +330,7 @@ async def agent_new_submit(request: Request):
         return _render(request, "agent_new.html", "agents",
                        error="No se pudo crear el agente (¿ID ya existe?)",
                        role_perms=role_perms, roles=_ROLES_AGENTS,
-                       ollama_models=_get_ollama_models())
+                       llm_models=_get_llm_models())
     return RedirectResponse("/agents", status_code=303)
 
 
@@ -343,7 +343,7 @@ def agent_edit_page(request: Request, agent_id: str):
     return _render(request, "agent_edit.html", "agents",
                    agent=agent, agent_id=agent_id, error="",
                    role_perms=role_perms, roles=_ROLES_AGENTS,
-                   ollama_models=_get_ollama_models())
+                   llm_models=_get_llm_models())
 
 
 @app.post("/agents/{agent_id}/edit")
@@ -983,15 +983,15 @@ def logs_stream(service: str = "all"):
 @app.get("/integrations", response_class=HTMLResponse)
 def integrations_page(request: Request):
     core_ok       = _core("/health") is not None
-    ollama_models = _get_ollama_models()
-    ollama_ok     = bool(ollama_models) or _ollama_ok()
+    llm_models = _get_llm_models()
+    llm_ok     = bool(llm_models) or _llm_ok()
     ear_state     = _ear_state()
 
     return _render(request, "integrations.html", "integrations",
                    core_ok=core_ok,
                    core_url=CORE_URL,
-                   ollama_ok=ollama_ok,
-                   ollama_models=ollama_models,
+                   llm_ok=llm_ok,
+                   llm_models=llm_models,
                    ear_state=ear_state)
 
 

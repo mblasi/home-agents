@@ -31,22 +31,22 @@
 <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 mb-4">
   <div class="flex items-center justify-between mb-3">
     <div>
-      <h2 class="text-sm font-semibold text-gray-300">Ollama</h2>
-      <p class="text-xs text-gray-600 mt-0.5">Motor de inferencia local — LLM para todos los agentes</p>
+      <h2 class="text-sm font-semibold text-gray-300">Backend LLM</h2>
+      <p class="text-xs text-gray-600 mt-0.5">Motor de inferencia — LLM para todos los agentes</p>
     </div>
-    <span class="text-lg">{{ "🟢" if ollama_ok else "🔴" }}</span>
+    <span class="text-lg">{{ "🟢" if llm_ok else "🔴" }}</span>
   </div>
   <div class="text-xs text-gray-500 space-y-1">
-    <div>Estado: <span class="{{ 'text-emerald-400' if ollama_ok else 'text-red-400' }}">
-      {{ "online" if ollama_ok else "offline" }}
+    <div>Estado: <span class="{{ 'text-emerald-400' if llm_ok else 'text-red-400' }}">
+      {{ "online" if llm_ok else "offline" }}
     </span></div>
     <div>URL: <code class="text-gray-400">localhost:11434</code></div>
   </div>
-  {% if ollama_models %}
+  {% if llm_models %}
   <div class="mt-3 pt-3 border-t border-gray-800">
     <div class="text-xs text-gray-500 mb-2">Modelos disponibles:</div>
     <div class="flex flex-wrap gap-1">
-      {% for m in ollama_models %}
+      {% for m in llm_models %}
       <span class="px-2 py-0.5 bg-gray-800 text-gray-300 rounded text-xs font-mono">{{ m }}</span>
       {% endfor %}
     </div>
