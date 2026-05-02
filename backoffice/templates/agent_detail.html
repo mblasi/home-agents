@@ -302,4 +302,70 @@
   {% endif %}
 </div>
 
+<!-- Intenciones activas por usuario -->
+<div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-4">
+  <div class="flex items-center justify-between mb-3">
+    <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Intenciones activas</h2>
+    <a href="/intents" class="text-xs text-indigo-400 hover:text-indigo-300">Ver todas →</a>
+  </div>
+
+  {% set status_colors = {
+    'pending':     'bg-yellow-900/40 text-yellow-400',
+    'in_progress': 'bg-blue-900/40 text-blue-400',
+    'done':        'bg-emerald-900/40 text-emerald-400',
+    'cancelled':   'bg-gray-800 text-gray-500',
+  } %}
+  {% set status_labels = {
+    'pending':     'pendiente',
+    'in_progress': 'en curso',
+    'done':        'completada',
+    'cancelled':   'cancelada',
+  } %}
+
+  {% if agent_intents %}
+  {# Group by user_id #}
+  {% set seen_users = [] %}
+  {% for intent in agent_intents %}
+    {% if intent.user_id not in seen_users %}
+      {% set _ = seen_users.append(intent.user_id) %}
+    {% endif %}
+  {% endfor %}
+
+  {% for user_id in seen_users %}
+  {% set user_intents_here = agent_intents | selectattr("user_id", "equalto", user_id) | list %}
+  <div class="mb-4">
+    <div class="flex items-center gap-2 mb-2">
+      <a href="/users/{{ user_id }}"
+         class="text-xs font-medium text-gray-300 hover:text-white font-mono hover:underline">
+        {{ user_id }}
+      </a>
+      <span class="text-xs text-gray-600">{{ user_intents_here | length }} intención{{ 'es' if user_intents_here | length != 1 }}</span>
+    </div>
+    <div class="space-y-1.5 pl-2 border-l border-gray-800">
+      {% for intent in user_intents_here %}
+      <div class="flex items-start gap-3 py-1.5">
+        <span class="w-2 h-2 rounded-full mt-1.5 shrink-0
+          {{ 'bg-yellow-400' if intent.status == 'pending' else 'bg-blue-400' }}"></span>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="text-sm text-gray-200">{{ intent.title }}</span>
+            <span class="px-1.5 py-0.5 rounded text-[10px] {{ status_colors.get(intent.status, 'bg-gray-800 text-gray-500') }}">
+              {{ status_labels.get(intent.status, intent.status) }}
+            </span>
+          </div>
+          {% if intent.description %}
+          <div class="text-xs text-gray-500 mt-0.5">{{ intent.description }}</div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+
+  {% else %}
+  <p class="text-sm text-gray-600">Sin intenciones activas para este agente.</p>
+  {% endif %}
+</div>
+
 {% endblock %}

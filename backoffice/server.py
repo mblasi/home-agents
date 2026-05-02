@@ -262,12 +262,16 @@ def agent_detail_page(request: Request, agent_id: str):
 
     conversations = _core("/conversations") or []
 
+    all_intents = _core("/intents") or []
+    agent_intents = [i for i in all_intents if i.get("agent_id") == agent_id]
+
     return _render(request, "agent_detail.html", "agents",
                    agent_id=agent_id, agent=agent,
                    recent_history=agent_history[-15:],
                    stats=stats,
                    roles_with_access=roles_with_access,
-                   conversations=conversations)
+                   conversations=conversations,
+                   agent_intents=agent_intents)
 
 
 @app.post("/agents/{agent_id}/toggle", response_class=HTMLResponse)
@@ -582,6 +586,24 @@ async def create_user_submit(request: Request):
                        agents=agents, role_perms=role_perms)
     uid = payload["id"]
     return RedirectResponse(f"/users/{uid}/onboard", status_code=303)
+
+
+@app.get("/users/{uid}", response_class=HTMLResponse)
+def user_detail_page(request: Request, uid: str):
+    user = _core(f"/users/{uid}")
+    if not user:
+        return RedirectResponse("/users", status_code=303)
+    agents, _ = _load_rbac_context()
+    ww_samples   = _core(f"/users/{uid}/wakeword/samples") or {"count": 0, "required": 30, "samples": []}
+    ww_metrics   = _core(f"/users/{uid}/wakeword/metrics") or {"tp": 0, "fp": 0, "rbac_deny": 0}
+    train_status = _core("/wakeword/train/status") or {"status": "idle"}
+    user_context = _core(f"/users/{uid}/context/raw") or {}
+    user_intents = _core(f"/users/{uid}/intents", params={"active_only": True}) or []
+    return _render(request, "user_detail.html", "users",
+                   user=user, uid=uid, agents=agents,
+                   ww_samples=ww_samples, ww_metrics=ww_metrics,
+                   train_status=train_status,
+                   user_context=user_context, user_intents=user_intents)
 
 
 @app.get("/users/{uid}/edit", response_class=HTMLResponse)
