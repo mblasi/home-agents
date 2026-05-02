@@ -152,7 +152,7 @@
                  focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 resize-y">{{ cur_val }}</textarea>
         {% elif meta.type == 'select' %}
         {% set static_opts = meta.options if meta.options is iterable and meta.options is not string else [] %}
-        {% set dynamic_opts = ollama_models if meta.options == 'ollama_models' else static_opts %}
+        {% set dynamic_opts = llm_models if meta.options == 'ollama_models' else static_opts %}
         <select name="config_{{ key }}"
                 class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200
                        focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500">

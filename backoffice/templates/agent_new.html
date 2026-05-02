@@ -94,11 +94,11 @@
       </div>
       <div>
         <label class="block text-xs font-medium text-gray-400 mb-1">Modelo</label>
-        {% if ollama_models %}
+        {% if llm_models %}
         <select name="model"
                 class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200
                        focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500">
-          {% for m in ollama_models %}
+          {% for m in llm_models %}
           <option value="{{ m }}" {% if m == 'qwen2.5:7b' %}selected{% endif %}>{{ m }}</option>
           {% endfor %}
         </select>
