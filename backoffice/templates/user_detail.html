@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+{% block title %}{{ user.name }} — Detalle{% endblock %}
+
+{% block content %}
+<div class="flex items-center gap-3 mb-6">
+  <a href="/users" class="text-gray-500 hover:text-white text-sm">← Usuarios</a>
+  <span class="text-gray-700">/</span>
+  <h1 class="text-2xl font-bold">{{ user.name }}</h1>
+  <a href="/users/{{ uid }}/edit"
+     class="ml-auto px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm rounded-lg transition-colors">
+    Editar
+  </a>
+</div>
+
+<!-- Datos básicos -->
+<div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-4">
+  <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Perfil</h2>
+  <div class="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
+    <div>
+      <span class="text-gray-500 text-xs uppercase tracking-wider block mb-0.5">ID</span>
+      <code class="text-gray-300 font-mono">{{ uid }}</code>
+    </div>
+    <div>
+      <span class="text-gray-500 text-xs uppercase tracking-wider block mb-0.5">Rol</span>
+      {% if user.role == "admin" %}
+        <span class="px-2 py-0.5 bg-purple-900/50 text-purple-400 rounded text-xs">{{ user.role }}</span>
+      {% elif user.role == "familiar" %}
+        <span class="px-2 py-0.5 bg-blue-900/50 text-blue-400 rounded text-xs">{{ user.role }}</span>
+      {% elif user.role == "adolescente" %}
+        <span class="px-2 py-0.5 bg-cyan-900/50 text-cyan-400 rounded text-xs">{{ user.role }}</span>
+      {% elif user.role == "niño" %}
+        <span class="px-2 py-0.5 bg-green-900/50 text-green-400 rounded text-xs">{{ user.role }}</span>
+      {% else %}
+        <span class="px-2 py-0.5 bg-gray-800 text-gray-400 rounded text-xs">{{ user.role }}</span>
+      {% endif %}
+    </div>
+    <div>
+      <span class="text-gray-500 text-xs uppercase tracking-wider block mb-0.5">Relación</span>
+      <span class="text-gray-300">{{ user.relationship or "—" }}</span>
+    </div>
+    <div>
+      <span class="text-gray-500 text-xs uppercase tracking-wider block mb-0.5">WhatsApp</span>
+      <code class="text-gray-300 font-mono text-xs">{{ user.wa_phone or "—" }}</code>
+    </div>
+  </div>
+</div>
+
+<!-- Wake word -->
+<div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-4">
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Reconocimiento de voz</h2>
+    {% set step = user.onboarding_step if user and user.onboarding_step else "completo" %}
+    {% if step != "completo" %}
+    <a href="/users/{{ uid }}/onboard"
+       class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium rounded-lg transition-colors">
+      Continuar onboarding →
+    </a>
+    {% else %}
+    <a href="/users/{{ uid }}/onboard"
+       class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-medium rounded-lg transition-colors">
+      Agregar muestras →
+    </a>
+    {% endif %}
+  </div>
+
+  {% set tp = ww_metrics.tp | default(0) | int %}
+  {% set fp = ww_metrics.fp | default(0) | int %}
+  {% set ww_total = tp + fp %}
+  {% set count = ww_samples.count | default(0) | int %}
+  {% set required = ww_samples.required | default(30) | int %}
+
+  {# Onboarding state badge #}
+  {% if step != "completo" %}
+  <div class="mb-3 flex items-center gap-2">
+    <span class="text-xs text-gray-400">Onboarding:</span>
+    {% if step == "frases_speaker_id" %}
+      <span class="px-2 py-0.5 text-xs rounded-full bg-yellow-900/50 text-yellow-400 border border-yellow-700/50">frases de identificación pendientes</span>
+    {% elif step == "muestras_wake_word" %}
+      <span class="px-2 py-0.5 text-xs rounded-full bg-blue-900/50 text-blue-400 border border-blue-700/50">muestras de wake word pendientes</span>
+    {% else %}
+      <span class="px-2 py-0.5 text-xs rounded-full bg-yellow-900/50 text-yellow-400 border border-yellow-700/50">{{ step }}</span>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <div class="grid grid-cols-3 gap-3 mb-4">
+    <div class="bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-2 text-center">
+      <div class="text-xs text-gray-500 mb-1">Muestras</div>
+      <div class="text-lg font-bold {{ 'text-emerald-400' if count >= required else 'text-yellow-400' }}">{{ count }}</div>
+      <div class="text-xs text-gray-600">/ {{ required }}</div>
+    </div>
+    <div class="bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-2 text-center">
+      <div class="text-xs text-gray-500 mb-1">Precisión</div>
+      {% if ww_total > 0 %}
+        {% set precision = ((tp / ww_total * 100) | round(1)) %}
+        <div class="text-lg font-bold
+          {{ 'text-emerald-400' if precision >= 85 else ('text-yellow-400' if precision >= 70 else 'text-red-400') }}">
+          {{ precision }}%
+        </div>
+        <div class="text-xs text-gray-600">TP={{ tp }} FP={{ fp }}</div>
+      {% else %}
+        <div class="text-lg font-bold text-gray-600">—</div>
+        <div class="text-xs text-gray-600">sin datos</div>
+      {% endif %}
+    </div>
+    <div class="bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-2 text-center">
+      <div class="text-xs text-gray-500 mb-1">Speaker ID</div>
+      {% if user.has_embedding %}
+        <div class="text-lg font-bold text-emerald-400">✓</div>
+        <div class="text-xs text-gray-600">entrenado</div>
+      {% else %}
+        <div class="text-lg font-bold text-gray-600">—</div>
+        <div class="text-xs text-gray-600">sin modelo</div>
+      {% endif %}
+    </div>
+  </div>
+
+  {# Alertas de precisión #}
+  {% if count < 20 or (ww_total > 0 and fp > 5 and (tp / ww_total * 100) < 85) %}
+  <div class="mb-4 space-y-1.5">
+    {% if count < 20 %}
+    <div class="flex items-start gap-2 text-xs text-yellow-300">
+      <span class="shrink-0 mt-0.5">⚠</span>
+      <span>Pocas muestras ({{ count }}/{{ required }} — se recomiendan al menos 20).
+        <a href="/users/{{ uid }}/onboard" class="underline hover:text-yellow-200 ml-1">Agregar →</a>
+      </span>
+    </div>
+    {% endif %}
+    {% if ww_total > 0 and fp > 5 and (tp / ww_total * 100) < 85 %}
+    <div class="flex items-start gap-2 text-xs text-yellow-300">
+      <span class="shrink-0 mt-0.5">⚠</span>
+      <span>Precisión baja — el modelo activa con voces que no son la tuya.
+        <a href="/users/{{ uid }}/onboard" class="underline hover:text-yellow-200 ml-1">Reentrenar →</a>
+      </span>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {# Entrenar modelo #}
+  <div class="flex items-center gap-3 pt-1 border-t border-gray-800">
+    <button
+      hx-post="/wakeword/train/start"
+      hx-target="#train-status-detail"
+      hx-swap="innerHTML"
+      {% if train_status.status == "running" %}disabled{% endif %}
+      class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50
+             disabled:cursor-not-allowed text-white rounded-lg text-xs font-medium
+             transition-colors">
+      Entrenar modelo
+    </button>
+    <div id="train-status-detail">
+      {% if train_status.status == "running" %}
+        <span class="text-xs text-blue-400 animate-pulse"
+              hx-get="/wakeword/train/status"
+              hx-trigger="every 3s"
+              hx-target="#train-status-detail"
+              hx-swap="innerHTML">⟳ Entrenando…</span>
+      {% elif train_status.status == "done" %}
+        <span class="text-xs text-emerald-400">✓ Modelo entrenado ({{ train_status.duration_s }}s — {{ train_status.n_positive }} positivos)</span>
+      {% elif train_status.status == "error" %}
+        <span class="text-xs text-red-400">✗ Error: {{ train_status.error | default("desconocido") }}</span>
+      {% else %}
+        <span class="text-xs text-gray-600">Modelo sin entrenar recientemente</span>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Intenciones activas -->
+<div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-4">
+  <div class="flex items-center justify-between mb-3">
+    <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Intenciones activas</h2>
+    <a href="/intents" class="text-xs text-indigo-400 hover:text-indigo-300">Ver todas →</a>
+  </div>
+
+  {% set status_colors = {
+    'pending':     'text-yellow-400',
+    'in_progress': 'text-blue-400',
+    'done':        'text-emerald-400',
+    'cancelled':   'text-gray-500',
+  } %}
+  {% set status_labels = {
+    'pending':     'pendiente',
+    'in_progress': 'en curso',
+    'done':        'completada',
+    'cancelled':   'cancelada',
+  } %}
+
+  {% if user_intents %}
+  <div class="space-y-2">
+    {% for intent in user_intents %}
+    {% set agent_info = agents.get(intent.agent_id, {}) %}
+    <div class="flex items-start gap-3 py-2 border-b border-gray-800/50">
+      <span class="text-base shrink-0">{{ agent_info.get('icon', '🤖') }}</span>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="text-sm text-gray-200">{{ intent.title }}</span>
+          <span class="text-[10px] {{ status_colors.get(intent.status, 'text-gray-500') }}">
+            {{ status_labels.get(intent.status, intent.status) }}
+          </span>
+        </div>
+        {% if intent.description %}
+        <div class="text-xs text-gray-500 mt-0.5">{{ intent.description }}</div>
+        {% endif %}
+        <div class="text-[10px] text-gray-600 mt-0.5">{{ agent_info.get('name', intent.agent_id) }}</div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="text-sm text-gray-600">Sin intenciones activas.</p>
+  {% endif %}
+</div>
+
+<!-- Contexto aprendido -->
+{% if user_context %}
+<div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-4">
+  <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Contexto aprendido</h2>
+  <p class="text-xs text-gray-600 mb-4">
+    Datos que los agentes recuerdan de este usuario.
+  </p>
+  {% for agent_id, fields in user_context.items() %}
+  {% set agent_info = agents.get(agent_id, {}) %}
+  <details class="mb-2 group">
+    <summary class="flex items-center gap-2 cursor-pointer py-2 border-b border-gray-800 hover:border-gray-700 list-none select-none">
+      <span class="text-base">{{ agent_info.get('icon', '🤖') }}</span>
+      <span class="text-sm font-medium text-gray-300">{{ agent_info.get('name', agent_id) }}</span>
+      <span class="text-xs text-gray-600 ml-1">{{ fields | length }} campo{{ 's' if fields | length != 1 }}</span>
+      <span class="ml-auto text-gray-600 text-xs">▾</span>
+    </summary>
+    <div class="pt-2 space-y-1">
+      {% for field_name, fd in fields.items() %}
+      {% set updated_days = ((now - fd.updated_at) / 86400) | round(0, 'floor') | int %}
+      {% set ttl_remaining = [fd.ttl_days - updated_days, 0] | max %}
+      <div class="flex items-start gap-3 py-2 border-b border-gray-800/50">
+        <div class="flex-1 min-w-0">
+          <div class="text-xs font-mono text-gray-500">{{ field_name }}</div>
+          <div class="text-sm text-gray-200 mt-0.5 break-words">{{ fd.value }}</div>
+          <div class="text-xs text-gray-600 mt-0.5">
+            actualizado hace {{ updated_days }}d — expira en {{ ttl_remaining }}d
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </details>
+  {% endfor %}
+</div>
+{% else %}
+<div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-4">
+  <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Contexto aprendido</h2>
+  <p class="text-sm text-gray-600">Sin datos aprendidos todavía.</p>
+</div>
+{% endif %}
+
+{% endblock %}
