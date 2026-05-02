@@ -163,7 +163,7 @@ def api_status():
     lines = [
         f'<div class="flex justify-between"><span class="text-gray-400">Core</span>'
         f'<span>{dot(core_ok)} {"OK" if core_ok else "down"}</span></div>',
-        f'<div class="flex justify-between"><span class="text-gray-400">Ollama</span>'
+        f'<div class="flex justify-between"><span class="text-gray-400">LLM</span>'
         f'<span>{dot(llm_ok)} {"OK" if llm_ok else "down"}</span></div>',
         f'<div class="flex justify-between"><span class="text-gray-400">Ear</span>'
         f'<span>{dot(ear_ok)} {ear_state["state"] if ear_ok and ear_state else "off"}</span></div>',
