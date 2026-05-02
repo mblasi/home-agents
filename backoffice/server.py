@@ -210,13 +210,15 @@ def dashboard(request: Request):
     speaker = _read_json("speaker.json") or {}
     agents_data = _core("/agents", timeout=10) or {}
     active_agents = {k: v for k, v in agents_data.items() if v.get("status") == "active"}
+    active_intents = _core("/intents") or []
 
     return _render(request, "dashboard.html", "dashboard",
                    core_ok=core_ok, ollama_ok=ollama_ok,
                    history=history[-10:],
                    alerts=alerts, state=state, speaker=speaker,
                    avg_lat=avg, history_count=len(history),
-                   active_agents=active_agents)
+                   active_agents=active_agents,
+                   active_intents=active_intents[:5])
 
 
 @app.get("/agents", response_class=HTMLResponse)
@@ -426,6 +428,29 @@ def delete_agent_htmx(agent_id: str):
     return HTMLResponse("")
 
 
+@app.get("/intents", response_class=HTMLResponse)
+def intents_page(request: Request):
+    """Vista de primer nivel: todas las intenciones activas de todos los usuarios."""
+    users_data  = _core("/users") or {}
+    agents_data = _core("/agents", timeout=10) or {}
+    all_intents = _core("/intents") or []
+    return _render(request, "intents.html", "intents",
+                   intents=all_intents, users=users_data, agents=agents_data)
+
+
+@app.patch("/users/{uid}/intents/{intent_id}", response_class=HTMLResponse)
+async def update_intent_proxy(uid: str, intent_id: str, request: Request):
+    body = await request.json()
+    _core(f"/users/{uid}/intents/{intent_id}", method="PATCH", json=body)
+    return HTMLResponse("")
+
+
+@app.delete("/users/{uid}/intents/{intent_id}", response_class=HTMLResponse)
+def delete_intent_proxy(uid: str, intent_id: str):
+    _core(f"/users/{uid}/intents/{intent_id}", method="DELETE")
+    return HTMLResponse("")
+
+
 @app.get("/shared-state", response_class=HTMLResponse)
 def shared_state_page(request: Request):
     data = _core("/shared-state") or {}
@@ -569,10 +594,11 @@ def edit_user_page(request: Request, uid: str):
     ww_metrics   = _core(f"/users/{uid}/wakeword/metrics") or {"tp": 0, "fp": 0, "rbac_deny": 0}
     train_status = _core("/wakeword/train/status") or {"status": "idle"}
     user_context = _core(f"/users/{uid}/context/raw") or {}
+    user_intents = _core(f"/users/{uid}/intents", params={"active_only": True}) or []
     return _render(request, "user_form.html", "users",
                    user=user, uid=uid, error="", agents=agents, role_perms=role_perms,
                    ww_samples=ww_samples, ww_metrics=ww_metrics, train_status=train_status,
-                   user_context=user_context)
+                   user_context=user_context, user_intents=user_intents)
 
 
 @app.post("/users/{uid}/update")
