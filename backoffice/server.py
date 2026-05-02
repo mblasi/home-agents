@@ -344,12 +344,14 @@ def agent_edit_page(request: Request, agent_id: str):
 async def agent_edit_submit(request: Request, agent_id: str):
     form = await request.form()
 
-    # Nombre e icono
+    # Nombre, icono y descripción (agent card)
     name = str(form.get("name", "")).strip()
     icon = str(form.get("icon", "")).strip()
-    if name or icon:
+    desc = str(form.get("desc", "")).strip()
+    if name or icon or desc:
         _core(f"/agents/{agent_id}/metadata", method="PATCH",
-              json={"name": name or None, "icon": icon or None})
+              json={"name": name or None, "icon": icon or None,
+                    "desc": desc or None})
 
     # Status
     status = str(form.get("status", "")).strip()
@@ -360,6 +362,11 @@ async def agent_edit_submit(request: Request, agent_id: str):
     kw_raw = str(form.get("keywords", ""))
     keywords = [k.strip() for k in kw_raw.splitlines() if k.strip()]
     _core(f"/agents/{agent_id}/keywords", method="PATCH", json={"keywords": keywords})
+
+    # Ejemplos de la agent card: uno por línea
+    ex_raw = str(form.get("examples", ""))
+    examples = [e.strip().strip('"\'') for e in ex_raw.splitlines() if e.strip()]
+    _core(f"/agents/{agent_id}/examples", method="PATCH", json={"examples": examples})
 
     # Config: campos dinámicos según config_schema del agente
     agent_info = _core(f"/agents/{agent_id}") or {}

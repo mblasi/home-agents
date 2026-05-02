@@ -76,10 +76,49 @@
     {% endif %}
   </div>
 
-  <!-- Sección 2: Keywords -->
+  <!-- Sección 2: Carta del Coordinador -->
+  <div id="card" class="bg-gray-900 border border-indigo-900/50 rounded-xl p-5 mb-5">
+    <h2 class="text-sm font-semibold text-indigo-400 uppercase tracking-wider mb-1">Carta del Coordinador</h2>
+    <p class="text-xs text-gray-600 mb-4">
+      Descripción y ejemplos que el coordinador LLM recibe para decidir si este agente
+      es el adecuado para cada pedido. Son los campos más importantes para la calidad del routing.
+    </p>
+
+    <!-- Descripción -->
+    <div class="mb-4">
+      <label class="block text-xs font-medium text-gray-400 mb-1">Descripción</label>
+      <input type="text" name="desc" value="{{ agent.desc or '' }}"
+             placeholder="Qué hace este agente en una frase"
+             class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200
+                    focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500">
+      <p class="mt-0.5 text-xs text-gray-600">
+        Aparece en el primer nivel del catálogo. Sé específico sobre el dominio del agente.
+      </p>
+    </div>
+
+    <!-- Ejemplos -->
+    <div>
+      <label class="block text-xs font-medium text-gray-400 mb-1">Ejemplos de activación</label>
+      <textarea
+        name="examples"
+        rows="7"
+        class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200
+               focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 resize-y"
+        placeholder="Un ejemplo por línea — escribe frases naturales que un usuario diría para usar este agente">{{ (agent.examples or []) | join('\n') }}</textarea>
+      <p class="mt-1 text-xs text-gray-600">
+        {{ (agent.examples or []) | length }} ejemplos actuales.
+        3-5 ejemplos variados mejoran significativamente la precisión del routing.
+      </p>
+    </div>
+  </div>
+
+  <!-- Sección 3: Keywords -->
   <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-5">
     <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-1">Keywords del dispatcher</h2>
-    <p class="text-xs text-gray-600 mb-3">Una keyword por línea. El dispatcher usa estas palabras para enrutar comandos a este agente.</p>
+    <p class="text-xs text-gray-600 mb-3">
+      Una keyword por línea. El dispatcher de reglas usa estas palabras como fallback rápido
+      cuando el coordinador LLM no está disponible.
+    </p>
     <textarea
       name="keywords"
       rows="10"
@@ -92,7 +131,7 @@
     </p>
   </div>
 
-  <!-- Sección 3: Configuración específica -->
+  <!-- Sección 4: Configuración específica -->
   {% if agent.config_schema %}
   <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-5">
     <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-1">Configuración</h2>
@@ -147,7 +186,7 @@
   </div>
   {% endif %}
 
-  <!-- Sección 4: Acceso por rol -->
+  <!-- Sección 5: Acceso por rol -->
   <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-5">
     <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-1">Acceso por rol</h2>
     <p class="text-xs text-gray-600 mb-3">Qué roles tienen acceso a este agente por defecto.</p>

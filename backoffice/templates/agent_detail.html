@@ -30,6 +30,52 @@
   "custom":    {"icon": "🔌", "name": "Backend externo"},
 } %}
 
+<!-- Carta del Coordinador — al frente, sección principal -->
+<div class="bg-gray-900 border border-indigo-900/50 rounded-xl p-5 mb-4">
+  <div class="flex items-center justify-between mb-4">
+    <div>
+      <h2 class="text-xs font-semibold text-indigo-400 uppercase tracking-wider">Carta del Coordinador</h2>
+      <p class="text-xs text-gray-600 mt-0.5">Lo que el coordinador LLM ve de este agente para decidir el routing</p>
+    </div>
+    <a href="/agents/{{ agent_id }}/edit#card"
+       class="text-xs text-indigo-400 hover:text-indigo-300 border border-indigo-900 rounded px-2 py-1">
+      Editar →
+    </a>
+  </div>
+
+  <!-- Descripción -->
+  <p class="text-sm text-gray-200 mb-5">{{ agent.desc or "Sin descripción" }}</p>
+
+  <!-- Ejemplos de activación -->
+  <div class="mb-5">
+    <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Ejemplos de activación</p>
+    {% if agent.examples %}
+    <div class="space-y-1.5">
+      {% for ex in agent.examples %}
+      <div class="flex items-start gap-2">
+        <span class="text-indigo-700 mt-0.5 shrink-0">›</span>
+        <span class="text-sm text-gray-300 italic">"{{ ex }}"</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm text-gray-600 italic">Sin ejemplos definidos — el coordinador solo usará la descripción.</p>
+    {% endif %}
+  </div>
+
+  <!-- Preview del texto exacto que ve el LLM -->
+  {% if agent.card_text %}
+  <details class="group">
+    <summary class="text-xs text-gray-600 cursor-pointer hover:text-gray-400 select-none list-none flex items-center gap-1">
+      <span class="group-open:hidden">▶</span>
+      <span class="hidden group-open:inline">▼</span>
+      Ver texto exacto que recibe el coordinador LLM
+    </summary>
+    <pre class="mt-2 text-xs text-gray-500 bg-gray-800/50 rounded-lg p-3 whitespace-pre-wrap font-mono border border-gray-800">{{ agent.card_text }}</pre>
+  </details>
+  {% endif %}
+</div>
+
 <div class="grid grid-cols-2 gap-4 mb-4">
 
   <!-- Estado -->
