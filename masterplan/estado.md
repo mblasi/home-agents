@@ -572,7 +572,7 @@ Total estimado:               ~2-3s        (vs 8s actual warm)
 ```
 Objetivo: Reemplazar el router de reglas por un LLM coordinador capaz de descomponer
           requests complejos, rutear a múltiples agentes y agregar respuestas.
-Estado:   EN CURSO (9/27 — etapas A+B completas, iniciando etapa C)
+Estado:   EN CURSO (12/27 — etapas A+B+C completas, iniciando etapa D)
 Deps:     FASE 3.2 (orquestador), FASE 3.3 (router de reglas como baseline),
           FASE 2.10 (contexto multi-turno), ≥2 agentes de dominio estables.
 Cuándo empezar: cuando el router de reglas muestre limitaciones reales en uso diario
@@ -659,9 +659,9 @@ simples en <100ms y el LLM entra solo cuando hay ambigüedad real.
 - [x] 9.9  Prompt de agregación: sintetizar respuestas parciales en texto coherente, sin repetir cada una
 
 #### Etapa C — Descomposición y corrección
-- [ ] 9.10 Detección de requests condicionales ("cuando X, hacé Y"): el coordinador genera un plan con condición explícita
-- [ ] 9.11 Manejo de falla de agente: el coordinador detecta error en resultado y reintenta o responde con degradación elegante
-- [ ] 9.12 Ciclo de clarificación: si el coordinador detecta ambigüedad irresoluble, genera una pregunta al usuario en vez de asumir
+- [x] 9.10 Detección de requests condicionales ("cuando X, hacé Y"): el coordinador genera un plan con condición explícita
+- [x] 9.11 Manejo de falla de agente: el coordinador detecta error en resultado y reintenta o responde con degradación elegante
+- [x] 9.12 Ciclo de clarificación: si el coordinador detecta ambigüedad irresoluble, genera una pregunta al usuario en vez de asumir
 
 #### Etapa D — Optimización de latencia
 - [ ] 9.13 Evaluar qwen2.5:3b como coordinador: instalar, benchmark de routing vs. 7b
