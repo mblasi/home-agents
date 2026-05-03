@@ -167,6 +167,36 @@
   </div>
 </div>
 
+<!-- Proactividad por agente -->
+{% if proactive_status %}
+<div class="bg-gray-900 border border-violet-900/30 rounded-xl p-5 mb-4">
+  <h2 class="text-xs font-semibold text-violet-400 uppercase tracking-wider mb-4">Proactividad</h2>
+  <div class="space-y-3">
+    {% for agent_id_p, pi in proactive_status.items() %}
+    {% set agent_info = agents.get(agent_id_p, {}) %}
+    {% set enabled = user_ctx_plain.get(agent_id_p, {}).get("proactive_enabled", True) %}
+    <div class="flex items-center gap-3 py-2 border-b border-gray-800/50 last:border-0">
+      <span class="text-base shrink-0">{{ agent_info.get('icon', '🔄') }}</span>
+      <div class="flex-1 min-w-0">
+        <div class="text-sm font-medium text-gray-200">{{ agent_info.get('name', agent_id_p) }}</div>
+        <div class="text-xs text-gray-600 mt-0.5">
+          cada {% set s = pi.interval_seconds %}{% if s >= 3600 %}{{ s // 3600 }}h{% else %}{{ s // 60 }}min{% endif %}
+          {% if pi.last_run_at %} · último run {{ pi.last_run_at | int | datetimefmt }}{% endif %}
+        </div>
+      </div>
+      <button
+        hx-post="/users/{{ uid }}/proactive/{{ agent_id_p }}/toggle"
+        hx-target="this" hx-swap="outerHTML"
+        class="px-2 py-1 text-xs font-medium rounded-lg transition-colors
+          {{ 'bg-violet-600 hover:bg-violet-500 text-white' if enabled else 'bg-gray-700 hover:bg-gray-600 text-gray-400' }}">
+        {{ '🔄 Activo' if enabled else '⏸ Pausado' }}
+      </button>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
 <!-- Intenciones activas -->
 <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-4">
   <div class="flex items-center justify-between mb-3">
@@ -174,36 +204,50 @@
     <a href="/intents" class="text-xs text-indigo-400 hover:text-indigo-300">Ver todas →</a>
   </div>
 
-  {% set status_colors = {
-    'pending':     'text-yellow-400',
-    'in_progress': 'text-blue-400',
-    'done':        'text-emerald-400',
-    'cancelled':   'text-gray-500',
-  } %}
-  {% set status_labels = {
-    'pending':     'pendiente',
-    'in_progress': 'en curso',
-    'done':        'completada',
-    'cancelled':   'cancelada',
-  } %}
-
   {% if user_intents %}
-  <div class="space-y-2">
-    {% for intent in user_intents %}
-    {% set agent_info = agents.get(intent.agent_id, {}) %}
-    <div class="flex items-start gap-3 py-2 border-b border-gray-800/50">
-      <span class="text-base shrink-0">{{ agent_info.get('icon', '🤖') }}</span>
-      <div class="flex-1 min-w-0">
-        <div class="flex items-center gap-2 flex-wrap">
-          <span class="text-sm text-gray-200">{{ intent.title }}</span>
-          <span class="text-[10px] {{ status_colors.get(intent.status, 'text-gray-500') }}">
-            {{ status_labels.get(intent.status, intent.status) }}
-          </span>
+  {# Agrupar por agente #}
+  {% set seen = [] %}
+  {% for intent in user_intents %}{% if intent.agent_id not in seen %}{% set _ = seen.append(intent.agent_id) %}{% endif %}{% endfor %}
+
+  <div class="space-y-4">
+    {% for gid in seen %}
+    {% set group = user_intents | selectattr("agent_id", "equalto", gid) | list %}
+    {% set agent_info = agents.get(gid, {}) %}
+    <div>
+      <div class="flex items-center gap-2 mb-2">
+        <span class="text-sm">{{ agent_info.get('icon', '🤖') }}</span>
+        <span class="text-xs font-medium text-gray-400">{{ agent_info.get('name', gid) }}</span>
+        <span class="text-xs text-gray-600">{{ group | length }} intención{{ 'es' if group | length != 1 }}</span>
+      </div>
+      <div class="space-y-1.5 pl-5 border-l border-gray-800">
+        {% for intent in group %}
+        <div id="intent-{{ intent.intent_id }}" class="flex items-start gap-3 py-1.5">
+          <div class="flex-1 min-w-0">
+            <div class="text-sm text-gray-200">{{ intent.title }}</div>
+            {% if intent.description %}
+            <div class="text-xs text-gray-500 mt-0.5">{{ intent.description }}</div>
+            {% endif %}
+          </div>
+          <div class="flex gap-1.5 shrink-0">
+            <button
+              hx-patch="/users/{{ uid }}/intents/{{ intent.intent_id }}"
+              hx-vals='{"status": "done"}'
+              hx-target="#intent-{{ intent.intent_id }}"
+              hx-swap="outerHTML"
+              class="px-2 py-0.5 text-[10px] bg-emerald-900/40 hover:bg-emerald-900/70 text-emerald-400 rounded transition-colors">
+              Hecha
+            </button>
+            <button
+              hx-patch="/users/{{ uid }}/intents/{{ intent.intent_id }}"
+              hx-vals='{"status": "cancelled"}'
+              hx-target="#intent-{{ intent.intent_id }}"
+              hx-swap="outerHTML"
+              class="px-2 py-0.5 text-[10px] bg-gray-800 hover:bg-gray-700 text-gray-500 rounded transition-colors">
+              Cancelar
+            </button>
+          </div>
         </div>
-        {% if intent.description %}
-        <div class="text-xs text-gray-500 mt-0.5">{{ intent.description }}</div>
-        {% endif %}
-        <div class="text-[10px] text-gray-600 mt-0.5">{{ agent_info.get('name', intent.agent_id) }}</div>
+        {% endfor %}
       </div>
     </div>
     {% endfor %}
@@ -233,7 +277,7 @@
       {% for field_name, fd in fields.items() %}
       {% set updated_days = ((now - fd.updated_at) / 86400) | round(0, 'floor') | int %}
       {% set ttl_remaining = [fd.ttl_days - updated_days, 0] | max %}
-      <div class="flex items-start gap-3 py-2 border-b border-gray-800/50">
+      <div id="ctx-{{ agent_id }}-{{ field_name }}" class="flex items-start gap-3 py-2 border-b border-gray-800/50">
         <div class="flex-1 min-w-0">
           <div class="text-xs font-mono text-gray-500">{{ field_name }}</div>
           <div class="text-sm text-gray-200 mt-0.5 break-words">{{ fd.value }}</div>
@@ -241,6 +285,14 @@
             actualizado hace {{ updated_days }}d — expira en {{ ttl_remaining }}d
           </div>
         </div>
+        <button
+          hx-delete="/users/{{ uid }}/context/{{ agent_id }}/{{ field_name }}"
+          hx-target="#ctx-{{ agent_id }}-{{ field_name }}"
+          hx-swap="outerHTML"
+          hx-confirm="¿Eliminar campo {{ field_name }}?"
+          class="shrink-0 px-1.5 py-0.5 text-[10px] text-gray-600 hover:text-red-400 hover:bg-red-900/20 rounded transition-colors">
+          ✕
+        </button>
       </div>
       {% endfor %}
     </div>

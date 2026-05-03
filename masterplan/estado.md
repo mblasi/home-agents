@@ -572,7 +572,7 @@ Total estimado:               ~2-3s        (vs 8s actual warm)
 ```
 Objetivo: Reemplazar el router de reglas por un LLM coordinador capaz de descomponer
           requests complejos, rutear a múltiples agentes y agregar respuestas.
-Estado:   COMPLETA
+Estado:   EN CURSO (9.34–9.35 pendientes)
 Deps:     FASE 3.2 (orquestador), FASE 3.3 (router de reglas como baseline),
           FASE 2.10 (contexto multi-turno), ≥2 agentes de dominio estables.
 Cuándo empezar: cuando el router de reglas muestre limitaciones reales en uso diario
@@ -792,6 +792,16 @@ Extensiones futuras: cron expressions, triggers por evento HAOS.
            `POST /proactive/{agent_id}/run` (retorna fragmento HTML con el resultado).
            `agent_detail_page()` llama `/proactive/status` y pasa `proactive_info[agent_id]`
            al template.
+- [ ] 9.34 `core/proactive.py` — filtro RBAC + control `proactive_enabled` por usuario:
+           `_run_agent()` comprueba RBAC antes de llamar `proactive_check` para cada usuario.
+           Lee campo `proactive_enabled` del contexto del usuario para ese agente (default True);
+           si es `False`, omite al usuario silenciosamente.
+- [ ] 9.35 Backoffice `user_detail.html` + `server.py` — control total del usuario sobre
+           proactividad: sección "Proactividad" con toggle opt-in/opt-out por agente (HTMX).
+           "Contexto aprendido": botón eliminar por campo individual (HTMX, proxy ya existe).
+           "Intenciones activas": agrupadas por agente, botones "Hecha" y "Cancelar" por intent
+           (HTMX PATCH al proxy ya existente, la fila desaparece al confirmar).
+           `user_detail_page()` recibe `proactive_status` del core.
 
 ---
 

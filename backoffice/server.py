@@ -472,7 +472,12 @@ def intents_page(request: Request):
 
 @app.patch("/users/{uid}/intents/{intent_id}", response_class=HTMLResponse)
 async def update_intent_proxy(uid: str, intent_id: str, request: Request):
-    body = await request.json()
+    ct = request.headers.get("content-type", "")
+    if "application/json" in ct:
+        body = await request.json()
+    else:
+        form = await request.form()
+        body = dict(form)
     _core(f"/users/{uid}/intents/{intent_id}", method="PATCH", json=body)
     return HTMLResponse("")
 
@@ -625,13 +630,18 @@ def user_detail_page(request: Request, uid: str):
     ww_samples   = _core(f"/users/{uid}/wakeword/samples") or {"count": 0, "required": 30, "samples": []}
     ww_metrics   = _core(f"/users/{uid}/wakeword/metrics") or {"tp": 0, "fp": 0, "rbac_deny": 0}
     train_status = _core("/wakeword/train/status") or {"status": "idle"}
-    user_context = _core(f"/users/{uid}/context/raw") or {}
-    user_intents = _core(f"/users/{uid}/intents", params={"active_only": True}) or []
+    user_context     = _core(f"/users/{uid}/context/raw") or {}
+    user_intents     = _core(f"/users/{uid}/intents", params={"active_only": True}) or []
+    proactive_status = _core("/proactive/status", timeout=3) or {}
+    # proactive_enabled per agent from plain context (not raw)
+    user_ctx_plain   = _core(f"/users/{uid}/context") or {}
     return _render(request, "user_detail.html", "users",
                    user=user, uid=uid, agents=agents,
                    ww_samples=ww_samples, ww_metrics=ww_metrics,
                    train_status=train_status,
-                   user_context=user_context, user_intents=user_intents)
+                   user_context=user_context, user_intents=user_intents,
+                   proactive_status=proactive_status,
+                   user_ctx_plain=user_ctx_plain)
 
 
 @app.get("/users/{uid}/edit", response_class=HTMLResponse)
@@ -690,6 +700,24 @@ def delete_user_htmx(uid: str):
 def delete_user_context_field_proxy(uid: str, agent_id: str, field: str):
     _core(f"/users/{uid}/context/{agent_id}/{field}", method="DELETE")
     return HTMLResponse("")
+
+
+@app.post("/users/{uid}/proactive/{agent_id}/toggle", response_class=HTMLResponse)
+def toggle_proactive_for_user(uid: str, agent_id: str):
+    ctx     = _core(f"/users/{uid}/context/{agent_id}") or {}
+    current = ctx.get("proactive_enabled", True)
+    new_val = not current
+    _core(f"/users/{uid}/context/{agent_id}", method="PATCH", json={"proactive_enabled": new_val})
+    on_cls  = "bg-violet-600 hover:bg-violet-500 text-white"
+    off_cls = "bg-gray-700 hover:bg-gray-600 text-gray-400"
+    label   = "🔄 Activo" if new_val else "⏸ Pausado"
+    css     = on_cls if new_val else off_cls
+    return HTMLResponse(
+        f'<button hx-post="/users/{uid}/proactive/{agent_id}/toggle" '
+        f'hx-target="this" hx-swap="outerHTML" '
+        f'class="px-2 py-1 text-xs font-medium rounded-lg transition-colors {css}">'
+        f'{label}</button>'
+    )
 
 
 # ── Onboarding wizard ─────────────────────────────────────────────────────────
