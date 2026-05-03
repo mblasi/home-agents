@@ -572,7 +572,7 @@ Total estimado:               ~2-3s        (vs 8s actual warm)
 ```
 Objetivo: Reemplazar el router de reglas por un LLM coordinador capaz de descomponer
           requests complejos, rutear a múltiples agentes y agregar respuestas.
-Estado:   EN CURSO (Etapa G — 9.28–9.33 pendientes)
+Estado:   COMPLETA
 Deps:     FASE 3.2 (orquestador), FASE 3.3 (router de reglas como baseline),
           FASE 2.10 (contexto multi-turno), ≥2 agentes de dominio estables.
 Cuándo empezar: cuando el router de reglas muestre limitaciones reales en uso diario
@@ -749,7 +749,7 @@ en cada agente.
 Triggers soportados en esta etapa: intervalo fijo en segundos.
 Extensiones futuras: cron expressions, triggers por evento HAOS.
 ```
-- [ ] 9.28 `core/proactive.py` — `ProactiveScheduler`: registra agentes que declaren
+- [x] 9.28 `core/proactive.py` — `ProactiveScheduler`: registra agentes que declaren
            `proactive_schedule: int` (segundos de intervalo) y
            `async proactive_check(user_id: str, user_ctx: dict) → list[dict]`.
            Corre un loop asyncio independiente por agente: `sleep(interval)` → itera todos
@@ -759,13 +759,13 @@ Extensiones futuras: cron expressions, triggers por evento HAOS.
            no crea uno nuevo (el agente puede forzar actualización pasando `intent_id` explícito).
            Mantiene metadata `{last_run_at, next_run_at, last_intents_created, total_created}`
            por agente; expuesta vía `scheduler.status()`.
-- [ ] 9.29 `core/server.py` — wiring del scheduler en `lifespan()`: instanciar `ProactiveScheduler`,
+- [x] 9.29 `core/server.py` — wiring del scheduler en `lifespan()`: instanciar `ProactiveScheduler`,
            registrar agentes de `AGENTS` que cumplan el protocolo, lanzar
            `asyncio.create_task(scheduler.run_all())` al startup.
            `GET /proactive/status` → retorna `scheduler.status()` (dict por agent_id).
            `POST /proactive/{agent_id}/run` → trigger manual inmediato para ese agente,
            retorna `{agent_id, users_checked, intents_created}`.
-- [ ] 9.30 `core/clima_agent.py` — implementar proactividad:
+- [x] 9.30 `core/clima_agent.py` — implementar proactividad:
            `proactive_schedule = 21600` (cada 6h).
            `proactive_check`: consulta Open-Meteo para hoy y mañana usando la ubicación del
            user_ctx (`preferred_location`) o la config default del agente.
@@ -775,7 +775,7 @@ Extensiones futuras: cron expressions, triggers por evento HAOS.
            temperatura mínima < 3°C → `"🧊 Noche fría (X°C) — cerrá ventanas"`;
            viento > 50km/h → `"💨 Viento fuerte previsto"`.
            Un intent por tipo de alerta; no genera si ya existe uno activo con el mismo título.
-- [ ] 9.31 `core/agenda_agent.py` — implementar proactividad:
+- [x] 9.31 `core/agenda_agent.py` — implementar proactividad:
            `proactive_schedule = 3600` (cada 1h).
            `proactive_check`: consulta CalDAV del usuario (si está configurado); por cada
            evento que comience en las próximas 2h genera intent
@@ -783,12 +783,12 @@ Extensiones futuras: cron expressions, triggers por evento HAOS.
            Deduplicación: guarda el `event_uid` de CalDAV en el `context` del intent;
            si ya existe un intent activo con ese `event_uid`, lo omite.
            No corre para usuarios sin CalDAV configurado (retorna `[]`).
-- [ ] 9.32 Backoffice `templates/agent_detail.html` — sección "Proactividad":
+- [x] 9.32 Backoffice `templates/agent_detail.html` — sección "Proactividad":
            Badge `🔄 proactivo` junto al nombre del agente si `agent.proactive_schedule` existe.
            Sección nueva con: intervalo declarado (ej: "cada 6h"), timestamp del último run,
            cantidad de intents creados en el último run, próximo run estimado.
            Botón "Ejecutar ahora" → `hx-post` → muestra resultado inline sin recargar.
-- [ ] 9.33 Backoffice `server.py` — proxy `GET /proactive/status` y
+- [x] 9.33 Backoffice `server.py` — proxy `GET /proactive/status` y
            `POST /proactive/{agent_id}/run` (retorna fragmento HTML con el resultado).
            `agent_detail_page()` llama `/proactive/status` y pasa `proactive_info[agent_id]`
            al template.
