@@ -192,8 +192,8 @@ def root():
 @app.get("/chat", response_class=HTMLResponse)
 def chat_page(request: Request):
     _require_auth(request)
-    users_resp = _core("/users") or []
-    users = users_resp if isinstance(users_resp, list) else []
+    users_resp = _core("/users") or {}
+    users = list(users_resp.values()) if isinstance(users_resp, dict) else (users_resp if isinstance(users_resp, list) else [])
     return templates.TemplateResponse(request, "chat.html", {"users": users})
 
 
