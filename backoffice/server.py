@@ -184,7 +184,47 @@ def api_status():
 
 @app.get("/", response_class=HTMLResponse)
 def root():
-    return RedirectResponse("/dashboard")
+    return RedirectResponse("/chat")
+
+
+# ── Chat (17.2–17.4) ───────────────────────────────────────────────────────────
+
+@app.get("/chat", response_class=HTMLResponse)
+def chat_page(request: Request):
+    _require_auth(request)
+    users_resp = _core("/users") or []
+    users = users_resp if isinstance(users_resp, list) else []
+    return templates.TemplateResponse(request, "chat.html", {"users": users})
+
+
+@app.post("/api/chat/send")
+def chat_send(request: Request, text: str = Form(...), user_id: str = Form("")):
+    _require_auth(request)
+    source: dict = {"channel": "chat"}
+    if user_id:
+        source["speaker_id"] = user_id
+
+    def _relay():
+        try:
+            with requests.post(
+                f"{CORE_URL}/process/stream",
+                json={"text": text, "source": source},
+                stream=True,
+                timeout=60,
+            ) as r:
+                for raw in r.iter_lines():
+                    if raw:
+                        yield raw.decode() + "\n"
+                    else:
+                        yield "\n"
+        except Exception as exc:
+            yield f"event: error\ndata: {json.dumps({'message': str(exc)})}\n\n"
+
+    return StreamingResponse(
+        _relay(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 _EAR_STALE_SECS = 180  # heartbeat cada 60s → 3x es margin seguro

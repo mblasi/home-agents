@@ -1189,6 +1189,58 @@ Nota:     Ver también Anexo A.2 (origen de esta fase).
 
 ---
 
+### FASE 17 - Chat Visual con la Plataforma
+
+```
+Objetivo: Interfaz de chat web para conversar con los agentes escribiendo (sin voz),
+          ver qué agente respondió y qué acción ejecutó, y gestionar el historial de
+          conversaciones. Es la nueva landing del backoffice — el punto de entrada
+          natural para el usuario antes de ir a las secciones de administración.
+Estado:   Pendiente
+Deps:     FASE 12 (backoffice, COMPLETA), FASE 9 (coordinador, COMPLETA).
+          Puede arrancarse ya. FASE 2.5 (usuarios) potencia el selector de usuario (17.6).
+```
+
+Stack: FastAPI + Jinja2 + Tailwind + JS nativo (sin HTMX en el chat — SSE requiere
+fetch/ReadableStream). El core expone `/process/stream` (SSE); el backoffice hace relay
+o el JS apunta directamente al core. Conversaciones persistidas en localStorage del browser.
+
+#### Infraestructura de streaming
+- [ ] 17.1  **SSE en core** — `POST /process/stream`: misma lógica que `/process` pero
+            llama a Ollama con `stream=True` y emite eventos SSE progresivos:
+            `event: token` (fragmento de texto LLM), `event: action` (ACTION ejecutada +
+            entity_id + resultado HAOS), `event: done` (fin + metadata: agente, latencias
+            STT/LLM/total). El endpoint `/process` existente no se toca.
+- [ ] 17.2  **Relay en backoffice** — `POST /api/chat/send` recibe `{text, user_id}`,
+            hace streaming del SSE del core y lo retransmite al browser como SSE.
+            Maneja reconexión y errores de core (core caído → evento `error` al cliente).
+
+#### UI de chat
+- [ ] 17.3  **Landing y layout** — `/` redirige a `/chat`. Template `chat.html` con layout
+            pantalla completa (sin sidebar, sin max-w-6xl): columna de mensajes con scroll,
+            input fijo al fondo, header mínimo con "⚓ Capitán" a la izquierda y link
+            "Administración →" a la derecha que lleva a `/dashboard`.
+- [ ] 17.4  **Render en tiempo real** — burbuja del usuario aparece al instante al enviar.
+            Burbuja del agente se construye token a token via SSE. Al recibir `event: action`,
+            agregar chip de metadata debajo de la burbuja (agente, acción ejecutada, latencia);
+            chip empieza colapsado, expandible al hacer click.
+- [ ] 17.5  **Persistencia local** — turnos guardados en `localStorage` del browser.
+            Al cargar `/chat`, los últimos N turnos se restauran en pantalla. Botón
+            "Nueva conversación" limpia el historial local y reinicia el contexto.
+
+#### Gestión de conversaciones
+- [ ] 17.6  **Selector de usuario activo** — dropdown en el header del chat con los usuarios
+            registrados (llamada a `/users` del backoffice). El `user_id` seleccionado se
+            envía con cada mensaje al core. Selección persistida en `localStorage`.
+- [ ] 17.7  **Panel lateral de historial** — botón "Historial" colapsable en el chat.
+            Lista las últimas conversaciones del core (`GET /conversations`), click en una
+            muestra los turnos anteriores en modo lectura (no se puede continuar, solo leer).
+- [ ] 17.8  **Exportar conversación** — botón en el header. Genera un JSON con los turnos
+            de la sesión actual y lo descarga via `Blob + URL.createObjectURL`. Alternativa:
+            botón "Copiar como markdown" para pegar en notas.
+
+---
+
 ## PIPELINE ACTUAL (para referencia rápida)
 
 ```
