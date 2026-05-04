@@ -227,6 +227,23 @@ def chat_send(request: Request, text: str = Form(...), user_id: str = Form("")):
     )
 
 
+@app.get("/api/chat/conversations")
+def api_chat_conversations(request: Request):
+    _require_auth(request)
+    data = _core("/conversations") or []
+    data.sort(key=lambda c: c.get("updated_at", 0), reverse=True)
+    return data
+
+
+@app.get("/api/chat/conversations/{conv_id}")
+def api_chat_conversation_detail(request: Request, conv_id: str):
+    _require_auth(request)
+    data = _core(f"/conversations/{conv_id}")
+    if data is None:
+        raise HTTPException(status_code=404, detail="Not found")
+    return data
+
+
 _EAR_STALE_SECS = 180  # heartbeat cada 60s → 3x es margin seguro
 
 
