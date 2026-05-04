@@ -1196,7 +1196,7 @@ Objetivo: Interfaz de chat web para conversar con los agentes escribiendo (sin v
           ver qué agente respondió y qué acción ejecutó, y gestionar el historial de
           conversaciones. Es la nueva landing del backoffice — el punto de entrada
           natural para el usuario antes de ir a las secciones de administración.
-Estado:   EN CURSO (4/8 — quedan 17.5–17.8)
+Estado:   COMPLETA
 Deps:     FASE 12 (backoffice, COMPLETA), FASE 9 (coordinador, COMPLETA).
           Puede arrancarse ya. FASE 2.5 (usuarios) potencia el selector de usuario (17.6).
 ```
@@ -1224,18 +1224,18 @@ o el JS apunta directamente al core. Conversaciones persistidas en localStorage 
             Burbuja del agente se construye token a token via SSE. Al recibir `event: action`,
             agregar chip de metadata debajo de la burbuja (agente, acción ejecutada, latencia);
             chip empieza colapsado, expandible al hacer click.
-- [ ] 17.5  **Persistencia local** — turnos guardados en `localStorage` del browser.
+- [x] 17.5  **Persistencia local** — turnos guardados en `localStorage` del browser.
             Al cargar `/chat`, los últimos N turnos se restauran en pantalla. Botón
             "Nueva conversación" limpia el historial local y reinicia el contexto.
 
 #### Gestión de conversaciones
-- [ ] 17.6  **Selector de usuario activo** — dropdown en el header del chat con los usuarios
+- [x] 17.6  **Selector de usuario activo** — dropdown en el header del chat con los usuarios
             registrados (llamada a `/users` del backoffice). El `user_id` seleccionado se
             envía con cada mensaje al core. Selección persistida en `localStorage`.
-- [ ] 17.7  **Panel lateral de historial** — botón "Historial" colapsable en el chat.
+- [x] 17.7  **Panel lateral de historial** — botón "Historial" colapsable en el chat.
             Lista las últimas conversaciones del core (`GET /conversations`), click en una
             muestra los turnos anteriores en modo lectura (no se puede continuar, solo leer).
-- [ ] 17.8  **Exportar conversación** — botón en el header. Genera un JSON con los turnos
+- [x] 17.8  **Exportar conversación** — botón en el header. Genera un JSON con los turnos
             de la sesión actual y lo descarga via `Blob + URL.createObjectURL`. Alternativa:
             botón "Copiar como markdown" para pegar en notas.
 
