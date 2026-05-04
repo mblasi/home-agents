@@ -1196,7 +1196,7 @@ Objetivo: Interfaz de chat web para conversar con los agentes escribiendo (sin v
           ver qué agente respondió y qué acción ejecutó, y gestionar el historial de
           conversaciones. Es la nueva landing del backoffice — el punto de entrada
           natural para el usuario antes de ir a las secciones de administración.
-Estado:   Pendiente
+Estado:   EN CURSO (4/8 — quedan 17.5–17.8)
 Deps:     FASE 12 (backoffice, COMPLETA), FASE 9 (coordinador, COMPLETA).
           Puede arrancarse ya. FASE 2.5 (usuarios) potencia el selector de usuario (17.6).
 ```
@@ -1206,21 +1206,21 @@ fetch/ReadableStream). El core expone `/process/stream` (SSE); el backoffice hac
 o el JS apunta directamente al core. Conversaciones persistidas en localStorage del browser.
 
 #### Infraestructura de streaming
-- [ ] 17.1  **SSE en core** — `POST /process/stream`: misma lógica que `/process` pero
+- [x] 17.1  **SSE en core** — `POST /process/stream`: misma lógica que `/process` pero
             llama a Ollama con `stream=True` y emite eventos SSE progresivos:
             `event: token` (fragmento de texto LLM), `event: action` (ACTION ejecutada +
             entity_id + resultado HAOS), `event: done` (fin + metadata: agente, latencias
             STT/LLM/total). El endpoint `/process` existente no se toca.
-- [ ] 17.2  **Relay en backoffice** — `POST /api/chat/send` recibe `{text, user_id}`,
+- [x] 17.2  **Relay en backoffice** — `POST /api/chat/send` recibe `{text, user_id}`,
             hace streaming del SSE del core y lo retransmite al browser como SSE.
             Maneja reconexión y errores de core (core caído → evento `error` al cliente).
 
 #### UI de chat
-- [ ] 17.3  **Landing y layout** — `/` redirige a `/chat`. Template `chat.html` con layout
+- [x] 17.3  **Landing y layout** — `/` redirige a `/chat`. Template `chat.html` con layout
             pantalla completa (sin sidebar, sin max-w-6xl): columna de mensajes con scroll,
             input fijo al fondo, header mínimo con "⚓ Capitán" a la izquierda y link
             "Administración →" a la derecha que lleva a `/dashboard`.
-- [ ] 17.4  **Render en tiempo real** — burbuja del usuario aparece al instante al enviar.
+- [x] 17.4  **Render en tiempo real** — burbuja del usuario aparece al instante al enviar.
             Burbuja del agente se construye token a token via SSE. Al recibir `event: action`,
             agregar chip de metadata debajo de la burbuja (agente, acción ejecutada, latencia);
             chip empieza colapsado, expandible al hacer click.
