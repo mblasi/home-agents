@@ -15,8 +15,21 @@
       <span class="text-lg font-bold tracking-tight">⚓ Capitán</span>
       <span id="status-badge" class="hidden text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-300"></span>
     </div>
-    <div class="flex items-center gap-4">
-      <!-- Selector de usuario -->
+    <div class="flex items-center gap-3">
+      <button onclick="newConversation()"
+              class="text-sm text-gray-400 hover:text-white transition-colors px-2 py-1 rounded hover:bg-gray-800">
+        + Nueva
+      </button>
+      <button onclick="toggleHistory()"
+              id="history-btn"
+              class="text-sm text-gray-400 hover:text-white transition-colors px-2 py-1 rounded hover:bg-gray-800">
+        Historial
+      </button>
+      <button onclick="exportConversation()"
+              class="text-sm text-gray-400 hover:text-white transition-colors px-2 py-1 rounded hover:bg-gray-800"
+              title="Exportar conversación">
+        ↓ Exportar
+      </button>
       {% if users %}
       <select id="user-select"
               class="text-sm bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500">
@@ -27,20 +40,36 @@
       </select>
       {% endif %}
       <a href="/dashboard"
-         class="text-sm text-gray-400 hover:text-white transition-colors">
+         class="text-sm text-gray-400 hover:text-white transition-colors px-2 py-1">
         Administración →
       </a>
     </div>
   </header>
 
-  <!-- Mensajes -->
-  <div id="messages" class="flex-1 overflow-y-auto px-4 py-6 space-y-4">
-    <!-- Mensaje de bienvenida -->
-    <div class="flex justify-start">
-      <div class="max-w-[70%] rounded-2xl rounded-tl-sm px-4 py-3 bg-gray-800 text-gray-100 text-sm leading-relaxed">
-        Hola. ¿En qué te puedo ayudar?
+  <!-- Cuerpo: mensajes + panel historial superpuesto -->
+  <div class="flex-1 relative overflow-hidden">
+
+    <!-- Mensajes -->
+    <div id="messages" class="h-full overflow-y-auto px-4 py-6 space-y-4">
+      <div class="flex justify-start">
+        <div class="max-w-[70%] rounded-2xl rounded-tl-sm px-4 py-3 bg-gray-800 text-gray-100 text-sm leading-relaxed">
+          Hola. ¿En qué te puedo ayudar?
+        </div>
       </div>
     </div>
+
+    <!-- Panel historial (overlay derecha) -->
+    <div id="history-panel"
+         class="hidden absolute inset-y-0 right-0 w-80 bg-gray-900 border-l border-gray-800 flex flex-col shadow-2xl z-10">
+      <div class="flex items-center justify-between px-4 py-3 border-b border-gray-800">
+        <span id="history-panel-title" class="text-sm font-semibold text-gray-200">Conversaciones</span>
+        <button onclick="toggleHistory()" class="text-gray-500 hover:text-white text-lg leading-none">×</button>
+      </div>
+      <div id="history-content" class="flex-1 overflow-y-auto p-3 space-y-2 text-sm">
+        <div class="text-gray-500 text-xs py-4 text-center">Cargando…</div>
+      </div>
+    </div>
+
   </div>
 
   <!-- Input fijo abajo -->
@@ -64,16 +93,17 @@
   </div>
 
 <script>
-const messagesEl = document.getElementById('messages');
-const form       = document.getElementById('chat-form');
-const input      = document.getElementById('chat-input');
-const sendBtn    = document.getElementById('send-btn');
+const messagesEl  = document.getElementById('messages');
+const form        = document.getElementById('chat-form');
+const input       = document.getElementById('chat-input');
+const sendBtn     = document.getElementById('send-btn');
 const statusBadge = document.getElementById('status-badge');
 const userSelect  = document.getElementById('user-select');
 
-// ── Restore localStorage ──────────────────────────────────────────────────────
 const STORAGE_KEY = 'capitan_chat_history';
+const USER_KEY    = 'capitan_chat_user';
 
+// ── 17.5 localStorage ─────────────────────────────────────────────────────────
 function loadHistory() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
@@ -91,6 +121,26 @@ function saveHistory() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(turns.slice(-40))); } catch (_) {}
 }
 
+function newConversation() {
+  localStorage.removeItem(STORAGE_KEY);
+  messagesEl.innerHTML = `
+    <div class="flex justify-start">
+      <div class="max-w-[70%] rounded-2xl rounded-tl-sm px-4 py-3 bg-gray-800 text-gray-100 text-sm leading-relaxed">
+        Hola. ¿En qué te puedo ayudar?
+      </div>
+    </div>`;
+  input.focus();
+}
+
+// ── 17.6 Selector de usuario ──────────────────────────────────────────────────
+if (userSelect) {
+  const savedUser = localStorage.getItem(USER_KEY) || '';
+  if (savedUser) userSelect.value = savedUser;
+  userSelect.addEventListener('change', () => {
+    localStorage.setItem(USER_KEY, userSelect.value);
+  });
+}
+
 // ── Burbujas ──────────────────────────────────────────────────────────────────
 function appendBubble(role, text, meta, scroll = true) {
   const isUser = role === 'user';
@@ -102,9 +152,8 @@ function appendBubble(role, text, meta, scroll = true) {
   const bubble = document.createElement('div');
   bubble.className = [
     'max-w-[70%] rounded-2xl px-4 py-3 text-sm leading-relaxed',
-    isUser
-      ? 'rounded-tr-sm bg-blue-600 text-white'
-      : 'rounded-tl-sm bg-gray-800 text-gray-100',
+    isUser ? 'rounded-tr-sm bg-blue-600 text-white'
+           : 'rounded-tl-sm bg-gray-800 text-gray-100',
   ].join(' ');
 
   const textEl = document.createElement('span');
@@ -112,9 +161,7 @@ function appendBubble(role, text, meta, scroll = true) {
   textEl.textContent = text;
   bubble.appendChild(textEl);
 
-  if (meta && !isUser) {
-    bubble.appendChild(buildChip(meta));
-  }
+  if (meta && !isUser) bubble.appendChild(buildChip(meta));
 
   wrapper.appendChild(bubble);
   messagesEl.appendChild(wrapper);
@@ -129,7 +176,8 @@ function buildChip(meta) {
   const latency    = meta.latency_ms != null ? `${meta.latency_ms}ms` : '';
   const action     = meta.action ? ` · ${meta.action}` : '';
   chip.innerHTML = `
-    <button class="hover:text-gray-200 transition-colors" onclick="this.nextElementSibling.classList.toggle('hidden')">
+    <button class="hover:text-gray-200 transition-colors"
+            onclick="this.nextElementSibling.classList.toggle('hidden')">
       ▸ ${agentLabel}${action} ${latency}
     </button>
     <div class="hidden mt-1 pl-2 border-l border-gray-700 space-y-0.5">
@@ -146,9 +194,7 @@ const PHASE_LABELS = { coordinating: '🔄 Coordinando…', running: '⚙️ Eje
 
 function setStatus(phase, agent) {
   if (!phase) { statusBadge.classList.add('hidden'); return; }
-  statusBadge.textContent = agent
-    ? `⚙️ ${agent}…`
-    : (PHASE_LABELS[phase] || phase);
+  statusBadge.textContent = agent ? `⚙️ ${agent}…` : (PHASE_LABELS[phase] || phase);
   statusBadge.classList.remove('hidden');
 }
 
@@ -163,13 +209,10 @@ form.addEventListener('submit', async (e) => {
 
   appendBubble('user', text);
 
-  // Burbuja vacía del agente con cursor de carga
   const { wrapper: agentWrapper, textEl: agentTextEl, bubble: agentBubble } = appendBubble('agent', '');
   agentTextEl.innerHTML = '<span class="animate-pulse text-gray-500">…</span>';
 
   let fullText = '';
-  let doneMeta = null;
-
   const fd = new FormData();
   fd.append('text', text);
   fd.append('user_id', userSelect ? userSelect.value : '');
@@ -202,7 +245,6 @@ form.addEventListener('submit', async (e) => {
             agentTextEl.textContent = fullText;
             messagesEl.scrollTop = messagesEl.scrollHeight;
           } else if (currentEvent === 'done') {
-            doneMeta = data;
             fullText = data.response;
             agentTextEl.textContent = fullText;
             agentBubble.appendChild(buildChip(data));
@@ -227,13 +269,110 @@ form.addEventListener('submit', async (e) => {
   }
 });
 
-// ── Ctrl+Enter / Enter ────────────────────────────────────────────────────────
 input.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault();
     form.dispatchEvent(new Event('submit'));
   }
 });
+
+// ── 17.7 Panel de historial ───────────────────────────────────────────────────
+const historyPanel   = document.getElementById('history-panel');
+const historyContent = document.getElementById('history-content');
+const historyTitle   = document.getElementById('history-panel-title');
+let historyOpen = false;
+
+function toggleHistory() {
+  historyOpen = !historyOpen;
+  historyPanel.classList.toggle('hidden', !historyOpen);
+  if (historyOpen) loadConversationList();
+}
+
+function timeAgo(ts) {
+  const diff = Math.floor(Date.now() / 1000 - ts);
+  if (diff < 60)   return 'ahora';
+  if (diff < 3600) return `${Math.floor(diff / 60)}m`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+  return `${Math.floor(diff / 86400)}d`;
+}
+
+const STATE_BADGE = {
+  active:  'bg-green-900 text-green-300',
+  closed:  'bg-gray-700 text-gray-400',
+  expired: 'bg-orange-900 text-orange-300',
+};
+
+async function loadConversationList() {
+  historyTitle.textContent = 'Conversaciones';
+  historyContent.innerHTML = '<div class="text-gray-500 text-xs py-4 text-center">Cargando…</div>';
+  try {
+    const r    = await fetch('/api/chat/conversations');
+    const list = await r.json();
+    if (!list.length) {
+      historyContent.innerHTML = '<div class="text-gray-600 text-xs py-4 text-center">Sin conversaciones en esta sesión</div>';
+      return;
+    }
+    historyContent.innerHTML = list.map(c => `
+      <button onclick="loadConversationDetail('${c.id}')"
+              class="w-full text-left px-3 py-2.5 rounded-lg hover:bg-gray-800 transition-colors border border-transparent hover:border-gray-700">
+        <div class="flex items-center justify-between mb-1">
+          <span class="font-mono text-xs text-gray-400">${c.id}</span>
+          <span class="text-xs px-1.5 py-0.5 rounded ${STATE_BADGE[c.state] || STATE_BADGE.closed}">${c.state}</span>
+        </div>
+        <div class="flex items-center justify-between text-xs text-gray-500">
+          <span>${c.turns} turno${c.turns !== 1 ? 's' : ''}</span>
+          <span>${timeAgo(c.updated_at)}</span>
+        </div>
+      </button>`).join('');
+  } catch (err) {
+    historyContent.innerHTML = `<div class="text-red-400 text-xs py-4 text-center">Error: ${err.message}</div>`;
+  }
+}
+
+async function loadConversationDetail(convId) {
+  historyTitle.textContent = `#${convId}`;
+  historyContent.innerHTML = '<div class="text-gray-500 text-xs py-4 text-center">Cargando…</div>';
+  try {
+    const r    = await fetch(`/api/chat/conversations/${convId}`);
+    const conv = await r.json();
+    const backBtn = `<button onclick="loadConversationList()" class="text-xs text-blue-400 hover:text-blue-300 mb-3 flex items-center gap-1">← Volver</button>`;
+    if (!conv.turns.length) {
+      historyContent.innerHTML = backBtn + '<div class="text-gray-600 text-xs py-2 text-center">Sin turnos</div>';
+      return;
+    }
+    const turnsHtml = conv.turns.map(t => {
+      const isUser = t.role === 'user';
+      return `<div class="flex ${isUser ? 'justify-end' : 'justify-start'} mb-2">
+        <div class="max-w-[90%] rounded-xl px-3 py-2 text-xs leading-relaxed ${isUser ? 'bg-blue-900 text-blue-100' : 'bg-gray-800 text-gray-300'}">
+          ${t.content.replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+        </div>
+      </div>`;
+    }).join('');
+    historyContent.innerHTML = backBtn + turnsHtml;
+  } catch (err) {
+    historyContent.innerHTML = `<button onclick="loadConversationList()" class="text-xs text-blue-400 mb-3">← Volver</button>
+      <div class="text-red-400 text-xs py-2 text-center">Error: ${err.message}</div>`;
+  }
+}
+
+// ── 17.8 Exportar ─────────────────────────────────────────────────────────────
+function exportConversation() {
+  const bubbles = messagesEl.querySelectorAll('[data-role]');
+  const turns = Array.from(bubbles).map(el => ({
+    role: el.dataset.role,
+    text: el.querySelector('[data-text]')?.textContent || '',
+    meta: el.dataset.meta ? JSON.parse(el.dataset.meta) : undefined,
+  }));
+
+  const payload = { exported_at: new Date().toISOString(), turns };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `capitan-chat-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 loadHistory();
