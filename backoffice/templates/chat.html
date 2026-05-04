@@ -30,7 +30,6 @@
               title="Exportar conversación">
         ↓ Exportar
       </button>
-      {% if users %}
       <select id="user-select"
               onchange="onUserChange()"
               class="text-sm bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500">
@@ -39,7 +38,6 @@
         <option value="{{ u.id }}">{{ u.name }}</option>
         {% endfor %}
       </select>
-      {% endif %}
       <a href="/dashboard" class="text-sm text-gray-400 hover:text-white transition-colors px-2 py-1">
         Administración →
       </a>
