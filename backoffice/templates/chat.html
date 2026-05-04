@@ -20,10 +20,10 @@
               class="text-sm text-gray-400 hover:text-white transition-colors px-2 py-1 rounded hover:bg-gray-800">
         + Nueva
       </button>
-      <button onclick="toggleHistory()"
-              id="history-btn"
+      <button onclick="toggleSidebar()"
+              id="sidebar-btn"
               class="text-sm text-gray-400 hover:text-white transition-colors px-2 py-1 rounded hover:bg-gray-800">
-        Historial
+        Contexto
       </button>
       <button onclick="exportConversation()"
               class="text-sm text-gray-400 hover:text-white transition-colors px-2 py-1 rounded hover:bg-gray-800"
@@ -32,6 +32,7 @@
       </button>
       {% if users %}
       <select id="user-select"
+              onchange="onUserChange()"
               class="text-sm bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500">
         <option value="">Invitado</option>
         {% for u in users %}
@@ -39,18 +40,17 @@
         {% endfor %}
       </select>
       {% endif %}
-      <a href="/dashboard"
-         class="text-sm text-gray-400 hover:text-white transition-colors px-2 py-1">
+      <a href="/dashboard" class="text-sm text-gray-400 hover:text-white transition-colors px-2 py-1">
         Administración →
       </a>
     </div>
   </header>
 
-  <!-- Cuerpo: mensajes + panel historial superpuesto -->
-  <div class="flex-1 relative overflow-hidden">
+  <!-- Cuerpo: mensajes + panel lateral -->
+  <div class="flex-1 flex overflow-hidden">
 
     <!-- Mensajes -->
-    <div id="messages" class="h-full overflow-y-auto px-4 py-6 space-y-4">
+    <div id="messages" class="flex-1 overflow-y-auto px-4 py-6 space-y-4">
       <div class="flex justify-start">
         <div class="max-w-[70%] rounded-2xl rounded-tl-sm px-4 py-3 bg-gray-800 text-gray-100 text-sm leading-relaxed">
           Hola. ¿En qué te puedo ayudar?
@@ -58,18 +58,36 @@
       </div>
     </div>
 
-    <!-- Panel historial (overlay derecha) -->
-    <div id="history-panel"
-         class="hidden absolute inset-y-0 right-0 w-80 bg-gray-900 border-l border-gray-800 flex flex-col shadow-2xl z-10">
-      <div class="flex items-center justify-between px-4 py-3 border-b border-gray-800">
-        <span id="history-panel-title" class="text-sm font-semibold text-gray-200">Conversaciones</span>
-        <button onclick="toggleHistory()" class="text-gray-500 hover:text-white text-lg leading-none">×</button>
-      </div>
-      <div id="history-content" class="flex-1 overflow-y-auto p-3 space-y-2 text-sm">
-        <div class="text-gray-500 text-xs py-4 text-center">Cargando…</div>
-      </div>
-    </div>
+    <!-- Panel lateral: conversaciones + intenciones (derecha) -->
+    <aside id="sidebar"
+           class="hidden w-80 shrink-0 border-l border-gray-800 bg-gray-900 flex flex-col overflow-hidden">
 
+      <!-- Tabs -->
+      <div class="flex border-b border-gray-800 text-xs font-medium">
+        <button id="tab-convs" onclick="showTab('convs')"
+                class="flex-1 py-2.5 text-center text-white bg-gray-800 border-b-2 border-blue-500">
+          Historial
+        </button>
+        <button id="tab-intents" onclick="showTab('intents')"
+                class="flex-1 py-2.5 text-center text-gray-500 hover:text-gray-300 transition-colors">
+          Intenciones
+        </button>
+      </div>
+
+      <!-- Panel historial -->
+      <div id="panel-convs" class="flex-1 overflow-y-auto p-3 space-y-2 text-sm">
+        <div class="text-gray-600 text-xs py-4 text-center">Cargando…</div>
+      </div>
+
+      <!-- Panel intenciones -->
+      <div id="panel-intents" class="hidden flex-1 overflow-y-auto p-3 text-sm">
+        <div id="intents-no-user" class="text-gray-600 text-xs py-4 text-center">
+          Seleccioná un usuario para ver sus intenciones activas
+        </div>
+        <div id="intents-list" class="hidden space-y-2"></div>
+      </div>
+
+    </aside>
   </div>
 
   <!-- Input fijo abajo -->
@@ -82,11 +100,8 @@
         placeholder="Escribí tu mensaje…"
         class="flex-1 rounded-xl bg-gray-800 border border-gray-700 px-4 py-3 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
       />
-      <button
-        type="submit"
-        id="send-btn"
-        class="px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-      >
+      <button type="submit" id="send-btn"
+              class="px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
         Enviar
       </button>
     </form>
@@ -99,21 +114,40 @@ const input       = document.getElementById('chat-input');
 const sendBtn     = document.getElementById('send-btn');
 const statusBadge = document.getElementById('status-badge');
 const userSelect  = document.getElementById('user-select');
+const sidebar     = document.getElementById('sidebar');
 
 const STORAGE_KEY = 'capitan_chat_history';
 const USER_KEY    = 'capitan_chat_user';
 
-// ── 17.5 localStorage ─────────────────────────────────────────────────────────
+// ── Selector de usuario ───────────────────────────────────────────────────────
+if (userSelect) {
+  const saved = localStorage.getItem(USER_KEY) || '';
+  if (saved) userSelect.value = saved;
+}
+
+function onUserChange() {
+  const uid = userSelect ? userSelect.value : '';
+  localStorage.setItem(USER_KEY, uid);
+  if (sidebarOpen) {
+    if (activeTab === 'convs') loadConversationList();
+    else loadIntents();
+  }
+}
+
+function currentUserId() {
+  return userSelect ? userSelect.value : '';
+}
+
+// ── localStorage ──────────────────────────────────────────────────────────────
 function loadHistory() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-    saved.forEach(turn => appendBubble(turn.role, turn.text, turn.meta, false));
+    saved.forEach(t => appendBubble(t.role, t.text, t.meta, false));
   } catch (_) {}
 }
 
 function saveHistory() {
-  const bubbles = messagesEl.querySelectorAll('[data-role]');
-  const turns = Array.from(bubbles).map(el => ({
+  const turns = Array.from(messagesEl.querySelectorAll('[data-role]')).map(el => ({
     role: el.dataset.role,
     text: el.querySelector('[data-text]')?.textContent || '',
     meta: el.dataset.meta ? JSON.parse(el.dataset.meta) : null,
@@ -130,15 +164,6 @@ function newConversation() {
       </div>
     </div>`;
   input.focus();
-}
-
-// ── 17.6 Selector de usuario ──────────────────────────────────────────────────
-if (userSelect) {
-  const savedUser = localStorage.getItem(USER_KEY) || '';
-  if (savedUser) userSelect.value = savedUser;
-  userSelect.addEventListener('change', () => {
-    localStorage.setItem(USER_KEY, userSelect.value);
-  });
 }
 
 // ── Burbujas ──────────────────────────────────────────────────────────────────
@@ -169,32 +194,53 @@ function appendBubble(role, text, meta, scroll = true) {
   return { wrapper, bubble, textEl };
 }
 
+// ── Chip de metadata ──────────────────────────────────────────────────────────
 function buildChip(meta) {
   const chip = document.createElement('div');
   chip.className = 'mt-2 text-xs text-gray-400';
-  const agentLabel = meta.agent_id || '—';
-  const latency    = meta.latency_ms != null ? `${meta.latency_ms}ms` : '';
-  const action     = meta.action ? ` · ${meta.action}` : '';
+
+  const isMulti   = meta.is_multi && meta.agent_ids && meta.agent_ids.length > 1;
+  const agentLine = isMulti
+    ? meta.agent_ids.join(' + ')
+    : (meta.agent_id || '—');
+  const latency   = meta.latency_ms != null ? `${meta.latency_ms}ms` : '';
+  const action    = meta.action ? ` · ${meta.action}` : '';
+
+  let stepsHtml = '';
+  if (isMulti && meta.steps_detail) {
+    stepsHtml = meta.steps_detail.map((s, i) => `
+      <div class="py-0.5">
+        <span class="text-gray-500">${i + 1}.</span>
+        <span class="text-gray-300">${s.agent}</span>
+        ${s.condition ? `<span class="text-yellow-600"> [${s.condition}]</span>` : ''}
+        <span class="text-gray-500"> — ${s.query}</span>
+      </div>`).join('');
+  }
+
   chip.innerHTML = `
-    <button class="hover:text-gray-200 transition-colors"
+    <button class="hover:text-gray-200 transition-colors text-left"
             onclick="this.nextElementSibling.classList.toggle('hidden')">
-      ▸ ${agentLabel}${action} ${latency}
+      ▸ ${agentLine}${action} ${latency}
     </button>
     <div class="hidden mt-1 pl-2 border-l border-gray-700 space-y-0.5">
-      <div>Agente: <span class="text-gray-300">${meta.agent_id || '—'}</span></div>
-      ${meta.action ? `<div>Acción: <span class="text-gray-300">${meta.action}</span></div>` : ''}
-      ${meta.latency_ms != null ? `<div>Latencia: <span class="text-gray-300">${meta.latency_ms}ms</span></div>` : ''}
+      ${isMulti ? `
+        <div class="font-medium text-gray-300 mb-1">Plan multi-agente (${meta.plan_steps} pasos)</div>
+        <div class="space-y-0.5 mb-1">${stepsHtml}</div>
+      ` : `
+        <div>Agente: <span class="text-gray-300">${meta.agent_id || '—'}</span></div>
+        ${meta.action ? `<div>Acción: <span class="text-gray-300">${meta.action}</span></div>` : ''}
+      `}
+      ${meta.latency_ms != null ? `<div>Latencia total: <span class="text-gray-300">${meta.latency_ms}ms</span></div>` : ''}
       ${meta.coordinator_latency_ms != null ? `<div>Coordinador: <span class="text-gray-300">${meta.coordinator_latency_ms}ms</span></div>` : ''}
     </div>`;
   return chip;
 }
 
 // ── Status badge ──────────────────────────────────────────────────────────────
-const PHASE_LABELS = { coordinating: '🔄 Coordinando…', running: '⚙️ Ejecutando…' };
-
 function setStatus(phase, agent) {
   if (!phase) { statusBadge.classList.add('hidden'); return; }
-  statusBadge.textContent = agent ? `⚙️ ${agent}…` : (PHASE_LABELS[phase] || phase);
+  const labels = { coordinating: '🔄 Coordinando…' };
+  statusBadge.textContent = agent ? `⚙️ ${agent}…` : (labels[phase] || phase);
   statusBadge.classList.remove('hidden');
 }
 
@@ -215,20 +261,18 @@ form.addEventListener('submit', async (e) => {
   let fullText = '';
   const fd = new FormData();
   fd.append('text', text);
-  fd.append('user_id', userSelect ? userSelect.value : '');
+  fd.append('user_id', currentUserId());
 
   try {
-    const resp = await fetch('/api/chat/send', { method: 'POST', body: fd });
+    const resp   = await fetch('/api/chat/send', { method: 'POST', body: fd });
     const reader = resp.body.getReader();
-    const decoder = new TextDecoder();
-    let buf = '';
-    let currentEvent = 'message';
+    const dec    = new TextDecoder();
+    let buf = '', currentEvent = 'message';
 
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      buf += decoder.decode(value, { stream: true });
-
+      buf += dec.decode(value, { stream: true });
       const lines = buf.split('\n');
       buf = lines.pop();
 
@@ -270,30 +314,45 @@ form.addEventListener('submit', async (e) => {
 });
 
 input.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    form.dispatchEvent(new Event('submit'));
-  }
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); form.dispatchEvent(new Event('submit')); }
 });
 
-// ── 17.7 Panel de historial ───────────────────────────────────────────────────
-const historyPanel   = document.getElementById('history-panel');
-const historyContent = document.getElementById('history-content');
-const historyTitle   = document.getElementById('history-panel-title');
-let historyOpen = false;
+// ── Panel lateral: tabs ───────────────────────────────────────────────────────
+let sidebarOpen = false;
+let activeTab   = 'convs';
 
-function toggleHistory() {
-  historyOpen = !historyOpen;
-  historyPanel.classList.toggle('hidden', !historyOpen);
-  if (historyOpen) loadConversationList();
+function toggleSidebar() {
+  sidebarOpen = !sidebarOpen;
+  sidebar.classList.toggle('hidden', !sidebarOpen);
+  if (sidebarOpen) {
+    if (activeTab === 'convs') loadConversationList();
+    else loadIntents();
+  }
 }
 
+function showTab(tab) {
+  activeTab = tab;
+  document.getElementById('panel-convs').classList.toggle('hidden',   tab !== 'convs');
+  document.getElementById('panel-intents').classList.toggle('hidden', tab !== 'intents');
+  document.getElementById('tab-convs').className   = tabClass(tab === 'convs');
+  document.getElementById('tab-intents').className = tabClass(tab === 'intents');
+  if (tab === 'convs')   loadConversationList();
+  if (tab === 'intents') loadIntents();
+}
+
+function tabClass(active) {
+  return 'flex-1 py-2.5 text-center text-xs font-medium ' +
+    (active ? 'text-white bg-gray-800 border-b-2 border-blue-500'
+            : 'text-gray-500 hover:text-gray-300 transition-colors');
+}
+
+// ── Historial de conversaciones ───────────────────────────────────────────────
 function timeAgo(ts) {
-  const diff = Math.floor(Date.now() / 1000 - ts);
-  if (diff < 60)   return 'ahora';
-  if (diff < 3600) return `${Math.floor(diff / 60)}m`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
-  return `${Math.floor(diff / 86400)}d`;
+  const d = Math.floor(Date.now() / 1000 - ts);
+  if (d < 60) return 'ahora';
+  if (d < 3600) return `${Math.floor(d/60)}m`;
+  if (d < 86400) return `${Math.floor(d/3600)}h`;
+  return `${Math.floor(d/86400)}d`;
 }
 
 const STATE_BADGE = {
@@ -303,16 +362,22 @@ const STATE_BADGE = {
 };
 
 async function loadConversationList() {
-  historyTitle.textContent = 'Conversaciones';
-  historyContent.innerHTML = '<div class="text-gray-500 text-xs py-4 text-center">Cargando…</div>';
+  const panel = document.getElementById('panel-convs');
+  panel.innerHTML = '<div class="text-gray-500 text-xs py-4 text-center">Cargando…</div>';
   try {
-    const r    = await fetch('/api/chat/conversations');
-    const list = await r.json();
+    const uid  = currentUserId();
+    let list = await fetch('/api/chat/conversations').then(r => r.json());
+
+    // Filtrar por usuario activo (source_key contiene speaker_id=uid)
+    if (uid) {
+      list = list.filter(c => (c.source_key || '').includes(`speaker_id=${uid}`));
+    }
+
     if (!list.length) {
-      historyContent.innerHTML = '<div class="text-gray-600 text-xs py-4 text-center">Sin conversaciones en esta sesión</div>';
+      panel.innerHTML = `<div class="text-gray-600 text-xs py-4 text-center">${uid ? 'Sin conversaciones para este usuario' : 'Sin conversaciones en esta sesión'}</div>`;
       return;
     }
-    historyContent.innerHTML = list.map(c => `
+    panel.innerHTML = list.map(c => `
       <button onclick="loadConversationDetail('${c.id}')"
               class="w-full text-left px-3 py-2.5 rounded-lg hover:bg-gray-800 transition-colors border border-transparent hover:border-gray-700">
         <div class="flex items-center justify-between mb-1">
@@ -325,19 +390,18 @@ async function loadConversationList() {
         </div>
       </button>`).join('');
   } catch (err) {
-    historyContent.innerHTML = `<div class="text-red-400 text-xs py-4 text-center">Error: ${err.message}</div>`;
+    panel.innerHTML = `<div class="text-red-400 text-xs py-4 text-center">Error: ${err.message}</div>`;
   }
 }
 
 async function loadConversationDetail(convId) {
-  historyTitle.textContent = `#${convId}`;
-  historyContent.innerHTML = '<div class="text-gray-500 text-xs py-4 text-center">Cargando…</div>';
+  const panel = document.getElementById('panel-convs');
+  panel.innerHTML = '<div class="text-gray-500 text-xs py-4 text-center">Cargando…</div>';
   try {
-    const r    = await fetch(`/api/chat/conversations/${convId}`);
-    const conv = await r.json();
-    const backBtn = `<button onclick="loadConversationList()" class="text-xs text-blue-400 hover:text-blue-300 mb-3 flex items-center gap-1">← Volver</button>`;
+    const conv = await fetch(`/api/chat/conversations/${convId}`).then(r => r.json());
+    const back = `<button onclick="loadConversationList()" class="text-xs text-blue-400 hover:text-blue-300 mb-3 flex items-center gap-1">← Volver</button>`;
     if (!conv.turns.length) {
-      historyContent.innerHTML = backBtn + '<div class="text-gray-600 text-xs py-2 text-center">Sin turnos</div>';
+      panel.innerHTML = back + '<div class="text-gray-600 text-xs py-2 text-center">Sin turnos</div>';
       return;
     }
     const turnsHtml = conv.turns.map(t => {
@@ -348,30 +412,80 @@ async function loadConversationDetail(convId) {
         </div>
       </div>`;
     }).join('');
-    historyContent.innerHTML = backBtn + turnsHtml;
+    panel.innerHTML = back + turnsHtml;
   } catch (err) {
-    historyContent.innerHTML = `<button onclick="loadConversationList()" class="text-xs text-blue-400 mb-3">← Volver</button>
+    panel.innerHTML = `<button onclick="loadConversationList()" class="text-xs text-blue-400 mb-3">← Volver</button>
       <div class="text-red-400 text-xs py-2 text-center">Error: ${err.message}</div>`;
   }
 }
 
-// ── 17.8 Exportar ─────────────────────────────────────────────────────────────
+// ── Intenciones activas del usuario ──────────────────────────────────────────
+const STATUS_COLORS = {
+  pending:     'bg-yellow-900 text-yellow-300',
+  in_progress: 'bg-blue-900 text-blue-300',
+  done:        'bg-green-900 text-green-300',
+  cancelled:   'bg-gray-700 text-gray-400',
+};
+
+const STATUS_LABEL = {
+  pending:     'pendiente',
+  in_progress: 'en curso',
+  done:        'hecho',
+  cancelled:   'cancelado',
+};
+
+async function loadIntents() {
+  const uid         = currentUserId();
+  const noUserEl    = document.getElementById('intents-no-user');
+  const listEl      = document.getElementById('intents-list');
+
+  if (!uid) {
+    noUserEl.classList.remove('hidden');
+    listEl.classList.add('hidden');
+    return;
+  }
+  noUserEl.classList.add('hidden');
+  listEl.classList.remove('hidden');
+  listEl.innerHTML = '<div class="text-gray-500 text-xs py-4 text-center">Cargando…</div>';
+
+  try {
+    const intents = await fetch(`/api/chat/users/${uid}/intents`).then(r => r.json());
+    const active  = intents.filter(i => ['pending','in_progress'].includes(i.status));
+
+    if (!active.length) {
+      listEl.innerHTML = '<div class="text-gray-600 text-xs py-4 text-center">Sin intenciones activas</div>';
+      return;
+    }
+
+    listEl.innerHTML = active.map(i => `
+      <div class="px-3 py-2.5 rounded-lg bg-gray-800 border border-gray-700">
+        <div class="flex items-start justify-between gap-2 mb-1">
+          <span class="text-gray-200 text-xs font-medium leading-snug">${i.title}</span>
+          <span class="text-xs px-1.5 py-0.5 rounded shrink-0 ${STATUS_COLORS[i.status] || ''}">${STATUS_LABEL[i.status] || i.status}</span>
+        </div>
+        ${i.description ? `<div class="text-gray-500 text-xs leading-snug mb-1">${i.description.replace(/</g,'&lt;')}</div>` : ''}
+        <div class="text-gray-600 text-xs">${i.agent_id || ''}</div>
+      </div>`).join('');
+  } catch (err) {
+    listEl.innerHTML = `<div class="text-red-400 text-xs py-4 text-center">Error: ${err.message}</div>`;
+  }
+}
+
+// ── Exportar ──────────────────────────────────────────────────────────────────
 function exportConversation() {
-  const bubbles = messagesEl.querySelectorAll('[data-role]');
-  const turns = Array.from(bubbles).map(el => ({
+  const turns = Array.from(messagesEl.querySelectorAll('[data-role]')).map(el => ({
     role: el.dataset.role,
     text: el.querySelector('[data-text]')?.textContent || '',
     meta: el.dataset.meta ? JSON.parse(el.dataset.meta) : undefined,
   }));
-
-  const payload = { exported_at: new Date().toISOString(), turns };
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
-  a.download = `capitan-chat-${new Date().toISOString().slice(0,10)}.json`;
+  const blob = new Blob([JSON.stringify({ exported_at: new Date().toISOString(), turns }, null, 2)],
+                        { type: 'application/json' });
+  const a = Object.assign(document.createElement('a'), {
+    href:     URL.createObjectURL(blob),
+    download: `capitan-chat-${new Date().toISOString().slice(0,10)}.json`,
+  });
   a.click();
-  URL.revokeObjectURL(url);
+  URL.revokeObjectURL(a.href);
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────

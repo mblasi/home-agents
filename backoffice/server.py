@@ -244,6 +244,13 @@ def api_chat_conversation_detail(request: Request, conv_id: str):
     return data
 
 
+@app.get("/api/chat/users/{user_id}/intents")
+def api_chat_user_intents(request: Request, user_id: str):
+    _require_auth(request)
+    data = _core(f"/users/{user_id}/intents") or []
+    return data
+
+
 _EAR_STALE_SECS = 180  # heartbeat cada 60s → 3x es margin seguro
 
 
