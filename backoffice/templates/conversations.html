@@ -70,9 +70,9 @@
         </td>
         <td class="px-4 py-3 text-center flex items-center justify-center gap-2">
           {% if c.speaker_id and c.speaker_id != "guest" %}
-          <a href="/chat?user_id={{ c.speaker_id }}"
+          <a href="/chat?user_id={{ c.speaker_id }}&conv_id={{ c.id }}"
              class="text-xs text-blue-500 hover:text-blue-300 transition-colors"
-             title="Retomar en chat web">↗ Chat</a>
+             title="Retomar esta conversación en el chat">↗ Chat</a>
           {% endif %}
           {% if c.state == "active" %}
           <button class="text-gray-600 hover:text-red-400 text-xs transition-colors"

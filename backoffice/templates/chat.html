@@ -114,6 +114,8 @@ const statusBadge = document.getElementById('status-badge');
 const userSelect  = document.getElementById('user-select');
 const sidebar     = document.getElementById('sidebar');
 
+let activeConvId = null;   // conversación activa; null = nueva sesión
+
 const STORAGE_KEY = 'capitan_chat_history';
 const USER_KEY    = 'capitan_chat_user';
 
@@ -155,6 +157,7 @@ function saveHistory() {
 
 function newConversation() {
   localStorage.removeItem(STORAGE_KEY);
+  activeConvId = null;
   messagesEl.innerHTML = `
     <div class="flex justify-start">
       <div class="max-w-[70%] rounded-2xl rounded-tl-sm px-4 py-3 bg-gray-800 text-gray-100 text-sm leading-relaxed">
@@ -260,6 +263,7 @@ form.addEventListener('submit', async (e) => {
   const fd = new FormData();
   fd.append('text', text);
   fd.append('user_id', currentUserId());
+  if (activeConvId) fd.append('conversation_id', activeConvId);
 
   try {
     const resp   = await fetch('/api/chat/send', { method: 'POST', body: fd });
@@ -402,6 +406,11 @@ async function loadConversationDetail(convId) {
       panel.innerHTML = back + '<div class="text-gray-600 text-xs py-2 text-center">Sin turnos</div>';
       return;
     }
+
+    // Cargar turnos en el área principal y activar la conversación
+    resumeConversationInMain(conv);
+
+    // Sidebar: mostrar mini-vista con confirmación
     const turnsHtml = conv.turns.map(t => {
       const isUser = t.role === 'user';
       return `<div class="flex ${isUser ? 'justify-end' : 'justify-start'} mb-2">
@@ -410,11 +419,30 @@ async function loadConversationDetail(convId) {
         </div>
       </div>`;
     }).join('');
-    panel.innerHTML = back + turnsHtml;
+    panel.innerHTML = back +
+      `<div class="text-xs text-emerald-400 mb-3 px-1">✓ Conversación cargada en el chat</div>` +
+      turnsHtml;
   } catch (err) {
     panel.innerHTML = `<button onclick="loadConversationList()" class="text-xs text-blue-400 mb-3">← Volver</button>
       <div class="text-red-400 text-xs py-2 text-center">Error: ${err.message}</div>`;
   }
+}
+
+function resumeConversationInMain(conv) {
+  // Limpiar área principal y cargar turnos de la conversación elegida
+  activeConvId = conv.id;
+  localStorage.removeItem(STORAGE_KEY);
+
+  messagesEl.innerHTML = '';
+  conv.turns.forEach(t => appendBubble(t.role === 'user' ? 'user' : 'agent', t.content, null, false));
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+
+  // Badge indicando qué conversación está activa
+  statusBadge.textContent = `↩ conv ${conv.id}`;
+  statusBadge.classList.remove('hidden');
+  setTimeout(() => { if (statusBadge.textContent.startsWith('↩')) statusBadge.classList.add('hidden'); }, 3000);
+
+  input.focus();
 }
 
 // ── Intenciones activas del usuario ──────────────────────────────────────────
@@ -487,18 +515,30 @@ function exportConversation() {
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
-// Pre-seleccionar usuario si viene en la URL (?user_id=xxx)
-const urlUser = new URLSearchParams(location.search).get('user_id');
+// Pre-seleccionar usuario y/o conversación desde la URL (?user_id=xxx&conv_id=yyy)
+const _urlParams = new URLSearchParams(location.search);
+const urlUser   = _urlParams.get('user_id');
+const urlConvId = _urlParams.get('conv_id');
+
 if (urlUser && userSelect) {
   userSelect.value = urlUser;
   localStorage.setItem(USER_KEY, urlUser);
 }
 
-loadHistory();
+if (urlConvId) {
+  // Cargar la conversación específica en el área principal
+  fetch(`/api/chat/conversations/${urlConvId}`)
+    .then(r => r.json())
+    .then(conv => resumeConversationInMain(conv))
+    .catch(() => loadHistory());
+} else {
+  loadHistory();
+}
+
 input.focus();
 
-// Si hay usuario en URL, abrir sidebar en historial automáticamente
-if (urlUser) {
+// Abrir sidebar si viene usuario o conversación desde URL
+if (urlUser || urlConvId) {
   toggleSidebar();
 }
 </script>

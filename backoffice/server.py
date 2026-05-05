@@ -198,17 +198,21 @@ def chat_page(request: Request):
 
 
 @app.post("/api/chat/send")
-def chat_send(request: Request, text: str = Form(...), user_id: str = Form("")):
+def chat_send(request: Request, text: str = Form(...), user_id: str = Form(""), conversation_id: str = Form("")):
     _require_auth(request)
     source: dict = {"channel": "chat"}
     if user_id:
         source["speaker_id"] = user_id
 
+    body: dict = {"text": text, "source": source}
+    if conversation_id:
+        body["conversation_id"] = conversation_id
+
     def _relay():
         try:
             with requests.post(
                 f"{CORE_URL}/process/stream",
-                json={"text": text, "source": source},
+                json=body,
                 stream=True,
                 timeout=60,
             ) as r:
