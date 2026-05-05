@@ -31,6 +31,7 @@
         <th class="px-4 py-3 text-left">Descripción</th>
         <th class="px-4 py-3 text-left">Keywords</th>
         <th class="px-4 py-3 text-center">Estado</th>
+        <th class="px-4 py-3 text-center">Proactivo</th>
         <th class="px-4 py-3 text-center">Accesible</th>
         <th class="px-4 py-3 text-center">Acciones</th>
       </tr>
@@ -72,6 +73,13 @@
               {% if st == 'active' %}bg-emerald-900/50 text-emerald-400 hover:bg-emerald-900{% elif st == 'planned' %}bg-gray-800 text-gray-500 hover:bg-gray-700{% else %}bg-red-900/50 text-red-400 hover:bg-red-900{% endif %}">
             {{ st }}
           </button>
+        </td>
+        <td class="px-4 py-3 text-center">
+          {% if info.proactive_enabled %}
+            <span class="px-2 py-0.5 bg-indigo-900/50 text-indigo-400 rounded text-xs">on</span>
+          {% else %}
+            <span class="px-2 py-0.5 bg-gray-800 text-gray-600 rounded text-xs">off</span>
+          {% endif %}
         </td>
         <td class="px-4 py-3 text-center">
           {% if info.reachable is none %}
