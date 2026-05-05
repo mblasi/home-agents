@@ -487,8 +487,20 @@ function exportConversation() {
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
+// Pre-seleccionar usuario si viene en la URL (?user_id=xxx)
+const urlUser = new URLSearchParams(location.search).get('user_id');
+if (urlUser && userSelect) {
+  userSelect.value = urlUser;
+  localStorage.setItem(USER_KEY, urlUser);
+}
+
 loadHistory();
 input.focus();
+
+// Si hay usuario en URL, abrir sidebar en historial automáticamente
+if (urlUser) {
+  toggleSidebar();
+}
 </script>
 </body>
 </html>

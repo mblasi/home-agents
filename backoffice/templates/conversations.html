@@ -23,18 +23,38 @@
     <thead>
       <tr class="border-b border-gray-800 text-gray-400 text-xs uppercase tracking-wider">
         <th class="px-4 py-3 text-left">ID</th>
-        <th class="px-4 py-3 text-left">Fuente</th>
+        <th class="px-4 py-3 text-left">Canal</th>
+        <th class="px-4 py-3 text-left">Usuario</th>
         <th class="px-4 py-3 text-center">Turnos</th>
         <th class="px-4 py-3 text-center">Estado</th>
         <th class="px-4 py-3 text-right">Última actividad</th>
-        <th class="px-4 py-3 w-16"></th>
+        <th class="px-4 py-3 w-24 text-center">Acciones</th>
       </tr>
     </thead>
     <tbody class="divide-y divide-gray-800">
       {% for c in convs %}
       <tr id="conv-{{ c.id }}" class="hover:bg-gray-800/50">
         <td class="px-4 py-3 font-mono text-xs text-gray-400">{{ c.id }}</td>
-        <td class="px-4 py-3 text-xs text-gray-300 max-w-xs truncate">{{ c.source_key }}</td>
+        <td class="px-4 py-3 text-xs text-gray-400">
+          {% if c.channel == "whatsapp" %}
+          <span title="{{ c.source_key }}">💬 WA</span>
+          {% elif c.channel == "chat" %}
+          <span>🖥 web</span>
+          {% elif c.channel %}
+          <span>{{ c.channel }}</span>
+          {% else %}
+          <span class="text-gray-600">mic</span>
+          {% endif %}
+        </td>
+        <td class="px-4 py-3 text-xs">
+          {% if c.speaker_id and c.speaker_id != "guest" %}
+          <span class="text-gray-200 font-medium">{{ c.speaker_id }}</span>
+          {% elif c.phone %}
+          <span class="text-yellow-600 font-mono" title="Teléfono no vinculado a ningún usuario">{{ c.phone }}</span>
+          {% else %}
+          <span class="text-gray-600">invitado</span>
+          {% endif %}
+        </td>
         <td class="px-4 py-3 text-center text-gray-300">{{ c.turns }}</td>
         <td class="px-4 py-3 text-center">
           {% if c.state == "active" %}
@@ -46,9 +66,14 @@
           {% endif %}
         </td>
         <td class="px-4 py-3 text-right text-xs text-gray-500">
-          {{ c.updated_at | int }}
+          {{ c.updated_at | datetimefmt }}
         </td>
-        <td class="px-4 py-3 text-center">
+        <td class="px-4 py-3 text-center flex items-center justify-center gap-2">
+          {% if c.speaker_id and c.speaker_id != "guest" %}
+          <a href="/chat?user_id={{ c.speaker_id }}"
+             class="text-xs text-blue-500 hover:text-blue-300 transition-colors"
+             title="Retomar en chat web">↗ Chat</a>
+          {% endif %}
           {% if c.state == "active" %}
           <button class="text-gray-600 hover:text-red-400 text-xs transition-colors"
                   hx-delete="/conversations/{{ c.id }}"
