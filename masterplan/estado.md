@@ -405,6 +405,11 @@ Stack:    whatsapp-web.js (Node 18), LocalAuth, POST /wa/inbound (FastAPI)
 - [x] Respuesta: espejo de entrada (texto → texto, PTT → nota de voz)
 - [x] Persistencia de sesión WA: LocalAuth en ~/.local/share/capitan/wa-session/
 
+#### Correcciones
+- [x] 3.5.11 **Fix formato @lid** — `msg.from` puede llegar como `205432...@lid` en vez de `5491...@c.us`
+             (formato "linked identity" de WA moderno). Usar `msg.getContact()` para resolver el número
+             real en todos los casos, en lugar de un simple `replace("@c.us", "")`.
+
 ---
 
 ### FASE 4 - Agente Clima

@@ -137,7 +137,16 @@ async function handleAudio(msg, phone) {
 client.on("message", async (msg) => {
   if (msg.isGroupMsg) return;
 
-  const phone = "+" + msg.from.replace("@c.us", "");
+  // msg.from puede ser "5491155...@c.us" o "205432...@lid" (linked identity, WA moderno).
+  // getContact().number siempre devuelve el número sin prefijo, sin @dominio.
+  let phone;
+  try {
+    const contact = await msg.getContact();
+    phone = "+" + contact.number;
+  } catch (_) {
+    // Fallback si getContact falla: extraer dígitos del from y asumir formato numérico
+    phone = "+" + msg.from.replace(/@\S+/, "");
+  }
 
   try {
     if (msg.type === "chat") {
