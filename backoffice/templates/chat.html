@@ -208,6 +208,8 @@ function newConversation() {
   _lastMsgDate = null;
   messagesEl.innerHTML = '';
   appendBubble('agent', 'Hola. ¿En qué te puedo ayudar?', null, false);
+  const p = new URLSearchParams(location.search);
+  if (p.has('conv_id')) { p.delete('conv_id'); history.replaceState(null, '', p.toString() ? `${location.pathname}?${p}` : location.pathname); }
   input.focus();
 }
 
@@ -411,9 +413,15 @@ form.addEventListener('submit', async (e) => {
           } else if (currentEvent === 'done') {
             fullText = data.response;
             agentTextEl.textContent = fullText;
+            const isNewConv = !activeConvId && data.conversation_id;
             activeConvId = data.conversation_id;
             convBadge.textContent = activeConvId;
             convBadge.classList.remove('hidden');
+            if (isNewConv) {
+              const p = new URLSearchParams(location.search);
+              p.set('conv_id', activeConvId);
+              history.replaceState(null, '', `${location.pathname}?${p}`);
+            }
             agentBubble.appendChild(buildChip(data));
             agentWrapper.dataset.meta = JSON.stringify(data);
             if (tickEl) {

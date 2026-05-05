@@ -4,8 +4,12 @@
 {% block content %}
 <div class="flex items-center justify-between mb-6">
   <h1 class="text-2xl font-bold">Conversaciones</h1>
-  <!-- Filtro por estado -->
+  <!-- Filtro por estado + nueva -->
   <div class="flex gap-2">
+    <a href="/chat"
+       class="text-xs px-3 py-1.5 rounded-lg border border-indigo-700 bg-indigo-950 text-indigo-300 hover:text-white hover:border-indigo-500 transition-colors">
+      + Nueva
+    </a>
     {% for s, label in [("all", "Todas"), ("active", "Activas"), ("closed", "Cerradas"), ("expired", "Expiradas")] %}
     <a href="/conversations?status={{ s }}"
        class="text-xs px-3 py-1.5 rounded-lg border transition-colors
