@@ -1238,6 +1238,10 @@ o el JS apunta directamente al core. Conversaciones persistidas en localStorage 
 - [x] 17.8  **Exportar conversación** — botón en el header. Genera un JSON con los turnos
             de la sesión actual y lo descarga via `Blob + URL.createObjectURL`. Alternativa:
             botón "Copiar como markdown" para pegar en notas.
+- [x] 17.9  **Persistencia de conversaciones en disco** — `ConversationManager` guarda las
+            conversaciones en `~/.local/share/capitan/conversations.json` al crear/actualizar/cerrar
+            cada conversación. Al iniciar el core, carga el archivo y restaura el historial completo.
+            Los turnos sobreviven reinicios del proceso.
 
 ---
 
