@@ -11,7 +11,17 @@
     {% if agent.dynamic %}<span class="ml-2 text-xs text-indigo-400 bg-indigo-900/30 border border-indigo-800 px-2 py-0.5 rounded-full">dinámico</span>{% endif %}
     {% if proactive_info %}<span class="ml-2 text-xs text-violet-400 bg-violet-900/20 border border-violet-800 px-2 py-0.5 rounded-full">🔄 proactivo</span>{% endif %}
   </h1>
-  <div class="ml-auto flex gap-2">
+  <div class="ml-auto flex gap-2 items-center">
+    {% set proactive_on = agent.get('proactive_enabled', true) %}
+    <button id="proactive-toggle-{{ agent_id }}"
+      hx-post="/agents/{{ agent_id }}/proactive/toggle"
+      hx-target="#proactive-toggle-{{ agent_id }}"
+      hx-swap="outerHTML"
+      class="px-3 py-1.5 border text-xs font-medium rounded-lg transition-colors
+        {% if proactive_on %}bg-violet-900/40 text-violet-300 border-violet-700 hover:bg-violet-800/60
+        {% else %}bg-gray-800 text-gray-500 border-gray-700 hover:bg-gray-700{% endif %}">
+      proactivo: {{ 'on' if proactive_on else 'off' }}
+    </button>
     <a href="/agents/{{ agent_id }}/edit"
        class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm rounded-lg transition-colors">
       Editar
@@ -338,7 +348,7 @@
         <span class="ml-2 text-gray-600">{{ conv.source_key or "—" }}</span>
       </div>
       <div class="flex items-center gap-3">
-        <span class="text-xs text-gray-600">{{ conv.turns | length if conv.turns is defined else "?" }} turns</span>
+        <span class="text-xs text-gray-600">{{ conv.turns if conv.turns is defined else "?" }} turns</span>
         <span class="px-1.5 py-0.5 rounded text-xs
           {% if conv.state == 'active' %}bg-emerald-900/40 text-emerald-400
           {% elif conv.state == 'closed' %}bg-gray-800 text-gray-500

@@ -54,7 +54,7 @@
 {# ── Contenido por paso ────────────────────────────────────────────────────────── #}
 
 {% if current_step == "completo" %}
-<div class="bg-gray-900 border border-emerald-800/50 rounded-xl p-6 max-w-lg">
+<div class="bg-gray-900 border border-emerald-800/50 rounded-xl p-6 max-w-lg mb-6">
   <div class="flex items-center gap-3 mb-4">
     <span class="text-2xl">✓</span>
     <div>
@@ -73,6 +73,39 @@
     </a>
   </div>
 </div>
+
+{# ── Re-enrollment post-onboarding ────────────────────────────────────────────── #}
+<h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Mejorar reconocimiento</h2>
+
+{% for re_step, (re_label, re_total) in enroll_labels.items() %}
+<div id="{{ re_step }}" class="bg-gray-900 border border-gray-800 rounded-xl p-5 max-w-lg mb-4">
+  <h3 class="text-sm font-semibold text-gray-200 mb-1">{{ re_label }}</h3>
+  {% if re_step == "frases_speaker_id" %}
+  <p class="text-xs text-gray-500 mb-4">
+    Volvé a grabar las {{ re_total }} frases para actualizar el perfil de voz. Útil si la tasa de reconocimiento bajó.
+  </p>
+  {% else %}
+  <p class="text-xs text-gray-500 mb-4">
+    Agregá {{ re_total }} muestras más de «Capitán» para mejorar la detección y reducir falsos positivos.
+  </p>
+  {% endif %}
+
+  <form hx-post="/users/{{ uid }}/enroll/start"
+        hx-target="#enroll-fragment-{{ re_step }}"
+        hx-swap="innerHTML">
+    <input type="hidden" name="step" value="{{ re_step }}">
+    <button type="submit"
+            class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs
+                   font-medium transition-colors mb-3">
+      Iniciar grabación
+    </button>
+  </form>
+
+  <div id="enroll-fragment-{{ re_step }}" class="min-h-[32px]">
+    <p class="text-xs text-gray-600">Presioná el botón para comenzar.</p>
+  </div>
+</div>
+{% endfor %}
 
 {% elif current_step in ["frases_speaker_id", "muestras_wake_word"] %}
 {% set step_label = enroll_labels[current_step][0] %}

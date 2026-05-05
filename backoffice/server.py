@@ -376,6 +376,31 @@ async def toggle_agent(agent_id: str):
     )
 
 
+@app.post("/agents/{agent_id}/proactive/toggle", response_class=HTMLResponse)
+async def toggle_agent_proactive(agent_id: str):
+    agent = _core(f"/agents/{agent_id}") or {}
+    current = agent.get("proactive_enabled", True)
+    new_val = not current
+    _core(f"/agents/{agent_id}/proactive", method="PATCH", json={"enabled": new_val})
+    return HTMLResponse(_proactive_toggle_html(agent_id, new_val))
+
+
+def _proactive_toggle_html(agent_id: str, enabled: bool) -> str:
+    if enabled:
+        css  = "bg-violet-900/40 text-violet-300 border-violet-700 hover:bg-violet-800/60"
+        label = "proactivo: on"
+    else:
+        css  = "bg-gray-800 text-gray-500 border-gray-700 hover:bg-gray-700"
+        label = "proactivo: off"
+    return (
+        f'<button id="proactive-toggle-{agent_id}" '
+        f'hx-post="/agents/{agent_id}/proactive/toggle" '
+        f'hx-target="#proactive-toggle-{agent_id}" hx-swap="outerHTML" '
+        f'class="px-3 py-1.5 border text-xs font-medium rounded-lg transition-colors {css}">'
+        f'{label}</button>'
+    )
+
+
 @app.post("/agents/{agent_id}/proactive/run", response_class=HTMLResponse)
 async def proactive_run(agent_id: str, request: Request):
     result = _core(f"/proactive/{agent_id}/run", method="POST", timeout=120)
@@ -554,6 +579,33 @@ async def update_intent_proxy(uid: str, intent_id: str, request: Request):
 def delete_intent_proxy(uid: str, intent_id: str):
     _core(f"/users/{uid}/intents/{intent_id}", method="DELETE")
     return HTMLResponse("")
+
+
+@app.post("/users/{uid}/intents/{intent_id}/respond", response_class=HTMLResponse)
+async def respond_intent_proxy(uid: str, intent_id: str, request: Request):
+    ct = request.headers.get("content-type", "")
+    if "application/json" in ct:
+        body = await request.json()
+    else:
+        form = await request.form()
+        body = dict(form)
+    value = body.get("value", "").strip()
+    if value:
+        all_intents = _core(f"/users/{uid}/intents") or []
+        intent = next((i for i in all_intents if i.get("intent_id") == intent_id), {})
+        ctx = intent.get("context", {})
+        field = ctx.get("required_field")
+        agent_id = intent.get("agent_id")
+        if field and agent_id:
+            _core(f"/users/{uid}/context/{agent_id}", method="PATCH", json={field: value})
+        _core(f"/users/{uid}/intents/{intent_id}", method="PATCH", json={"status": "done"})
+    row_id = f"intent-row-{intent_id}"
+    return HTMLResponse(
+        f'<div id="{row_id}" class="px-4 py-3 text-xs text-emerald-400 bg-emerald-950/30 border border-emerald-900/40 rounded-xl">'
+        f'✓ Guardado'
+        f'<script>setTimeout(()=>document.getElementById("{row_id}")?.remove(),2000)</script>'
+        f'</div>'
+    )
 
 
 @app.get("/shared-state", response_class=HTMLResponse)

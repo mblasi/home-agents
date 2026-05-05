@@ -90,19 +90,41 @@
     </div>
 
     <!-- Acciones -->
-    <div class="shrink-0 flex gap-2">
+    <div class="shrink-0 flex gap-2 items-start">
       {% if intent.status in ['pending', 'in_progress'] %}
-      <button
-        hx-patch="/users/{{ intent.user_id }}/intents/{{ intent.intent_id }}"
-        hx-vals='{"status": "done"}'
-        hx-target="#intent-row-{{ intent.intent_id }}"
-        hx-swap="outerHTML"
-        hx-headers='{"Content-Type": "application/json"}'
-        title="Marcar como completada"
-        class="px-2 py-1 text-xs text-emerald-400 hover:text-emerald-300 hover:bg-emerald-900/20
-               rounded transition-colors border border-emerald-800/50">
-        ✓ completar
-      </button>
+        {% set req_field = intent.context.get('required_field') if intent.context else None %}
+        {% if req_field %}
+        <form
+          hx-post="/users/{{ intent.user_id }}/intents/{{ intent.intent_id }}/respond"
+          hx-target="#intent-row-{{ intent.intent_id }}"
+          hx-swap="outerHTML"
+          class="flex gap-1 items-center">
+          <input
+            type="text"
+            name="value"
+            required
+            placeholder="{{ intent.context.get('required_field_placeholder', '') }}"
+            class="px-2 py-1 text-xs bg-gray-800 border border-gray-700 rounded text-gray-200
+                   placeholder-gray-600 focus:outline-none focus:border-emerald-600 w-44">
+          <button type="submit"
+            class="px-2 py-1 text-xs text-emerald-400 hover:text-emerald-300 hover:bg-emerald-900/20
+                   rounded transition-colors border border-emerald-800/50 whitespace-nowrap">
+            ✓ guardar
+          </button>
+        </form>
+        {% else %}
+        <button
+          hx-patch="/users/{{ intent.user_id }}/intents/{{ intent.intent_id }}"
+          hx-vals='{"status": "done"}'
+          hx-target="#intent-row-{{ intent.intent_id }}"
+          hx-swap="outerHTML"
+          hx-headers='{"Content-Type": "application/json"}'
+          title="Marcar como completada"
+          class="px-2 py-1 text-xs text-emerald-400 hover:text-emerald-300 hover:bg-emerald-900/20
+                 rounded transition-colors border border-emerald-800/50">
+          ✓ completar
+        </button>
+        {% endif %}
       {% endif %}
       <button
         hx-delete="/users/{{ intent.user_id }}/intents/{{ intent.intent_id }}"
