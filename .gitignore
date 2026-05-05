@@ -25,3 +25,5 @@ venv/
 .DS_Store
 *.swp
 *.swo
+
+wa/.wwebjs_cache/
