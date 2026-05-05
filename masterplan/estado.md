@@ -409,6 +409,11 @@ Stack:    whatsapp-web.js (Node 18), LocalAuth, POST /wa/inbound (FastAPI)
 - [x] 3.5.11 **Fix formato @lid** — `msg.from` puede llegar como `205432...@lid` en vez de `5491...@c.us`
              (formato "linked identity" de WA moderno). Usar `msg.getContact()` para resolver el número
              real en todos los casos, en lugar de un simple `replace("@c.us", "")`.
+- [x] 3.5.12 **Match por wa_lid** — `contact.number` en modo `@lid` devuelve el LID, no el teléfono.
+             Solución: campo `wa_lid` en User (además de `wa_phone`). Para mensajes `@c.us` se usa
+             `from_number`; para `@lid` se pasa `from_lid` al core. El core intenta match por
+             `wa_phone` primero, luego por `wa_lid`. El backoffice muestra y permite editar `wa_lid`
+             en el perfil de usuario.
 
 ---
 

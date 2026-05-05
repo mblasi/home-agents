@@ -71,11 +71,15 @@ client.on("disconnected", (reason) => {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-async function handleText(msg, phone, text) {
+async function handleText(msg, phone, fromLid, text) {
+  const body = { text, message_id: msg.id.id };
+  if (phone)   body.from_number = phone;
+  if (fromLid) body.from_lid    = fromLid;
+
   const res = await fetch(`${CORE_URL}/wa/inbound`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ from_number: phone, text, message_id: msg.id.id }),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) {
@@ -87,25 +91,25 @@ async function handleText(msg, phone, text) {
   const data = await res.json();
   if (data.response) {
     await msg.reply(data.response);
-    console.log(`[WA] → ${phone}: ${data.response.slice(0, 80)}`);
+    console.log(`[WA] → ${phone || fromLid}: ${data.response.slice(0, 80)}`);
   }
 }
 
-async function handleAudio(msg, phone) {
+async function handleAudio(msg, phone, fromLid) {
   const media = await msg.downloadMedia();
   if (!media) {
-    console.error(`[WA] No se pudo descargar el audio de ${phone}`);
+    console.error(`[WA] No se pudo descargar el audio de ${phone || fromLid}`);
     return;
   }
+
+  const body = { audio_b64: media.data, message_id: msg.id.id };
+  if (phone)   body.from_number = phone;
+  if (fromLid) body.from_lid    = fromLid;
 
   const res = await fetch(`${CORE_URL}/wa/inbound/audio`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      from_number: phone,
-      audio_b64: media.data,
-      message_id: msg.id.id,
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) {
@@ -115,7 +119,7 @@ async function handleAudio(msg, phone) {
   }
 
   const data = await res.json();
-  console.log(`[WA] STT ${phone}: "${data.transcription}"`);
+  console.log(`[WA] STT ${phone || fromLid}: "${data.transcription}"`);
 
   if (data.audio_b64) {
     const voiceNote = new MessageMedia(
@@ -125,10 +129,10 @@ async function handleAudio(msg, phone) {
     );
     const chat = await msg.getChat();
     await chat.sendMessage(voiceNote, { sendAudioAsVoice: true });
-    console.log(`[WA] → ${phone}: [nota de voz] ${data.response.slice(0, 60)}`);
+    console.log(`[WA] → ${phone || fromLid}: [nota de voz] ${data.response.slice(0, 60)}`);
   } else if (data.response) {
     await msg.reply(data.response);
-    console.log(`[WA] → ${phone}: ${data.response.slice(0, 80)}`);
+    console.log(`[WA] → ${phone || fromLid}: ${data.response.slice(0, 80)}`);
   }
 }
 
@@ -138,25 +142,48 @@ client.on("message", async (msg) => {
   if (msg.isGroupMsg) return;
 
   // msg.from puede ser "5491155...@c.us" o "205432...@lid" (linked identity, WA moderno).
-  // getContact().number siempre devuelve el número sin prefijo, sin @dominio.
-  let phone;
+  // Estrategia: getChat() → contact.id → msg.from (en ese orden de confiabilidad).
+  let phone = null;
+  let fromLid = null;
+
   try {
-    const contact = await msg.getContact();
-    phone = "+" + contact.number;
+    const chat  = await msg.getChat();
+    const chatId = chat.id._serialized;
+
+    if (chatId.endsWith("@c.us")) {
+      phone = "+" + chat.id.user;
+    } else {
+      // Chat también en @lid — extraer LID para match en el core
+      if (chatId.endsWith("@lid")) fromLid = chat.id.user;
+
+      // Intentar vía contacto
+      const contact = await msg.getContact();
+      if (contact.id._serialized.endsWith("@c.us")) {
+        phone = "+" + contact.id.user;
+      } else if (contact.id._serialized.endsWith("@lid")) {
+        fromLid = fromLid || contact.id.user;
+      }
+    }
   } catch (_) {
-    // Fallback si getContact falla: extraer dígitos del from y asumir formato numérico
-    phone = "+" + msg.from.replace(/@\S+/, "");
+    // noop — usamos fromLid o fallback
   }
+
+  if (!phone && !fromLid) {
+    // Último recurso: extraer lo que sea del from
+    fromLid = msg.from.replace(/@\S+/, "");
+  }
+
+  console.log(`[WA] from=${msg.from} → phone=${phone} lid=${fromLid}`);
 
   try {
     if (msg.type === "chat") {
       const text = msg.body.trim();
       if (!text) return;
-      console.log(`[WA] texto ${phone}: ${text}`);
-      await handleText(msg, phone, text);
+      console.log(`[WA] texto ${phone || fromLid}: ${text}`);
+      await handleText(msg, phone, fromLid, text);
     } else if (msg.type === "ptt" || msg.type === "audio") {
-      console.log(`[WA] audio ${phone} (${msg.type})`);
-      await handleAudio(msg, phone);
+      console.log(`[WA] audio ${phone || fromLid} (${msg.type})`);
+      await handleAudio(msg, phone, fromLid);
     }
   } catch (err) {
     console.error(`[WA] Error inesperado: ${err.message}`);
