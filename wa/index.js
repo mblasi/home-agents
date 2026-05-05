@@ -24,12 +24,14 @@ require("dotenv").config({ path: __dirname + "/.env" });
 
 const { Client, LocalAuth, MessageMedia } = require("whatsapp-web.js");
 const qrcode = require("qrcode-terminal");
-const fs = require("fs");
+const fs   = require("fs");
+const http = require("http");
 const path = require("path");
 
 // ── Configuración ──────────────────────────────────────────────────────────────
 
 const CORE_URL = process.env.CORE_URL || "http://localhost:8765";
+const WA_PORT  = parseInt(process.env.WA_PORT || "3001", 10);
 const SESSION_PATH =
   process.env.WA_SESSION_PATH ||
   path.join(process.env.HOME, ".local/share/capitan/wa-session");
@@ -190,6 +192,50 @@ client.on("message", async (msg) => {
     await msg.reply("Ocurrió un error interno. Intentá de nuevo.").catch(() => {});
   }
 });
+
+// ── Servidor HTTP outbound ─────────────────────────────────────────────────────
+
+http.createServer(async (req, res) => {
+  if (req.method !== "POST" || req.url !== "/send") {
+    res.writeHead(404);
+    res.end();
+    return;
+  }
+
+  let body = "";
+  req.on("data", (chunk) => { body += chunk; });
+  req.on("end", async () => {
+    try {
+      const { to, text, audio_b64 } = JSON.parse(body);
+      if (!to || (!text && !audio_b64)) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "to y (text o audio_b64) son requeridos" }));
+        return;
+      }
+      const chatId = to.replace("+", "") + "@c.us";
+
+      if (audio_b64) {
+        const voiceNote = new MessageMedia("audio/ogg; codecs=opus", audio_b64, "notification.ogg");
+        const chat = await client.getChatById(chatId);
+        await chat.sendMessage(voiceNote, { sendAudioAsVoice: true });
+        console.log(`[WA] → ${to}: [nota de voz]`);
+      } else {
+        await client.sendMessage(chatId, text);
+        console.log(`[WA] → ${to}: ${text.slice(0, 80)}`);
+      }
+
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true }));
+    } catch (err) {
+      console.error(`[WA] Error outbound: ${err.message}`);
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: err.message }));
+    }
+  });
+}).listen(WA_PORT, "127.0.0.1", () => {
+  console.log(`[WA] Servidor outbound escuchando en :${WA_PORT}`);
+});
+
 
 // ── Arranque ───────────────────────────────────────────────────────────────────
 

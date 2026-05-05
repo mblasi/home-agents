@@ -45,6 +45,19 @@
       <code class="text-yellow-600 font-mono text-xs block mt-0.5" title="WhatsApp LID (linked identity)">LID: {{ user.wa_lid }}</code>
       {% endif %}
     </div>
+    {% if user.wa_phone %}
+    <div>
+      <span class="text-gray-500 text-xs uppercase tracking-wider block mb-0.5">Notif. WA</span>
+      {% set wa_fmt = (user.preferences or {}).get('wa_notify_format', 'text') %}
+      <button id="wa-fmt-btn"
+        hx-post="/users/{{ uid }}/preferences/wa_notify_format/toggle"
+        hx-target="#wa-fmt-btn" hx-swap="outerHTML"
+        class="text-xs px-2 py-0.5 rounded border transition-colors
+          {{ 'bg-blue-900/30 text-blue-300 border-blue-700' if wa_fmt == 'audio' else 'bg-gray-800 text-gray-400 border-gray-700' }}">
+        {{ '🔊 Audio' if wa_fmt == 'audio' else '💬 Texto' }}
+      </button>
+    </div>
+    {% endif %}
   </div>
 </div>
 
@@ -173,7 +186,25 @@
 <!-- Proactividad por agente -->
 {% if proactive_status %}
 <div class="bg-gray-900 border border-violet-900/30 rounded-xl p-5 mb-4">
-  <h2 class="text-xs font-semibold text-violet-400 uppercase tracking-wider mb-4">Proactividad</h2>
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="text-xs font-semibold text-violet-400 uppercase tracking-wider">Proactividad</h2>
+    <button id="run-all-btn" onclick="runAllProactive('{{ uid }}')"
+      class="px-3 py-1 text-xs font-medium bg-violet-900/40 hover:bg-violet-800/60 text-violet-300 border border-violet-700/50 rounded-lg transition-colors">
+      Ejecutar todas
+    </button>
+  </div>
+
+  <!-- resultados del "Ejecutar todas" -->
+  <div id="run-all-results" class="hidden mb-4 border border-violet-900/20 rounded-lg bg-violet-950/20">
+    <div class="flex items-center justify-between px-3 pt-2.5 pb-1">
+      <div id="run-all-status" class="text-xs text-violet-400"></div>
+      <button onclick="document.getElementById('run-all-results').classList.add('hidden')"
+        class="text-gray-600 hover:text-gray-400 text-xs leading-none ml-2">✕</button>
+    </div>
+    <div id="run-all-rows" class="space-y-1 px-3 pb-2"></div>
+    <div id="run-all-summary" class="text-xs text-gray-500 px-3 pt-1 pb-2.5 border-t border-gray-800 hidden"></div>
+  </div>
+
   <div class="space-y-3">
     {% for agent_id_p, pi in proactive_status.items() %}
     {% set agent_info = agents.get(agent_id_p, {}) %}
@@ -198,6 +229,88 @@
     {% endfor %}
   </div>
 </div>
+
+<script>
+async function runAllProactive(uid) {
+  const btn        = document.getElementById('run-all-btn');
+  const resultsDiv = document.getElementById('run-all-results');
+  const statusEl   = document.getElementById('run-all-status');
+  const rowsEl     = document.getElementById('run-all-rows');
+  const summaryEl  = document.getElementById('run-all-summary');
+
+  btn.disabled    = true;
+  btn.textContent = 'Ejecutando…';
+  btn.classList.add('opacity-50', 'cursor-not-allowed');
+  resultsDiv.classList.remove('hidden');
+  rowsEl.innerHTML    = '';
+  summaryEl.classList.add('hidden');
+  statusEl.textContent = 'Iniciando…';
+
+  const resp   = await fetch(`/users/${uid}/proactive/run-all`);
+  const reader = resp.body.getReader();
+  const dec    = new TextDecoder();
+  let buf = '', currentEvent = 'message';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop();
+
+      for (const line of lines) {
+        if (line.startsWith('event: ')) {
+          currentEvent = line.slice(7).trim();
+        } else if (line.startsWith('data: ')) {
+          const data = JSON.parse(line.slice(6));
+
+          if (currentEvent === 'start') {
+            statusEl.textContent = `Ejecutando ${data.agents_count} agentes…`;
+
+          } else if (currentEvent === 'result') {
+            const row = document.createElement('div');
+            row.className = 'flex items-center justify-between gap-2';
+            const nameEl = document.createElement('span');
+            nameEl.className = 'text-xs text-gray-300 truncate';
+            nameEl.textContent = data.agent_name || data.agent_id;
+            const rightEl = document.createElement('span');
+            if (data.error) {
+              rightEl.className = 'text-xs text-red-400 shrink-0';
+              rightEl.textContent = 'error';
+              rightEl.title = data.error;
+            } else {
+              rightEl.className = 'text-xs shrink-0 ' + (data.intents_created > 0 ? 'text-violet-300 font-medium' : 'text-gray-600');
+              rightEl.textContent = data.intents_created > 0
+                ? `+${data.intents_created} intento${data.intents_created !== 1 ? 's' : ''}`
+                : 'sin novedades';
+            }
+            row.appendChild(nameEl);
+            row.appendChild(rightEl);
+            rowsEl.appendChild(row);
+
+          } else if (currentEvent === 'done') {
+            statusEl.textContent = `Completado — ${data.agents_run} agentes`;
+            summaryEl.textContent = data.total_intents > 0
+              ? `Total: ${data.total_intents} intento${data.total_intents !== 1 ? 's' : ''} nuevos generados`
+              : 'Sin intenciones nuevas generadas';
+            summaryEl.classList.remove('hidden');
+
+          } else if (currentEvent === 'error') {
+            statusEl.textContent = `Error: ${data.message}`;
+            statusEl.classList.replace('text-violet-400', 'text-red-400');
+          }
+          currentEvent = 'message';
+        }
+      }
+    }
+  } finally {
+    btn.disabled    = false;
+    btn.textContent = 'Ejecutar todas';
+    btn.classList.remove('opacity-50', 'cursor-not-allowed');
+  }
+}
+</script>
 {% endif %}
 
 <!-- Intenciones activas -->

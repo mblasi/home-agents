@@ -1346,6 +1346,32 @@ El asistente responderá con:
 
 ---
 
+### FASE 18 - Mejoras de UX de Audio
+
+```
+Objetivo: Mejorar la experiencia de interacción por voz: feedback sonoro al detectar
+          la wake word y duck de volumen automático para no interferir con audio en
+          reproducción mientras el usuario habla.
+Estado:   Pendiente
+Deps:     FASE 1 (pipeline base, COMPLETA), FASE 16 deseable para extensión a nodos.
+```
+
+- [ ] 18.1  **Sonido de confirmación en wake word** — reproducir un beep/chime breve
+            (archivo WAV) via ffplay inmediatamente al detectar la wake word, antes de
+            iniciar la grabación del comando. El sonido debe ser corto (<500ms) y
+            no solaparse con la grabación STT. Archivo de audio en `ear/assets/wakeword_ack.wav`.
+
+- [ ] 18.2  **Duck de volumen durante grabación** — al detectar wake word, bajar el
+            volumen del sistema al mínimo posible (o mutear) antes de grabar el comando,
+            y restaurarlo al nivel previo al terminar. Usar `pactl set-sink-volume` para
+            control de PulseAudio/PipeWire. Debe detectar el nivel actual, bajar, grabar,
+            y restaurar incluso si la grabación falla o el pipeline lanza excepción
+            (try/finally). Implementar en `ear/listen.py`.
+
+Estado:   Pendiente
+
+---
+
 ## NOTAS Y DECISIONES TOMADAS
 
 ### 2026-04-27

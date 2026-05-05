@@ -10,37 +10,53 @@
 <body class="h-full text-gray-100 flex flex-col bg-gray-950">
 
   <!-- Header -->
-  <header class="shrink-0 flex items-center justify-between px-5 py-3 bg-gray-900 border-b border-gray-800">
-    <div class="flex items-center gap-3">
-      <span class="text-lg font-bold tracking-tight">⚓ Capitán</span>
-      <span id="status-badge" class="hidden text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-300"></span>
-    </div>
-    <div class="flex items-center gap-3">
-      <button onclick="newConversation()"
-              class="text-sm text-gray-400 hover:text-white transition-colors px-2 py-1 rounded hover:bg-gray-800">
-        + Nueva
-      </button>
-      <button onclick="toggleSidebar()"
-              id="sidebar-btn"
-              class="text-sm text-gray-400 hover:text-white transition-colors px-2 py-1 rounded hover:bg-gray-800">
-        Contexto
-      </button>
-      <button onclick="exportConversation()"
-              class="text-sm text-gray-400 hover:text-white transition-colors px-2 py-1 rounded hover:bg-gray-800"
-              title="Exportar conversación">
-        ↓ Exportar
-      </button>
-      <select id="user-select"
-              onchange="onUserChange()"
-              class="text-sm bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500">
-        <option value="">Invitado</option>
-        {% for u in users %}
-        <option value="{{ u.id }}">{{ u.name }}</option>
-        {% endfor %}
-      </select>
-      <a href="/dashboard" class="text-sm text-gray-400 hover:text-white transition-colors px-2 py-1">
-        Administración →
-      </a>
+  <header class="shrink-0 bg-gray-900 border-b border-gray-800">
+    <div class="flex items-center justify-between px-5 py-3">
+      <!-- Izquierda: logo + usuario -->
+      <div class="flex items-center gap-4">
+        <a href="/conversations" class="text-lg font-bold tracking-tight hover:text-gray-300 transition-colors">⚓ Capitán</a>
+        <span id="status-badge" class="hidden text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-300"></span>
+        <span id="conv-badge" class="hidden text-[10px] font-mono px-2 py-0.5 rounded bg-gray-800 text-gray-500 border border-gray-700 select-all"></span>
+        <!-- Usuario activo: visualmente separado de las acciones -->
+        <div class="flex items-center gap-2 pl-3 border-l border-gray-700">
+          <span class="text-xs text-gray-500 select-none">como</span>
+          <div class="relative">
+            <select id="user-select"
+                    onchange="onUserChange()"
+                    class="appearance-none text-sm bg-indigo-950 border border-indigo-700 rounded-lg pl-3 pr-7 py-1.5 text-indigo-200 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer">
+              <option value="">Invitado</option>
+              {% for u in users %}
+              <option value="{{ u.id }}">{{ u.name }}</option>
+              {% endfor %}
+            </select>
+            <span class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-indigo-400 text-xs">▾</span>
+          </div>
+        </div>
+      </div>
+      <!-- Derecha: acciones -->
+      <div class="flex items-center gap-1">
+        <button onclick="newConversation()"
+                title="Nueva conversación"
+                class="flex items-center justify-center w-8 h-8 rounded-lg bg-gray-800 border border-gray-600 text-gray-200 hover:bg-gray-700 hover:border-gray-500 transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+        </button>
+        <button onclick="exportConversation()"
+                title="Exportar conversación"
+                class="flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-gray-800 transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+        </button>
+        <a href="/dashboard"
+           title="Administración"
+           class="flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-gray-800 transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </a>
+      </div>
     </div>
   </header>
 
@@ -50,9 +66,17 @@
     <!-- Mensajes -->
     <div id="messages" class="flex-1 overflow-y-auto px-4 py-6 space-y-1.5"></div>
 
+    <!-- Handle de colapsar/expandir: siempre visible en el borde derecho -->
+    <button id="sidebar-btn"
+            onclick="toggleSidebar()"
+            title="Mostrar/ocultar contexto"
+            class="shrink-0 w-5 flex items-center justify-center self-stretch bg-gray-900 border-l border-gray-800 text-gray-600 hover:text-gray-300 hover:bg-gray-800 transition-colors select-none">
+      <span id="sidebar-arrow" class="text-[10px]">‹</span>
+    </button>
+
     <!-- Panel lateral: conversaciones + intenciones (derecha) -->
     <aside id="sidebar"
-           class="hidden w-80 shrink-0 border-l border-gray-800 bg-gray-900 flex flex-col overflow-hidden">
+           class="hidden w-80 shrink-0 border-l border-gray-800 bg-gray-900 flex flex-col overflow-hidden transition-all">
 
       <!-- Tabs -->
       <div class="flex border-b border-gray-800 text-xs font-medium">
@@ -105,6 +129,7 @@ const form        = document.getElementById('chat-form');
 const input       = document.getElementById('chat-input');
 const sendBtn     = document.getElementById('send-btn');
 const statusBadge = document.getElementById('status-badge');
+const convBadge   = document.getElementById('conv-badge');
 const userSelect  = document.getElementById('user-select');
 const sidebar     = document.getElementById('sidebar');
 
@@ -179,6 +204,7 @@ function saveHistory() {
 function newConversation() {
   localStorage.removeItem(STORAGE_KEY);
   activeConvId = null;
+  convBadge.classList.add('hidden');
   _lastMsgDate = null;
   messagesEl.innerHTML = '';
   appendBubble('agent', 'Hola. ¿En qué te puedo ayudar?', null, false);
@@ -250,7 +276,7 @@ function appendBubble(role, text, meta = null, scroll = true, ts = null, userNam
 
   if (isUser) {
     const tickEl = document.createElement('span');
-    tickEl.className   = 'tick text-[11px] text-blue-300 leading-none';
+    tickEl.className   = 'tick text-[11px] text-gray-500 leading-none';
     tickEl.textContent = '✓';
     footer.appendChild(tickEl);
   }
@@ -374,7 +400,8 @@ form.addEventListener('submit', async (e) => {
           if (currentEvent === 'status') {
             setStatus(data.phase, data.agent);
             if (data.phase === 'running' && tickEl) {
-              tickEl.textContent = '✓✓';  // entregado al agente
+              tickEl.textContent = '✓✓';
+              tickEl.className   = 'tick text-[11px] text-blue-400 leading-none';
             }
           } else if (currentEvent === 'token') {
             if (fullText === '') agentTextEl.textContent = '';
@@ -385,11 +412,13 @@ form.addEventListener('submit', async (e) => {
             fullText = data.response;
             agentTextEl.textContent = fullText;
             activeConvId = data.conversation_id;
+            convBadge.textContent = activeConvId;
+            convBadge.classList.remove('hidden');
             agentBubble.appendChild(buildChip(data));
             agentWrapper.dataset.meta = JSON.stringify(data);
             if (tickEl) {
-              tickEl.textContent = '✓✓';                              // respondido
-              tickEl.className   = 'tick text-[11px] text-blue-100 leading-none';
+              tickEl.textContent = '✓✓';
+              tickEl.className   = 'tick text-[11px] text-sky-300 leading-none font-bold';
             }
           } else if (currentEvent === 'error') {
             agentTextEl.textContent = `Error: ${data.message}`;
@@ -419,14 +448,23 @@ input.addEventListener('keydown', (e) => {
 let sidebarOpen = false;
 let activeTab   = 'convs';
 
-function toggleSidebar() {
-  sidebarOpen = !sidebarOpen;
+function toggleSidebar(forceOpen) {
+  sidebarOpen = forceOpen !== undefined ? forceOpen : !sidebarOpen;
   sidebar.classList.toggle('hidden', !sidebarOpen);
+  document.getElementById('sidebar-arrow').textContent = sidebarOpen ? '›' : '‹';
   if (sidebarOpen) {
     if (activeTab === 'convs') loadConversationList();
     else loadIntents();
   }
 }
+
+document.addEventListener('click', (e) => {
+  if (!sidebarOpen) return;
+  const path = e.composedPath();
+  if (path.includes(sidebar)) return;
+  if (path.includes(document.getElementById('sidebar-btn'))) return;
+  toggleSidebar(false);
+});
 
 function showTab(tab) {
   activeTab = tab;
@@ -523,6 +561,8 @@ async function loadConversationDetail(convId) {
 
 function resumeConversationInMain(conv) {
   activeConvId = conv.id;
+  convBadge.textContent = activeConvId;
+  convBadge.classList.remove('hidden');
   localStorage.removeItem(STORAGE_KEY);
   _lastMsgDate = null;
   messagesEl.innerHTML = '';
@@ -534,9 +574,7 @@ function resumeConversationInMain(conv) {
   });
   messagesEl.scrollTop = messagesEl.scrollHeight;
 
-  statusBadge.textContent = `↩ conv ${conv.id}`;
-  statusBadge.classList.remove('hidden');
-  setTimeout(() => { if (statusBadge.textContent.startsWith('↩')) statusBadge.classList.add('hidden'); }, 3000);
+  statusBadge.classList.add('hidden');
 
   input.focus();
 }
@@ -642,7 +680,7 @@ if (urlConvId) {
 
 input.focus();
 
-if (urlUser || urlConvId) toggleSidebar();
+// sidebar siempre cerrado al inicio
 </script>
 </body>
 </html>

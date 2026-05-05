@@ -824,11 +824,34 @@ def delete_user_context_field_proxy(uid: str, agent_id: str, field: str):
     return HTMLResponse("")
 
 
+@app.post("/users/{uid}/preferences/{key}/toggle", response_class=HTMLResponse)
+def toggle_user_preference(uid: str, key: str):
+    user = _core(f"/users/{uid}") or {}
+    prefs = dict(user.get("preferences") or {})
+    if key == "wa_notify_format":
+        current = prefs.get("wa_notify_format", "text")
+        new_val = "audio" if current == "text" else "text"
+        prefs["wa_notify_format"] = new_val
+        _core(f"/users/{uid}", method="PATCH", json={"preferences": prefs})
+        is_audio = new_val == "audio"
+        cls  = "bg-blue-900/30 text-blue-300 border-blue-700" if is_audio else "bg-gray-800 text-gray-400 border-gray-700"
+        label = "🔊 Audio" if is_audio else "💬 Texto"
+        return HTMLResponse(
+            f'<button id="wa-fmt-btn" '
+            f'hx-post="/users/{uid}/preferences/wa_notify_format/toggle" '
+            f'hx-target="#wa-fmt-btn" hx-swap="outerHTML" '
+            f'class="text-xs px-2 py-0.5 rounded border transition-colors {cls}">'
+            f'{label}</button>'
+        )
+    return HTMLResponse("", status_code=400)
+
+
 @app.post("/users/{uid}/proactive/{agent_id}/toggle", response_class=HTMLResponse)
 def toggle_proactive_for_user(uid: str, agent_id: str):
-    ctx     = _core(f"/users/{uid}/context/{agent_id}") or {}
-    current = ctx.get("proactive_enabled", True)
-    new_val = not current
+    ctx       = _core(f"/users/{uid}/context/{agent_id}") or {}
+    raw_field = ctx.get("proactive_enabled")
+    current   = raw_field.get("value", True) if isinstance(raw_field, dict) else (True if raw_field is None else raw_field)
+    new_val   = not current
     _core(f"/users/{uid}/context/{agent_id}", method="PATCH", json={"proactive_enabled": new_val})
     on_cls  = "bg-violet-600 hover:bg-violet-500 text-white"
     off_cls = "bg-gray-700 hover:bg-gray-600 text-gray-400"
@@ -839,6 +862,32 @@ def toggle_proactive_for_user(uid: str, agent_id: str):
         f'hx-target="this" hx-swap="outerHTML" '
         f'class="px-2 py-1 text-xs font-medium rounded-lg transition-colors {css}">'
         f'{label}</button>'
+    )
+
+
+@app.get("/users/{uid}/proactive/run-all")
+def proactive_run_all_for_user(uid: str, concurrency: int = 3):
+    """SSE proxy: retransmite el stream de core /proactive/run-for-user/{uid}."""
+    def _relay():
+        try:
+            with requests.get(
+                f"{CORE_URL}/proactive/run-for-user/{uid}",
+                params={"concurrency": concurrency},
+                stream=True,
+                timeout=300,
+            ) as r:
+                for raw in r.iter_lines():
+                    if raw:
+                        yield raw.decode() + "\n"
+                    else:
+                        yield "\n"
+        except Exception as exc:
+            yield f"event: error\ndata: {json.dumps({'message': str(exc)})}\n\n"
+
+    return StreamingResponse(
+        _relay(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
 
 
