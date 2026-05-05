@@ -434,7 +434,11 @@ function resumeConversationInMain(conv) {
   localStorage.removeItem(STORAGE_KEY);
 
   messagesEl.innerHTML = '';
-  conv.turns.forEach(t => appendBubble(t.role === 'user' ? 'user' : 'agent', t.content, null, false));
+  conv.turns.forEach(t => {
+    const role = t.role === 'user' ? 'user' : 'agent';
+    const meta = (role === 'agent' && t.meta && Object.keys(t.meta).length) ? t.meta : null;
+    appendBubble(role, t.content, meta, false);
+  });
   messagesEl.scrollTop = messagesEl.scrollHeight;
 
   // Badge indicando qué conversación está activa
