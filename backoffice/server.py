@@ -113,6 +113,39 @@ app.add_middleware(AuthMiddleware)
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
+_CAPITAN_DIR = Path.home() / ".local/share/capitan"
+
+_OAUTH_SERVICES = {
+    "ml": {
+        "me_url": "https://api.mercadolibre.com/users/me",
+        "label": "MercadoLibre",
+    },
+    "mp": {
+        "me_url": "https://api.mercadopago.com/users/me",
+        "label": "MercadoPago",
+    },
+}
+
+
+def _oauth_token_path(service: str, user_id: str) -> Path:
+    return _CAPITAN_DIR / f"{service}_token_{user_id}.json"
+
+
+def _oauth_status(service: str, user_id: str) -> dict:
+    path = _oauth_token_path(service, user_id)
+    if not path.exists():
+        return {"connected": False}
+    try:
+        data = json.loads(path.read_text())
+        return {
+            "connected": True,
+            "api_user_id": str(data.get("user_id", "")),
+            "saved_at": data.get("saved_at", ""),
+        }
+    except Exception:
+        return {"connected": False}
+
+
 def _core(path: str, method: str = "GET", timeout: int = 3, **kwargs):
     """Llama al core con timeout corto; devuelve None si falla."""
     try:
@@ -456,15 +489,27 @@ async def agent_new_submit(request: Request):
 
 
 @app.get("/agents/{agent_id}/edit", response_class=HTMLResponse)
-def agent_edit_page(request: Request, agent_id: str):
+def agent_edit_page(request: Request, agent_id: str, connected: str = ""):
     agent = _core(f"/agents/{agent_id}")
     if not agent:
         return RedirectResponse("/agents", status_code=303)
     role_perms = _core("/rbac/roles") or {}
+    users = _core("/users") or {}
+
+    oauth_statuses: dict[str, dict[str, dict]] = {}
+    for b in (agent.get("backends") or []):
+        if b.get("type") == "oauth2":
+            svc = b.get("service", "")
+            oauth_statuses[svc] = {
+                uid: _oauth_status(svc, uid) for uid in users
+            }
+
     return _render(request, "agent_edit.html", "agents",
                    agent=agent, agent_id=agent_id, error="",
                    role_perms=role_perms, roles=_ROLES_AGENTS,
-                   llm_models=_get_llm_models())
+                   llm_models=_get_llm_models(),
+                   users=users, oauth_statuses=oauth_statuses,
+                   just_connected=connected)
 
 
 @app.post("/agents/{agent_id}/edit")
@@ -551,6 +596,53 @@ async def agent_edit_submit(request: Request, agent_id: str):
 def delete_agent_htmx(agent_id: str):
     _core(f"/agents/{agent_id}", method="DELETE")
     return HTMLResponse("")
+
+
+# ── OAuth2 backends (token manual) ─────────────────────────────────────────────
+
+@app.post("/auth/{service}/token", response_class=HTMLResponse)
+async def oauth_save_token(request: Request, service: str):
+    if service not in _OAUTH_SERVICES:
+        raise HTTPException(status_code=404)
+    form = await request.form()
+    user_id = str(form.get("user_id", "")).strip()
+    access_token = str(form.get("access_token", "")).strip()
+    agent_id = str(form.get("agent_id", "")).strip()
+    if not user_id or not access_token:
+        return RedirectResponse(f"/agents/{agent_id}/edit", status_code=303)
+
+    api_user_id = ""
+    try:
+        r = requests.get(
+            _OAUTH_SERVICES[service]["me_url"],
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=10,
+        )
+        if r.status_code == 200:
+            api_user_id = str(r.json().get("id", ""))
+    except Exception:
+        pass
+
+    _CAPITAN_DIR.mkdir(parents=True, exist_ok=True)
+    token_data = {
+        "access_token": access_token,
+        "user_id": api_user_id,
+        "saved_at": _dt.datetime.now().isoformat(timespec="seconds"),
+        "expires_at": time.time() + 3600 * 24 * 30,
+    }
+    _oauth_token_path(service, user_id).write_text(json.dumps(token_data, indent=2))
+    return RedirectResponse(f"/agents/{agent_id}/edit?connected=1", status_code=303)
+
+
+@app.post("/auth/{service}/disconnect", response_class=HTMLResponse)
+async def oauth_disconnect(request: Request, service: str):
+    if service not in _OAUTH_SERVICES:
+        raise HTTPException(status_code=404)
+    form = await request.form()
+    user_id = str(form.get("user_id", "")).strip()
+    agent_id = str(form.get("agent_id", "")).strip()
+    _oauth_token_path(service, user_id).unlink(missing_ok=True)
+    return RedirectResponse(f"/agents/{agent_id}/edit", status_code=303)
 
 
 @app.get("/intents", response_class=HTMLResponse)

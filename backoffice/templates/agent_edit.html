@@ -131,7 +131,90 @@
     </p>
   </div>
 
-  <!-- Sección 4: Configuración específica -->
+  <!-- Sección 4: Backends -->
+  {% if agent.backends %}
+  <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-5">
+    <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Backends</h2>
+
+    {% if just_connected %}
+    <div class="mb-3 bg-emerald-900/30 border border-emerald-700 text-emerald-300 px-3 py-2 rounded-lg text-xs">
+      Token guardado correctamente.
+    </div>
+    {% endif %}
+
+    <div class="space-y-4">
+      {% for b in agent.backends %}
+      {% if b.type == 'oauth2' %}
+        {% set svc = b.service %}
+        <div class="border border-gray-700 rounded-lg p-4">
+          <div class="flex items-center gap-2 mb-3">
+            <span class="text-sm font-medium text-gray-200">{{ b.label }}</span>
+            <span class="text-xs text-indigo-400 bg-indigo-900/30 px-1.5 py-0.5 rounded">oauth2</span>
+            {% if b.url %}<code class="text-xs text-gray-600 ml-1">{{ b.url }}</code>{% endif %}
+          </div>
+          {% if users %}
+            {% for uid, user in users.items() %}
+            {% set st = oauth_statuses.get(svc, {}).get(uid, {}) %}
+            <div class="py-3 border-t border-gray-800 first:border-0">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs text-gray-400">{{ user.name }}</span>
+                {% if st.connected %}
+                  <span class="text-xs text-emerald-400">● conectado</span>
+                {% else %}
+                  <span class="text-xs text-gray-600">● no conectado</span>
+                {% endif %}
+              </div>
+              {% if st.connected %}
+                <div class="text-xs text-gray-600 mb-2">
+                  {% if st.api_user_id %}ID: <code class="text-gray-500">{{ st.api_user_id }}</code> · {% endif %}
+                  guardado {{ st.saved_at[:10] if st.saved_at else '' }}
+                </div>
+                <form method="POST" action="/auth/{{ svc }}/disconnect" class="inline">
+                  <input type="hidden" name="user_id" value="{{ uid }}">
+                  <input type="hidden" name="agent_id" value="{{ agent_id }}">
+                  <button type="submit" class="text-xs text-red-400 hover:text-red-300 transition-colors">
+                    Desconectar
+                  </button>
+                </form>
+              {% else %}
+                <details class="mt-1">
+                  <summary class="text-xs text-indigo-400 hover:text-indigo-300 cursor-pointer select-none">
+                    Ingresar token →
+                  </summary>
+                  <form method="POST" action="/auth/{{ svc }}/token" class="mt-2 space-y-2">
+                    <input type="hidden" name="user_id" value="{{ uid }}">
+                    <input type="hidden" name="agent_id" value="{{ agent_id }}">
+                    <input type="text" name="access_token" placeholder="access token"
+                           class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5
+                                  text-xs text-gray-200 font-mono focus:outline-none focus:ring-1
+                                  focus:ring-indigo-500">
+                    <button type="submit"
+                            class="px-3 py-1 bg-indigo-700 hover:bg-indigo-600 text-white text-xs
+                                   rounded transition-colors">
+                      Guardar
+                    </button>
+                  </form>
+                </details>
+              {% endif %}
+            </div>
+            {% endfor %}
+          {% else %}
+            <p class="text-xs text-gray-600">No hay usuarios registrados.</p>
+          {% endif %}
+        </div>
+      {% else %}
+        <div class="flex items-center gap-3 py-1">
+          <span class="text-xs bg-gray-800 px-2 py-0.5 rounded text-gray-400">{{ b.type }}</span>
+          <span class="text-sm text-gray-500">{{ b.label }}</span>
+          {% if b.url %}<code class="text-xs text-gray-600">{{ b.url }}</code>{% endif %}
+        </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Sección 5: Configuración específica -->
   {% if agent.config_schema %}
   <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-5">
     <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-1">Configuración</h2>
@@ -186,7 +269,7 @@
   </div>
   {% endif %}
 
-  <!-- Sección 5: Contexto de usuario -->
+  <!-- Sección 6: Contexto de usuario -->
   {% set ctx_schema = agent.get('user_context_schema') %}
   {% if ctx_schema is not none %}
   <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-5">
@@ -227,7 +310,7 @@
   </div>
   {% endif %}
 
-  <!-- Sección 6: Acceso por rol -->
+  <!-- Sección 7: Acceso por rol -->
   <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-5">
     <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-1">Acceso por rol</h2>
     <p class="text-xs text-gray-600 mb-3">Qué roles tienen acceso a este agente por defecto.</p>
