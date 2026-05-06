@@ -138,7 +138,7 @@ function _updatePendingState(sender, data) {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-async function _sendResponse(msg, phone, fromLid, data) {
+async function _sendResponse(msg, phone, data) {
   try {
     const chat = await msg.getChat();
     await chat.sendSeen();
@@ -170,7 +170,7 @@ async function _sendResponse(msg, phone, fromLid, data) {
     sentMsg = await msg.reply(data.response).catch(() => null);
   }
 
-  console.log(`[WA] → ${phone || fromLid}: ${data.response.slice(0, 80)}`);
+  console.log(`[WA] → ${phone}: ${data.response.slice(0, 80)}`);
 
   if (!data.needs_reply) {
     try { await msg.react("✅"); } catch (_) { /* noop */ }
@@ -179,14 +179,12 @@ async function _sendResponse(msg, phone, fromLid, data) {
   return sentMsg;
 }
 
-async function handleText(msg, phone, fromLid, text) {
-  const sender = phone || fromLid;
+async function handleText(msg, phone, text) {
   const body = { text, message_id: msg.id.id };
-  if (phone)   body.from_number = phone;
-  if (fromLid) body.from_lid    = fromLid;
+  if (phone) body.from_number = phone;
 
   // Retomar conversación pendiente por teléfono (pending_field en curso)
-  const pendingConvId = _resolvePendingByPhone(sender);
+  const pendingConvId = _resolvePendingByPhone(phone);
   if (pendingConvId) {
     body.conversation_id = pendingConvId;
     console.log(`[WA] pending phone → conv ${pendingConvId}`);
@@ -214,16 +212,15 @@ async function handleText(msg, phone, fromLid, text) {
   }
 
   const data = await res.json();
-  _updatePendingState(sender, data);
-  await _sendResponse(msg, phone, fromLid, data);
+  _updatePendingState(phone, data);
+  await _sendResponse(msg, phone, data);
 }
 
-async function handleMedia(msg, phone, fromLid, mediaType) {
-  const sender = phone || fromLid;
-  const pendingConvId = _resolvePendingByPhone(sender);
+async function handleMedia(msg, phone, mediaType) {
+  const pendingConvId = _resolvePendingByPhone(phone);
 
   if (!pendingConvId) {
-    console.log(`[WA] media ${mediaType} de ${sender} sin conversación pendiente — ignorando`);
+    console.log(`[WA] media ${mediaType} de ${phone} sin conversación pendiente — ignorando`);
     try {
       const chat = await msg.getChat();
       await chat.sendSeen();
@@ -234,12 +231,12 @@ async function handleMedia(msg, phone, fromLid, mediaType) {
 
   const media = await msg.downloadMedia();
   if (!media) {
-    console.error(`[WA] No se pudo descargar ${mediaType} de ${sender}`);
+    console.error(`[WA] No se pudo descargar ${mediaType} de ${phone}`);
     await msg.reply("No pude descargar el archivo. Intentá de nuevo.").catch(() => {});
     return;
   }
 
-  console.log(`[WA] media ${mediaType} de ${sender} → conv ${pendingConvId}`);
+  console.log(`[WA] media ${mediaType} de ${phone} → conv ${pendingConvId}`);
 
   const body = {
     text:           "",
@@ -250,8 +247,7 @@ async function handleMedia(msg, phone, fromLid, mediaType) {
     media_type:     mediaType,
     media_filename: media.filename || null,
   };
-  if (phone)   body.from_number = phone;
-  if (fromLid) body.from_lid    = fromLid;
+  if (phone) body.from_number = phone;
 
   const res = await fetch(`${CORE_URL}/wa/inbound`, {
     method: "POST",
@@ -266,21 +262,19 @@ async function handleMedia(msg, phone, fromLid, mediaType) {
   }
 
   const data = await res.json();
-  _updatePendingState(sender, data);
-  await _sendResponse(msg, phone, fromLid, data);
+  _updatePendingState(phone, data);
+  await _sendResponse(msg, phone, data);
 }
 
-async function handleAudio(msg, phone, fromLid) {
+async function handleAudio(msg, phone) {
   const media = await msg.downloadMedia();
   if (!media) {
-    console.error(`[WA] No se pudo descargar el audio de ${phone || fromLid}`);
+    console.error(`[WA] No se pudo descargar el audio de ${phone}`);
     return;
   }
 
   const body = { audio_b64: media.data, message_id: msg.id.id };
-  if (phone)   body.from_number = phone;
-  if (fromLid) body.from_lid    = fromLid;
-
+  if (phone) body.from_number = phone;
   const res = await fetch(`${CORE_URL}/wa/inbound/audio`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -294,7 +288,7 @@ async function handleAudio(msg, phone, fromLid) {
   }
 
   const data = await res.json();
-  console.log(`[WA] STT ${phone || fromLid}: "${data.transcription}"`);
+  console.log(`[WA] STT ${phone}: "${data.transcription}"`);
 
   if (data.audio_b64) {
     const voiceNote = new MessageMedia(
@@ -304,10 +298,10 @@ async function handleAudio(msg, phone, fromLid) {
     );
     const chat = await msg.getChat();
     await chat.sendMessage(voiceNote, { sendAudioAsVoice: true });
-    console.log(`[WA] → ${phone || fromLid}: [nota de voz] ${data.response.slice(0, 60)}`);
+    console.log(`[WA] → ${phone}: [nota de voz] ${data.response.slice(0, 60)}`);
   } else if (data.response) {
     await msg.reply(data.response);
-    console.log(`[WA] → ${phone || fromLid}: ${data.response.slice(0, 80)}`);
+    console.log(`[WA] → ${phone}: ${data.response.slice(0, 80)}`);
   }
 }
 
@@ -316,10 +310,7 @@ async function handleAudio(msg, phone, fromLid) {
 client.on("message", async (msg) => {
   if (msg.isGroupMsg) return;
 
-  // msg.from puede ser "5491155...@c.us" o "205432...@lid" (linked identity, WA moderno).
-  // Estrategia: getChat() → contact.id → msg.from (en ese orden de confiabilidad).
   let phone = null;
-  let fromLid = null;
 
   try {
     const chat  = await msg.getChat();
@@ -328,40 +319,30 @@ client.on("message", async (msg) => {
     if (chatId.endsWith("@c.us")) {
       phone = "+" + chat.id.user;
     } else {
-      // Chat también en @lid — extraer LID para match en el core
-      if (chatId.endsWith("@lid")) fromLid = chat.id.user;
-
-      // Intentar vía contacto
+      // Intentar vía contacto para obtener número real
       const contact = await msg.getContact();
       if (contact.id._serialized.endsWith("@c.us")) {
         phone = "+" + contact.id.user;
-      } else if (contact.id._serialized.endsWith("@lid")) {
-        fromLid = fromLid || contact.id.user;
       }
     }
   } catch (_) {
-    // noop — usamos fromLid o fallback
+    // noop
   }
 
-  if (!phone && !fromLid) {
-    // Último recurso: extraer lo que sea del from
-    fromLid = msg.from.replace(/@\S+/, "");
-  }
-
-  console.log(`[WA] from=${msg.from} → phone=${phone} lid=${fromLid}`);
+  console.log(`[WA] from=${msg.from} → phone=${phone}`);
 
   try {
     if (msg.type === "chat") {
       const text = msg.body.trim();
       if (!text) return;
-      console.log(`[WA] texto ${phone || fromLid}: ${text}`);
-      await handleText(msg, phone, fromLid, text);
+      console.log(`[WA] texto ${phone}: ${text}`);
+      await handleText(msg, phone, text);
     } else if (msg.type === "ptt" || msg.type === "audio") {
-      console.log(`[WA] audio ${phone || fromLid} (${msg.type})`);
-      await handleAudio(msg, phone, fromLid);
+      console.log(`[WA] audio ${phone} (${msg.type})`);
+      await handleAudio(msg, phone);
     } else if (msg.type === "image" || msg.type === "document") {
-      console.log(`[WA] media ${msg.type} ${phone || fromLid}`);
-      await handleMedia(msg, phone, fromLid, msg.type);
+      console.log(`[WA] media ${msg.type} ${phone}`);
+      await handleMedia(msg, phone, msg.type);
     }
   } catch (err) {
     console.error(`[WA] Error inesperado: ${err.message}`);
