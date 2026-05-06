@@ -462,7 +462,7 @@ Estado:   COMPLETA (5.2 postergada, google-free; alarma luces → HAOS nativo)
 ### FASE 6 - Agente Inversiones
 ```
 Objetivo: Consultas financieras por voz, datos privados locales
-Estado:   EN CURSO (6/7 — solo queda 6.6)
+Estado:   EN CURSO (8/9 — solo queda 6.6)
 Nota:     Modo dummy (recomendaciones + P&L hipotética). Portfolio por usuario (FASE 2.5).
           Fuentes: yfinance (acciones/crypto/FX) + dolarapi.com (dólar oficial/blue/MEP/CCL).
 ```
@@ -484,6 +484,17 @@ Nota:     Modo dummy (recomendaciones + P&L hipotética). Portfolio por usuario 
 - [ ] 6.6  RAG sobre noticias financieras (scraping + embeddings)
 - [x] 6.7  Resumen diario automático (en finance_alerts.check()):
            Dólar oficial/blue, UYU, movimientos de watchlist. Emite a FINANCE_BRIEFING_HOUR (8am).
+- [x] 6.8  Planes de inversión diversificados (portfolio.py + finance_agent.py):
+           El LLM puede emitir [PORTFOLIO:nombre|TICKER:pct,...] para crear/guardar planes
+           con snapshot de precios al momento. save_plan(), list_plans(), delete_plan(),
+           calculate_plan_pnl(). Soporte multi-plan por usuario, reemplazo por nombre.
+           El agente inyecta los planes existentes como contexto al LLM.
+- [x] 6.9  Reporte comparativo diario de planes con formato WA (finance_alerts.py):
+           Al momento del briefing matutino, por cada usuario con planes guardados:
+           1. Alerta TTS corta: "tu mejor plan es X con +Y%"
+           2. Reporte WA rico enviado directo vía wa_notifier: tabla por plan con
+              P&L por posición, ponderada total, medallas 🥇🥈🥉, mejor plan 🏆.
+           Cooldown 20h por usuario. Configurable via FINANCE_BRIEFING_HOUR.
 
 ---
 
