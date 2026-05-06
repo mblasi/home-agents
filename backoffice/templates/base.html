@@ -7,58 +7,84 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script>tailwind.config = { darkMode: 'class' }</script>
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <style>
+    #sidebar { transition: width 200ms ease; }
+    #sidebar[data-collapsed] { width: 3.5rem; }
+    #sidebar:not([data-collapsed]) { width: 14rem; }
+    #sidebar[data-collapsed] .sb-text    { display: none; }
+    #sidebar[data-collapsed] .sb-section { display: none; }
+    #sidebar[data-collapsed] .sb-status  { display: none; }
+    #sidebar[data-collapsed] .sb-link    { justify-content: center; padding-left: 0; padding-right: 0; }
+    #sidebar[data-collapsed] .sb-brand   { justify-content: center; }
+    #sidebar[data-collapsed] .sb-logout  { justify-content: center; }
+    #sidebar[data-collapsed] #sb-toggle  { transform: rotate(180deg); }
+  </style>
 </head>
 <body class="h-full text-gray-100 flex">
 
   <!-- Sidebar -->
-  <aside class="w-56 shrink-0 flex flex-col bg-gray-900 border-r border-gray-800 h-screen sticky top-0">
-    <div class="px-4 py-5 border-b border-gray-800">
-      <span class="text-lg font-bold tracking-tight">⚓ Capitán</span>
-      <p class="text-xs text-gray-500 mt-0.5">Backoffice</p>
+  <aside id="sidebar" class="w-56 shrink-0 flex flex-col bg-gray-900 border-r border-gray-800 h-screen sticky top-0 overflow-hidden">
+
+    <div class="px-3 py-5 border-b border-gray-800 flex items-center gap-2 sb-brand">
+      <span class="text-lg shrink-0">⚓</span>
+      <div class="sb-text min-w-0">
+        <p class="text-sm font-bold tracking-tight leading-tight">Capitán</p>
+        <p class="text-xs text-gray-500">Backoffice</p>
+      </div>
+      <button id="sb-toggle" onclick="sidebarToggle()"
+              class="ml-auto shrink-0 text-gray-500 hover:text-gray-200 transition-colors p-1 rounded hover:bg-gray-800"
+              title="Colapsar sidebar">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/>
+        </svg>
+      </button>
     </div>
 
     <!-- Indicadores de estado -->
-    <div class="px-4 py-3 border-b border-gray-800 space-y-1 text-xs"
+    <div class="sb-status px-4 py-3 border-b border-gray-800 space-y-1 text-xs"
          hx-get="/api/status" hx-trigger="load, every 30s" hx-target="this" hx-swap="innerHTML">
       <div class="text-gray-500">cargando…</div>
     </div>
 
-    {% set link_base = "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-gray-400 hover:text-white hover:bg-gray-800" %}
-    {% set link_active = "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors bg-gray-800 text-white" %}
+    {% set link_base   = "sb-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-gray-400 hover:text-white hover:bg-gray-800" %}
+    {% set link_active = "sb-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors bg-gray-800 text-white" %}
 
-    <nav class="flex-1 px-3 py-4 overflow-y-auto space-y-6">
+    <nav class="flex-1 px-2 py-4 overflow-y-auto space-y-5">
 
       <!-- Monitoreo -->
-      <div class="flex flex-col gap-1">
-        <p class="px-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-gray-600">Monitoreo</p>
-        <a href="/dashboard"    class="{{ link_active if section == 'dashboard'    else link_base }}">📊 Dashboard</a>
-        <a href="/stats"        class="{{ link_active if section == 'stats'        else link_base }}">📈 Estadísticas</a>
-        <a href="/alerts"       class="{{ link_active if section == 'alerts'       else link_base }}">🔔 Alertas</a>
-        <a href="/logs"         class="{{ link_active if section == 'logs'         else link_base }}">📋 Logs</a>
+      <div class="flex flex-col gap-0.5">
+        <p class="sb-section px-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-gray-600">Monitoreo</p>
+        <a href="/dashboard"    title="Dashboard"    class="{{ link_active if section == 'dashboard'    else link_base }}"><span>📊</span><span class="sb-text">Dashboard</span></a>
+        <a href="/stats"        title="Estadísticas" class="{{ link_active if section == 'stats'        else link_base }}"><span>📈</span><span class="sb-text">Estadísticas</span></a>
+        <a href="/alerts"       title="Alertas"      class="{{ link_active if section == 'alerts'       else link_base }}"><span>🔔</span><span class="sb-text">Alertas</span></a>
+        <a href="/logs"         title="Logs"         class="{{ link_active if section == 'logs'         else link_base }}"><span>📋</span><span class="sb-text">Logs</span></a>
       </div>
 
       <!-- Sistema -->
-      <div class="flex flex-col gap-1">
-        <p class="px-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-gray-600">Sistema</p>
-        <a href="/agents"       class="{{ link_active if section == 'agents'       else link_base }}">🤖 Agentes</a>
-        <a href="/intents"      class="{{ link_active if section == 'intents'      else link_base }}">🎯 Intenciones</a>
-        <a href="/conversations"class="{{ link_active if section == 'conversations'else link_base }}">💬 Conversaciones</a>
-        <a href="/shared-state" class="{{ link_active if section == 'shared-state' else link_base }}">🔗 Shared State</a>
-        <a href="/plan"         class="{{ link_active if section == 'plan'         else link_base }}">🗺️ Plan</a>
+      <div class="flex flex-col gap-0.5">
+        <p class="sb-section px-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-gray-600">Sistema</p>
+        <a href="/agents"       title="Agentes"        class="{{ link_active if section == 'agents'       else link_base }}"><span>🤖</span><span class="sb-text">Agentes</span></a>
+        <a href="/intents"      title="Intenciones"    class="{{ link_active if section == 'intents'      else link_base }}"><span>🎯</span><span class="sb-text">Intenciones</span></a>
+        <a href="/conversations"title="Conversaciones" class="{{ link_active if section == 'conversations'else link_base }}"><span>💬</span><span class="sb-text">Conversaciones</span></a>
+        <a href="/shared-state" title="Shared State"   class="{{ link_active if section == 'shared-state' else link_base }}"><span>🔗</span><span class="sb-text">Shared State</span></a>
+        <a href="/plan"         title="Plan"           class="{{ link_active if section == 'plan'         else link_base }}"><span>🗺️</span><span class="sb-text">Plan</span></a>
       </div>
 
       <!-- Configuración -->
-      <div class="flex flex-col gap-1">
-        <p class="px-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-gray-600">Configuración</p>
-        <a href="/users"        class="{{ link_active if section == 'users'        else link_base }}">👥 Usuarios</a>
-        <a href="/integrations" class="{{ link_active if section == 'integrations' else link_base }}">🔌 Integraciones</a>
-        <a href="/config"       class="{{ link_active if section == 'config'       else link_base }}">⚙️ Config (.env)</a>
+      <div class="flex flex-col gap-0.5">
+        <p class="sb-section px-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-gray-600">Configuración</p>
+        <a href="/users"        title="Usuarios"      class="{{ link_active if section == 'users'        else link_base }}"><span>👥</span><span class="sb-text">Usuarios</span></a>
+        <a href="/integrations" title="Integraciones" class="{{ link_active if section == 'integrations' else link_base }}"><span>🔌</span><span class="sb-text">Integraciones</span></a>
+        <a href="/config"       title="Config (.env)" class="{{ link_active if section == 'config'       else link_base }}"><span>⚙️</span><span class="sb-text">Config (.env)</span></a>
       </div>
 
     </nav>
 
-    <div class="px-4 py-3 border-t border-gray-800">
-      <a href="/logout" class="text-xs text-gray-500 hover:text-gray-300">Cerrar sesión</a>
+    <div class="px-3 py-3 border-t border-gray-800">
+      <a href="/logout" title="Cerrar sesión"
+         class="sb-logout flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 transition-colors py-1 rounded px-2 hover:bg-gray-800">
+        <span>🚪</span><span class="sb-text">Cerrar sesión</span>
+      </a>
     </div>
   </aside>
 
@@ -68,6 +94,21 @@
       {% block content %}{% endblock %}
     </div>
   </main>
+
+  <script>
+    const sidebar = document.getElementById('sidebar');
+    const STORAGE_KEY = 'capitan-sidebar-collapsed';
+
+    function sidebarToggle() {
+      const collapsed = !sidebar.hasAttribute('data-collapsed');
+      collapsed ? sidebar.setAttribute('data-collapsed', '') : sidebar.removeAttribute('data-collapsed');
+      localStorage.setItem(STORAGE_KEY, collapsed ? '1' : '0');
+    }
+
+    if (localStorage.getItem(STORAGE_KEY) === '1') {
+      sidebar.setAttribute('data-collapsed', '');
+    }
+  </script>
 
 </body>
 </html>
