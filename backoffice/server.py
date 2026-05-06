@@ -482,6 +482,7 @@ async def agent_new_submit(request: Request):
     payload = {
         "id":            str(form.get("id", "")).strip().lower().replace(" ", "_"),
         "name":          str(form.get("name", "")).strip(),
+        "fancy_name":    str(form.get("fancy_name", "")).strip(),
         "icon":          str(form.get("icon", "")).strip(),
         "desc":          str(form.get("desc", "")).strip(),
         "status":        str(form.get("status", "planned")),
@@ -529,14 +530,15 @@ def agent_edit_page(request: Request, agent_id: str, connected: str = ""):
 async def agent_edit_submit(request: Request, agent_id: str):
     form = await request.form()
 
-    # Nombre, icono y descripción (agent card)
-    name = str(form.get("name", "")).strip()
-    icon = str(form.get("icon", "")).strip()
-    desc = str(form.get("desc", "")).strip()
-    if name or icon or desc:
+    # Nombre, nombre de fantasía, icono y descripción (agent card)
+    name       = str(form.get("name", "")).strip()
+    fancy_name = str(form.get("fancy_name", "")).strip()
+    icon       = str(form.get("icon", "")).strip()
+    desc       = str(form.get("desc", "")).strip()
+    if name or fancy_name or icon or desc:
         _core(f"/agents/{agent_id}/metadata", method="PATCH",
-              json={"name": name or None, "icon": icon or None,
-                    "desc": desc or None})
+              json={"name": name or None, "fancy_name": fancy_name or None,
+                    "icon": icon or None, "desc": desc or None})
 
     # Status
     status = str(form.get("status", "")).strip()
@@ -820,7 +822,6 @@ async def create_user_submit(request: Request):
         "role":           role,
         "relationship":   str(form.get("relationship", "invitado")),
         "wa_phone":       str(form.get("wa_phone", "")).strip() or None,
-        "wa_lid":         str(form.get("wa_lid", "")).strip() or None,
         "agent_ids":      agent_ids,
         "revoked_agents": revoked_agents,
     }
@@ -886,7 +887,6 @@ async def update_user_submit(request: Request, uid: str):
         "role":           role,
         "relationship":   str(form.get("relationship", "invitado")),
         "wa_phone":       str(form.get("wa_phone", "")).strip() or None,
-        "wa_lid":         str(form.get("wa_lid", "")).strip() or None,
         "agent_ids":      agent_ids,
         "revoked_agents": revoked_agents,
     }

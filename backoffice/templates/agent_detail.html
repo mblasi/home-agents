@@ -7,6 +7,7 @@
   <span class="text-gray-700">/</span>
   <h1 class="text-2xl font-bold">
     {{ agent.icon }} {{ agent.name }}
+    {% if agent.fancy_name %}<span class="text-indigo-300 text-base font-normal ml-2 italic">{{ agent.fancy_name }}</span>{% endif %}
     <span class="text-gray-500 text-base font-normal ml-1">{{ agent_id }}</span>
     {% if agent.dynamic %}<span class="ml-2 text-xs text-indigo-400 bg-indigo-900/30 border border-indigo-800 px-2 py-0.5 rounded-full">dinámico</span>{% endif %}
     {% if proactive_info %}<span class="ml-2 text-xs text-violet-400 bg-violet-900/20 border border-violet-800 px-2 py-0.5 rounded-full">🔄 proactivo</span>{% endif %}

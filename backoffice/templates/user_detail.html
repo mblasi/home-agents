@@ -41,9 +41,6 @@
     <div>
       <span class="text-gray-500 text-xs uppercase tracking-wider block mb-0.5">WhatsApp</span>
       <code class="text-gray-300 font-mono text-xs">{{ user.wa_phone or "—" }}</code>
-      {% if user.wa_lid %}
-      <code class="text-yellow-600 font-mono text-xs block mt-0.5" title="WhatsApp LID (linked identity)">LID: {{ user.wa_lid }}</code>
-      {% endif %}
     </div>
     {% if user.wa_phone %}
     <div>

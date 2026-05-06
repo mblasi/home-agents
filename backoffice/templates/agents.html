@@ -43,7 +43,7 @@
           <div class="flex items-center gap-2">
             <span class="text-lg">{{ info.icon }}</span>
             <div>
-              <div class="font-medium">{{ info.name }}</div>
+              <div class="font-medium">{{ info.name }}{% if info.fancy_name %} <span class="text-indigo-300 font-normal italic text-sm">{{ info.fancy_name }}</span>{% endif %}</div>
               <div class="text-xs text-gray-500">
                 {{ aid }}
                 {% if info.dynamic %}<span class="ml-1 text-indigo-400 text-xs">dinámico</span>{% endif %}
