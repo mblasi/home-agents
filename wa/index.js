@@ -139,6 +139,14 @@ async function handleText(msg, phone, fromLid, text) {
       _storePending(sentMsg.id.id, data.conversation_id);
       console.log(`[WA] pendiente: msg ${sentMsg.id.id} → conv ${data.conversation_id}`);
     }
+    // 19.2: si el intent fue procesado sin necesidad de respuesta, confirmar con reacción
+    if (!data.needs_reply) {
+      try {
+        await msg.react("✅");
+      } catch (_) {
+        // react no soportado; fallback silencioso (la respuesta ya fue enviada)
+      }
+    }
   }
 }
 
