@@ -132,8 +132,35 @@ async function handleText(msg, phone, fromLid, text) {
 
   const data = await res.json();
   if (data.response) {
-    const sentMsg = await msg.reply(data.response);
+    let sentMsg = null;
+
+    // 19.3: imagen adjunta
+    if (data.media_url) {
+      try {
+        const media = await MessageMedia.fromUrl(data.media_url, { unsafeMime: true });
+        const chat = await msg.getChat();
+        sentMsg = await chat.sendMessage(media, { caption: data.response });
+      } catch (err) {
+        console.error(`[WA] Error enviando media: ${err.message}`);
+        sentMsg = await msg.reply(data.response).catch(() => null);
+      }
+    } else if (data.link_preview) {
+      // 19.3: link preview — sendMessage con quoted manual
+      try {
+        const chat = await msg.getChat();
+        sentMsg = await chat.sendMessage(data.response, {
+          linkPreview: true,
+          quotedMessageId: msg.id._serialized,
+        });
+      } catch (err) {
+        sentMsg = await msg.reply(data.response).catch(() => null);
+      }
+    } else {
+      sentMsg = await msg.reply(data.response).catch(() => null);
+    }
+
     console.log(`[WA] → ${phone || fromLid}: ${data.response.slice(0, 80)}`);
+
     // 19.1: si el agente espera respuesta, trackear el mensaje enviado
     if (data.needs_reply && sentMsg?.id?.id) {
       _storePending(sentMsg.id.id, data.conversation_id);
@@ -259,10 +286,10 @@ http.createServer(async (req, res) => {
   req.on("data", (chunk) => { body += chunk; });
   req.on("end", async () => {
     try {
-      const { to, text, audio_b64 } = JSON.parse(body);
-      if (!to || (!text && !audio_b64)) {
+      const { to, text, audio_b64, media_url, link_preview } = JSON.parse(body);
+      if (!to || (!text && !audio_b64 && !media_url)) {
         res.writeHead(400, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "to y (text o audio_b64) son requeridos" }));
+        res.end(JSON.stringify({ error: "to y (text, audio_b64 o media_url) son requeridos" }));
         return;
       }
       const chatId = to.replace("+", "") + "@c.us";
@@ -272,8 +299,15 @@ http.createServer(async (req, res) => {
         const chat = await client.getChatById(chatId);
         await chat.sendMessage(voiceNote, { sendAudioAsVoice: true });
         console.log(`[WA] → ${to}: [nota de voz]`);
+      } else if (media_url) {
+        // 19.3: imagen/archivo adjunto en notificación outbound
+        const media = await MessageMedia.fromUrl(media_url, { unsafeMime: true });
+        await client.sendMessage(chatId, media, { caption: text || "" });
+        console.log(`[WA] → ${to}: [media] ${(text || "").slice(0, 60)}`);
       } else {
-        await client.sendMessage(chatId, text);
+        // 19.3: link preview en notificaciones outbound
+        const opts = link_preview ? { linkPreview: true } : {};
+        await client.sendMessage(chatId, text, opts);
         console.log(`[WA] → ${to}: ${text.slice(0, 80)}`);
       }
 
