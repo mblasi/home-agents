@@ -75,18 +75,19 @@ client.on("disconnected", (reason) => {
   setTimeout(() => client.initialize(), 10_000);
 });
 
-// ── Estado de conversaciones pendientes ────────────────────────────────────────
-// msg_id → { conversation_id, ts }
-// Cuando el core responde con needs_reply=true, guardamos el ID del mensaje enviado.
-// En el próximo mensaje con quoted reply, lo enrutamos a la misma conversación.
+// ── Estado de mensajes pendientes ──────────────────────────────────────────────
+// msg_id → { conversation_id?, intent_id?, ts }
+//
+// _pendingConvs:  cuando core responde needs_reply=true → quoted-reply retoma conversación
+// _pendingIntents: cuando core envía notif proactiva con intent_id → quoted-reply cierra intent
 
 const PENDING_TTL_MS = 5 * 60 * 1000; // 5 min
 
-const _pendingConvs = new Map();
+const _pendingConvs    = new Map();
+const _pendingIntents  = new Map();
 
 function _storePending(msgId, conversationId) {
   _pendingConvs.set(msgId, { conversation_id: conversationId, ts: Date.now() });
-  // Limpiar entradas viejas cada vez que agregamos una
   const cutoff = Date.now() - PENDING_TTL_MS;
   for (const [k, v] of _pendingConvs) {
     if (v.ts < cutoff) _pendingConvs.delete(k);
@@ -103,6 +104,24 @@ function _resolvePending(quotedMsgId) {
   return entry.conversation_id;
 }
 
+function _storePendingIntent(msgId, intentId) {
+  _pendingIntents.set(msgId, { intent_id: intentId, ts: Date.now() });
+  const cutoff = Date.now() - PENDING_TTL_MS;
+  for (const [k, v] of _pendingIntents) {
+    if (v.ts < cutoff) _pendingIntents.delete(k);
+  }
+}
+
+function _resolvePendingIntent(quotedMsgId) {
+  const entry = _pendingIntents.get(quotedMsgId);
+  if (!entry) return null;
+  if (Date.now() - entry.ts > PENDING_TTL_MS) {
+    _pendingIntents.delete(quotedMsgId);
+    return null;
+  }
+  return entry.intent_id;
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 async function handleText(msg, phone, fromLid, text) {
@@ -110,15 +129,14 @@ async function handleText(msg, phone, fromLid, text) {
   if (phone)   body.from_number = phone;
   if (fromLid) body.from_lid    = fromLid;
 
-  // 19.1: si es un quoted-reply a un mensaje pendiente, retomar esa conversación
+  // 19.1: si es un quoted-reply, retomar conversación pendiente o cerrar intent
   if (msg.hasQuotedMsg) {
     try {
       const quoted = await msg.getQuotedMessage();
-      const convId = _resolvePending(quoted.id.id);
-      if (convId) {
-        body.conversation_id = convId;
-        console.log(`[WA] quoted-reply → conv ${convId}`);
-      }
+      const convId   = _resolvePending(quoted.id.id);
+      const intentId = _resolvePendingIntent(quoted.id.id);
+      if (convId)   { body.conversation_id = convId;   console.log(`[WA] quoted-reply → conv ${convId}`); }
+      if (intentId) { body.intent_id       = intentId; console.log(`[WA] quoted-reply → intent ${intentId}`); }
     } catch (_) { /* noop */ }
   }
 
@@ -295,7 +313,7 @@ http.createServer(async (req, res) => {
       return;
     }
     try {
-      const { to, text, audio_b64, media_url, link_preview } = JSON.parse(body);
+      const { to, text, audio_b64, media_url, link_preview, intent_id } = JSON.parse(body);
       if (!to || (!text && !audio_b64 && !media_url)) {
         res.writeHead(400, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: "to y (text, audio_b64 o media_url) son requeridos" }));
@@ -303,21 +321,28 @@ http.createServer(async (req, res) => {
       }
       const chatId = to.replace("+", "") + "@c.us";
 
+      let sentMsg = null;
       if (audio_b64) {
         const voiceNote = new MessageMedia("audio/ogg; codecs=opus", audio_b64, "notification.ogg");
         const chat = await client.getChatById(chatId);
-        await chat.sendMessage(voiceNote, { sendAudioAsVoice: true });
+        sentMsg = await chat.sendMessage(voiceNote, { sendAudioAsVoice: true });
         console.log(`[WA] → ${to}: [nota de voz]`);
       } else if (media_url) {
         // 19.3: imagen/archivo adjunto en notificación outbound
         const media = await MessageMedia.fromUrl(media_url, { unsafeMime: true });
-        await client.sendMessage(chatId, media, { caption: text || "" });
+        sentMsg = await client.sendMessage(chatId, media, { caption: text || "" });
         console.log(`[WA] → ${to}: [media] ${(text || "").slice(0, 60)}`);
       } else {
         // 19.3: link preview en notificaciones outbound
         const opts = link_preview ? { linkPreview: true } : {};
-        await client.sendMessage(chatId, text, opts);
+        sentMsg = await client.sendMessage(chatId, text, opts);
         console.log(`[WA] → ${to}: ${text.slice(0, 80)}`);
+      }
+
+      // 19.1: si la notificación lleva intent_id, trackear para que quoted-reply lo cierre
+      if (intent_id && sentMsg?.id?.id) {
+        _storePendingIntent(sentMsg.id.id, intent_id);
+        console.log(`[WA] intent pendiente: msg ${sentMsg.id.id} → ${intent_id}`);
       }
 
       res.writeHead(200, { "Content-Type": "application/json" });
