@@ -31,9 +31,10 @@ from fastapi.templating import Jinja2Templates
 
 # ── Configuración ──────────────────────────────────────────────────────────────
 
-CORE_URL   = os.environ.get("CORE_URL",   "http://localhost:8765")
+CORE_URL      = os.environ.get("CORE_URL",      "http://localhost:8765")
 _LLM_BASE_URL = (os.environ.get("LLM_BASE_URL") or os.environ.get("OLLAMA_URL") or "http://localhost:11434")
 BACKOFFICE_TOKEN = os.environ.get("BACKOFFICE_TOKEN", "")
+OAUTH_APP_URL = os.environ.get("OAUTH_APP_URL", "").rstrip("/")
 METRICS_DIR   = Path("/tmp/capitan")
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
@@ -134,16 +135,28 @@ def _oauth_token_path(service: str, user_id: str) -> Path:
 def _oauth_status(service: str, user_id: str) -> dict:
     path = _oauth_token_path(service, user_id)
     if not path.exists():
-        return {"connected": False}
+        return {"connected": False, "online": False}
     try:
         data = json.loads(path.read_text())
-        return {
-            "connected": True,
-            "api_user_id": str(data.get("user_id", "")),
-            "saved_at": data.get("saved_at", ""),
-        }
     except Exception:
-        return {"connected": False}
+        return {"connected": False, "online": False}
+
+    token  = data.get("access_token", "")
+    me_url = (_OAUTH_SERVICES.get(service) or {}).get("me_url", "")
+    online = False
+    if token and me_url:
+        try:
+            r = requests.get(me_url, headers={"Authorization": f"Bearer {token}"}, timeout=3)
+            online = r.status_code == 200
+        except Exception:
+            pass
+
+    return {
+        "connected": True,
+        "online":    online,
+        "api_user_id": str(data.get("user_id", "")),
+        "saved_at":    data.get("saved_at", ""),
+    }
 
 
 def _core(path: str, method: str = "GET", timeout: int = 3, **kwargs):
@@ -509,7 +522,7 @@ def agent_edit_page(request: Request, agent_id: str, connected: str = ""):
                    role_perms=role_perms, roles=_ROLES_AGENTS,
                    llm_models=_get_llm_models(),
                    users=users, oauth_statuses=oauth_statuses,
-                   just_connected=connected)
+                   just_connected=connected, oauth_app_url=OAUTH_APP_URL)
 
 
 @app.post("/agents/{agent_id}/edit")

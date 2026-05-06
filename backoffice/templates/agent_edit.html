@@ -158,8 +158,10 @@
             <div class="py-3 border-t border-gray-800 first:border-0">
               <div class="flex items-center justify-between mb-2">
                 <span class="text-xs text-gray-400">{{ user.name }}</span>
-                {% if st.connected %}
-                  <span class="text-xs text-emerald-400">● conectado</span>
+                {% if st.online %}
+                  <span class="text-xs text-emerald-400">● online</span>
+                {% elif st.connected %}
+                  <span class="text-xs text-yellow-500">● token guardado (offline)</span>
                 {% else %}
                   <span class="text-xs text-gray-600">● no conectado</span>
                 {% endif %}
@@ -177,11 +179,16 @@
                   </button>
                 </form>
               {% else %}
-                <a href="/auth/{{ svc }}/connect?user_id={{ uid }}&agent_id={{ agent_id }}"
-                   class="inline-block mt-1 px-3 py-1.5 bg-indigo-700 hover:bg-indigo-600
-                          text-white text-xs rounded transition-colors">
-                  Conectar cuenta →
-                </a>
+                {% if oauth_app_url %}
+                  <a href="{{ oauth_app_url }}/auth/{{ svc }}/login?user_id={{ uid }}&agent_id={{ agent_id }}"
+                     target="_blank"
+                     class="inline-block mt-1 px-3 py-1.5 bg-indigo-700 hover:bg-indigo-600
+                            text-white text-xs rounded transition-colors">
+                    Conectar cuenta →
+                  </a>
+                {% else %}
+                  <span class="text-xs text-gray-600">Configurar OAUTH_APP_URL en backoffice/.env</span>
+                {% endif %}
               {% endif %}
             </div>
             {% endfor %}

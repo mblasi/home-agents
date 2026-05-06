@@ -4,3 +4,6 @@
 [submodule "ear"]
 	path = ear
 	url = git@github.com:mblasi/home-agents-ear.git
+[submodule "oauth-app"]
+	path = oauth-app
+	url = git@github.com:mblasi/home-agents-oauth.git
