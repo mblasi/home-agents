@@ -1421,7 +1421,7 @@ Estado:   COMPLETA
 Objetivo: Búsqueda, benchmark, recomendación y seguimiento de precios en ML
           via API pública + OAuth 2.0 para operaciones autenticadas.
           Flujo conversacional multi-turno hasta encontrar el producto buscado.
-Estado:   Pendiente
+Estado:   COMPLETA
 Deps:     FASE 9 (coordinador, COMPLETA), FASE 6 (patrón agente+alertas, COMPLETA),
           FASE 19 (mensajes ricos WA, deseable para output).
 Site:     MLU (Uruguay) por defecto; configurable via ML_SITE en .env (MLA, MLB, etc.)
@@ -1429,7 +1429,7 @@ Site:     MLU (Uruguay) por defecto; configurable via ML_SITE en .env (MLA, MLB,
 
 #### Etapa A — Cliente público y búsqueda básica
 
-- [ ] 20.1  **Cliente ML público** (`ml_client.py`) — wrapper sobre la API pública de ML sin auth:
+- [x] 20.1  **Cliente ML público** (`ml_client.py`) — wrapper sobre la API pública de ML sin auth:
             `search(query, site, filters)` → lista de items paginada;
             `get_item(item_id)` → detalle completo (precio, condición, stock, vendedor, envío, fotos);
             `get_description(item_id)` → texto completo del producto;
@@ -1437,19 +1437,19 @@ Site:     MLU (Uruguay) por defecto; configurable via ML_SITE en .env (MLA, MLB,
             Cache por defecto 10min (configurable); respeta rate limits ML (burst 10 req/s).
             Site configurable vía parámetro o `ML_SITE` en `.env`; default `MLU`.
 
-- [ ] 20.2  **Parsing de intents de búsqueda** — el LLM extrae de la consulta:
+- [x] 20.2  **Parsing de intents de búsqueda** — el LLM extrae de la consulta:
             `query` (término libre), `price_max`, `price_min`, `condition` (new/used/all),
             `category_hint` (texto libre → resolver a category_id vía `/sites/{site}/categories`),
             `free_shipping` (bool). Prompt específico de extracción (micro-LLM, similar a
             `_extract_destination()` en travel_agent.py). Sin categoría explícita, buscar en todo ML.
 
-- [ ] 20.3  **Benchmark de resultados** — dado el resultado de `search()`, generar tabla comparativa:
+- [x] 20.3  **Benchmark de resultados** — dado el resultado de `search()`, generar tabla comparativa:
             precio, vendedor (nick + nivel), reputación (verde/amarillo/naranja/rojo), envío gratis,
             cantidad vendida, ubicación, link corto (permalink). Ordenar por score ponderado
             (precio normalizado 40%, reputación vendedor 30%, ventas 20%, envío 10%).
             Formato texto adaptado al canal: tabla monoespaciada para WA/chat, lista para voz.
 
-- [ ] 20.4  **Recomendación justificada** — el agente elige el mejor ítem del benchmark y
+- [x] 20.4  **Recomendación justificada** — el agente elige el mejor ítem del benchmark y
             genera una recomendación en lenguaje natural explicando por qué (precio justo,
             vendedor confiable, envío incluido, etc.). Si ningún ítem supera un umbral de
             calidad mínima (reputación < verde o precio outlier), lo indica y sugiere refinar
@@ -1457,14 +1457,14 @@ Site:     MLU (Uruguay) por defecto; configurable via ML_SITE en .env (MLA, MLB,
 
 #### Etapa B — Flujo conversacional multi-turno
 
-- [ ] 20.5  **Contexto de búsqueda por conversación** — `MLSearchContext` en `shared_state`
+- [x] 20.5  **Contexto de búsqueda por conversación** — `MLSearchContext` en `shared_state`
             por `source_key`: guarda la última query, filtros activos, página actual, y lista
             de items mostrados (referenciados por índice 1..N para follow-ups).
             Permite: "mostrá más" → página siguiente; "el segundo" → detalle del ítem 2;
             "filtrá por nuevo" → rerun con `condition=new`; "más barato" → rerun con
             `price_max` ajustado al mínimo encontrado; "seguí buscando" → nueva query derivada.
 
-- [ ] 20.6  **Refinamiento iterativo** — el agente detecta intents de refinamiento:
+- [x] 20.6  **Refinamiento iterativo** — el agente detecta intents de refinamiento:
             `show_more`, `filter_update`, `item_detail`, `restart_search`.
             Para `item_detail`: llama `get_item()` + `get_description()` y resume en 3-4 puntos
             clave (qué incluye, garantía, ubicación vendedor, tiempo de entrega estimado).
@@ -1472,20 +1472,20 @@ Site:     MLU (Uruguay) por defecto; configurable via ML_SITE en .env (MLA, MLB,
 
 #### Etapa C — Seguimiento de precios
 
-- [ ] 20.7  **Tracker de precios** (`ml_price_tracker.py`) — persistencia en
+- [x] 20.7  **Tracker de precios** (`ml_price_tracker.py`) — persistencia en
             `~/.local/share/capitan/ml_prices.json`. Estructura por usuario:
             `{user_id: [{item_id, title, target_price, snapshots: [{ts, price}], alert_sent}]}`.
             Comandos: "seguí el precio de este" (ítem del contexto actual), "dejá de seguir X",
             "¿cómo está el precio de lo que seguís?". El `item_id` se resuelve desde el contexto
             de búsqueda activo o por título si el usuario lo describe.
 
-- [ ] 20.8  **Alertas de precio** — el tracker tiene método `check()` registrado en el sistema
+- [x] 20.8  **Alertas de precio** — el tracker tiene método `check()` registrado en el sistema
             de alertas existente (`alert_queue.py`): si precio actual < (precio_snapshot_anterior × (1 - ML_PRICE_DROP_PCT))
             → emite alerta "{title} bajó X% — ahora ${precio}". Umbral default 5% vía
             `ML_PRICE_DROP_PCT` en `.env`. Cooldown 24h por ítem para no repetir alertas.
             Chequeo cada hora junto al poller de alertas del core.
 
-- [ ] 20.9  **Seguimiento de búsqueda guardada** — además de items individuales, permitir
+- [x] 20.9  **Seguimiento de búsqueda guardada** — además de items individuales, permitir
             guardar una query completa (ej: "notebook RTX 4060 hasta $3000"). Cada chequeo
             corre la búsqueda, compara contra el mejor precio previo registrado, y alerta si
             aparece un ítem nuevo más barato que el mínimo histórico. Útil para productos
@@ -1493,14 +1493,14 @@ Site:     MLU (Uruguay) por defecto; configurable via ML_SITE en .env (MLA, MLB,
 
 #### Etapa D — OAuth y operaciones autenticadas
 
-- [ ] 20.10 **Registro de app ML** — proceso de setup único documentado:
+- [x] 20.10 **Registro de app ML** — proceso de setup único documentado:
             1. Crear app en https://developers.mercadolibre.com.ar → obtener `client_id` y `client_secret`.
             2. Configurar redirect URI: `http://localhost:8766/ml/callback` (puerto separado del core).
             3. Agregar `ML_CLIENT_ID`, `ML_CLIENT_SECRET` a `core/.env`.
             Scope requerido: `read` (para búsqueda autenticada y wishlist), `offline_access` (refresh).
             Sin estas vars, el agente opera en modo público sin OAuth (degradación limpia).
 
-- [ ] 20.11 **OAuth 2.0 Authorization Code flow** (`ml_auth.py`) — al solicitar auth:
+- [x] 20.11 **OAuth 2.0 Authorization Code flow** (`ml_auth.py`) — al solicitar auth:
             1. Generar URL de autorización ML y enviar al usuario por WA/voz/chat.
             2. Levantar servidor temporal `http://localhost:8766/ml/callback` con `http.server`
                (solo durante la ventana de auth, máx 5min).
@@ -1509,13 +1509,13 @@ Site:     MLU (Uruguay) por defecto; configurable via ML_SITE en .env (MLA, MLB,
             4. Persistir tokens en `~/.local/share/capitan/ml_token_{user_id}.json` (gitignored).
             Auto-refresh: si `access_token` vence (6h), usar `refresh_token` (180 días) transparentemente.
 
-- [ ] 20.12 **Operaciones autenticadas** — con token válido:
+- [x] 20.12 **Operaciones autenticadas** — con token válido:
             `get_my_orders()` — historial de compras del usuario (útil para "¿ya compré esto antes?");
             `get_wishlist()` — items guardados del usuario en ML;
             `add_to_wishlist(item_id)` — guardar ítem desde el flujo conversacional.
             Si el usuario no autenticó, operaciones degradan a modo público con aviso.
 
-Estado:   Pendiente
+Estado:   COMPLETA
 
 ---
 
@@ -1525,20 +1525,20 @@ Estado:   Pendiente
 Objetivo: Consulta de saldo, movimientos, cobros y pagos via MercadoPago,
           con OAuth propio (ecosistema MP distinto al de ML aunque mismo developer portal).
           Foco en consulta y monitoreo; operaciones de pago requieren confirmación explícita.
-Estado:   Pendiente
+Estado:   COMPLETA
 Deps:     FASE 20.10-20.11 (patrón OAuth ya establecido, reutilizable); FASE 9 (coordinador).
           Si 20.11 ya implementó ml_auth.py, mp_auth.py puede ser una generalización.
 ```
 
 #### Etapa A — OAuth y cliente MP
 
-- [ ] 21.1  **Registro de app MP** — setup único en https://www.mercadopago.com.uy/developers:
+- [x] 21.1  **Registro de app MP** — setup único en https://www.mercadopago.com.uy/developers:
             Crear app distinta a la de ML (misma cuenta de developer, diferente `client_id`).
             Redirect URI: `http://localhost:8767/mp/callback` (puerto separado de ML y core).
             Scopes: `read` + `offline_access` mínimo; `write` + `money_transfer` solo si se
             implementan pagos (etapa C). Vars `MP_CLIENT_ID`, `MP_CLIENT_SECRET` en `core/.env`.
 
-- [ ] 21.2  **OAuth 2.0 y cliente MP** (`mp_auth.py`, `mp_client.py`) — mismo patrón que
+- [x] 21.2  **OAuth 2.0 y cliente MP** (`mp_auth.py`, `mp_client.py`) — mismo patrón que
             `ml_auth.py` (20.11): URL auth → servidor temporal :8767 → code → tokens → refresh.
             `mp_client.py` wrappea la API REST de MP con auth header `Bearer {access_token}`;
             auto-refresh transparente; tokens en `~/.local/share/capitan/mp_token_{user_id}.json`.
@@ -1547,45 +1547,45 @@ Deps:     FASE 20.10-20.11 (patrón OAuth ya establecido, reutilizable); FASE 9 
 
 #### Etapa B — Consultas de cuenta (solo lectura)
 
-- [ ] 21.3  **Saldo y cuenta** — `get_balance()`: saldo disponible y en proceso por moneda
+- [x] 21.3  **Saldo y cuenta** — `get_balance()`: saldo disponible y en proceso por moneda
             (ARS, UYU, USD si aplica). Respuesta natural: "Tenés $X disponibles y $Y en proceso".
             `get_account_info()`: nombre del titular, email, nivel de cuenta (mercadolíder, etc.).
 
-- [ ] 21.4  **Movimientos y historial** — `get_movements(limit, date_from, date_to)`:
+- [x] 21.4  **Movimientos y historial** — `get_movements(limit, date_from, date_to)`:
             lista de transacciones con tipo (pago recibido, retiro, transferencia, compra ML),
             monto, estado, descripción y fecha. Parsing de consultas: "¿cuánto cobré esta semana?",
             "¿cuándo fue el último retiro?", "¿hay algún pago pendiente?".
             Cache 5min (los movimientos son sensibles a tiempo real).
 
-- [ ] 21.5  **Cobros pendientes y rechazados** — `get_pending_payments()`: filtra movimientos
+- [x] 21.5  **Cobros pendientes y rechazados** — `get_pending_payments()`: filtra movimientos
             por estado `pending` o `in_process`; `get_rejected_payments()`: estado `rejected` con
             motivo de rechazo. Útil para: "¿hay algún cobro que no se acreditó?".
 
-- [ ] 21.6  **Resumen periódico** — método `summary(period)` que agrega: cobros totales,
+- [x] 21.6  **Resumen periódico** — método `summary(period)` que agrega: cobros totales,
             pagos totales, saldo neto, transacción más grande, del período indicado (hoy/semana/mes).
             Integrado al sistema de alertas: resumen diario opcional a hora configurable
             via `MP_BRIEFING_HOUR` en `.env` (análogo a `FINANCE_BRIEFING_HOUR`).
 
 #### Etapa C — Cobros y solicitudes de dinero (operaciones escritura)
 
-- [ ] 21.7  **Link de cobro / QR** — `create_payment_link(amount, description, payer_email?)`:
+- [x] 21.7  **Link de cobro / QR** — `create_payment_link(amount, description, payer_email?)`:
             genera un `checkout/preference` y devuelve el `init_point` (URL de pago MP) listo
             para compartir. Uso: "generá un link de cobro por $500 con descripción 'alquiler'".
             Para uso presencial: `create_qr(amount, description)` via `instore/orders/qr`
             (requiere `pos_id`, documentar setup previo).
 
-- [ ] 21.8  **Solicitud de dinero (money request)** — `request_money(amount, payer_id_or_email, description)`:
+- [x] 21.8  **Solicitud de dinero (money request)** — `request_money(amount, payer_id_or_email, description)`:
             crea una solicitud de cobro a otro usuario MP. Uso: "pedile $200 a Juan por la cena".
             Requiere confirmación explícita antes de ejecutar: el agente muestra el resumen
             ("¿Confirmo solicitud de $200 a juan@mail.com por 'cena'?") y espera `needs_reply: true`
             (integrado con FASE 19.1). Scope `money_transfer` requerido.
 
-- [ ] 21.9  **Transferencia entre cuentas MP propias** — `transfer_to_bank(amount, account)`:
+- [x] 21.9  **Transferencia entre cuentas MP propias** — `transfer_to_bank(amount, account)`:
             extracción a CBU/CVU bancaria. Solo ejecuta con doble confirmación (confirmar monto
             y confirmar destino en dos mensajes separados). Scope `money_transfer`. Registrar
             en log local con timestamp para auditoría.
 
-Estado:   Pendiente
+Estado:   COMPLETA
 
 ---
 
