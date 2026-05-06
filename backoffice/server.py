@@ -598,40 +598,26 @@ def delete_agent_htmx(agent_id: str):
     return HTMLResponse("")
 
 
-# ── OAuth2 backends (token manual) ─────────────────────────────────────────────
+# ── OAuth2 backends ─────────────────────────────────────────────────────────────
 
-@app.post("/auth/{service}/token", response_class=HTMLResponse)
-async def oauth_save_token(request: Request, service: str):
-    if service not in _OAUTH_SERVICES:
-        raise HTTPException(status_code=404)
-    form = await request.form()
-    user_id = str(form.get("user_id", "")).strip()
-    access_token = str(form.get("access_token", "")).strip()
-    agent_id = str(form.get("agent_id", "")).strip()
-    if not user_id or not access_token:
-        return RedirectResponse(f"/agents/{agent_id}/edit", status_code=303)
+@app.get("/auth/{service}/connect")
+def oauth_connect(service: str, user_id: str, agent_id: str = ""):
+    """Inicia el flujo OAuth2: pide a core la URL y redirige al usuario."""
+    result = _core(f"/auth/{service}/url", params={"user_id": user_id, "agent_id": agent_id})
+    if not result or not result.get("url"):
+        raise HTTPException(status_code=503, detail=f"Core no pudo generar la URL de autorización para {service}")
+    return RedirectResponse(result["url"], status_code=302)
 
-    api_user_id = ""
-    try:
-        r = requests.get(
-            _OAUTH_SERVICES[service]["me_url"],
-            headers={"Authorization": f"Bearer {access_token}"},
-            timeout=10,
-        )
-        if r.status_code == 200:
-            api_user_id = str(r.json().get("id", ""))
-    except Exception:
-        pass
 
-    _CAPITAN_DIR.mkdir(parents=True, exist_ok=True)
-    token_data = {
-        "access_token": access_token,
-        "user_id": api_user_id,
-        "saved_at": _dt.datetime.now().isoformat(timespec="seconds"),
-        "expires_at": time.time() + 3600 * 24 * 30,
-    }
-    _oauth_token_path(service, user_id).write_text(json.dumps(token_data, indent=2))
-    return RedirectResponse(f"/agents/{agent_id}/edit?connected=1", status_code=303)
+@app.get("/auth/{service}/callback")
+def oauth_callback(service: str, code: str = "", state: str = "", error: str = ""):
+    """Recibe el callback de ML/MP con el code, lo envía a core para canjearlo."""
+    if error or not code:
+        return RedirectResponse("/agents", status_code=302)
+    result = _core(f"/auth/{service}/callback", method="POST", json={"code": code, "state": state})
+    agent_id = (result or {}).get("agent_id", "")
+    redirect = f"/agents/{agent_id}/edit?connected=1" if agent_id else "/agents"
+    return RedirectResponse(redirect, status_code=302)
 
 
 @app.post("/auth/{service}/disconnect", response_class=HTMLResponse)

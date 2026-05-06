@@ -138,7 +138,7 @@
 
     {% if just_connected %}
     <div class="mb-3 bg-emerald-900/30 border border-emerald-700 text-emerald-300 px-3 py-2 rounded-lg text-xs">
-      Token guardado correctamente.
+      Cuenta conectada correctamente.
     </div>
     {% endif %}
 
@@ -177,24 +177,11 @@
                   </button>
                 </form>
               {% else %}
-                <details class="mt-1">
-                  <summary class="text-xs text-indigo-400 hover:text-indigo-300 cursor-pointer select-none">
-                    Ingresar token →
-                  </summary>
-                  <form method="POST" action="/auth/{{ svc }}/token" class="mt-2 space-y-2">
-                    <input type="hidden" name="user_id" value="{{ uid }}">
-                    <input type="hidden" name="agent_id" value="{{ agent_id }}">
-                    <input type="text" name="access_token" placeholder="access token"
-                           class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5
-                                  text-xs text-gray-200 font-mono focus:outline-none focus:ring-1
-                                  focus:ring-indigo-500">
-                    <button type="submit"
-                            class="px-3 py-1 bg-indigo-700 hover:bg-indigo-600 text-white text-xs
-                                   rounded transition-colors">
-                      Guardar
-                    </button>
-                  </form>
-                </details>
+                <a href="/auth/{{ svc }}/connect?user_id={{ uid }}&agent_id={{ agent_id }}"
+                   class="inline-block mt-1 px-3 py-1.5 bg-indigo-700 hover:bg-indigo-600
+                          text-white text-xs rounded transition-colors">
+                  Conectar cuenta →
+                </a>
               {% endif %}
             </div>
             {% endfor %}
