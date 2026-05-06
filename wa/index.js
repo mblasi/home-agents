@@ -71,12 +71,52 @@ client.on("disconnected", (reason) => {
   setTimeout(() => client.initialize(), 10_000);
 });
 
+// ── Estado de conversaciones pendientes ────────────────────────────────────────
+// msg_id → { conversation_id, ts }
+// Cuando el core responde con needs_reply=true, guardamos el ID del mensaje enviado.
+// En el próximo mensaje con quoted reply, lo enrutamos a la misma conversación.
+
+const PENDING_TTL_MS = 5 * 60 * 1000; // 5 min
+
+const _pendingConvs = new Map();
+
+function _storePending(msgId, conversationId) {
+  _pendingConvs.set(msgId, { conversation_id: conversationId, ts: Date.now() });
+  // Limpiar entradas viejas cada vez que agregamos una
+  const cutoff = Date.now() - PENDING_TTL_MS;
+  for (const [k, v] of _pendingConvs) {
+    if (v.ts < cutoff) _pendingConvs.delete(k);
+  }
+}
+
+function _resolvePending(quotedMsgId) {
+  const entry = _pendingConvs.get(quotedMsgId);
+  if (!entry) return null;
+  if (Date.now() - entry.ts > PENDING_TTL_MS) {
+    _pendingConvs.delete(quotedMsgId);
+    return null;
+  }
+  return entry.conversation_id;
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 async function handleText(msg, phone, fromLid, text) {
   const body = { text, message_id: msg.id.id };
   if (phone)   body.from_number = phone;
   if (fromLid) body.from_lid    = fromLid;
+
+  // 19.1: si es un quoted-reply a un mensaje pendiente, retomar esa conversación
+  if (msg.hasQuotedMsg) {
+    try {
+      const quoted = await msg.getQuotedMessage();
+      const convId = _resolvePending(quoted.id.id);
+      if (convId) {
+        body.conversation_id = convId;
+        console.log(`[WA] quoted-reply → conv ${convId}`);
+      }
+    } catch (_) { /* noop */ }
+  }
 
   const res = await fetch(`${CORE_URL}/wa/inbound`, {
     method: "POST",
@@ -92,8 +132,13 @@ async function handleText(msg, phone, fromLid, text) {
 
   const data = await res.json();
   if (data.response) {
-    await msg.reply(data.response);
+    const sentMsg = await msg.reply(data.response);
     console.log(`[WA] → ${phone || fromLid}: ${data.response.slice(0, 80)}`);
+    // 19.1: si el agente espera respuesta, trackear el mensaje enviado
+    if (data.needs_reply && sentMsg?.id?.id) {
+      _storePending(sentMsg.id.id, data.conversation_id);
+      console.log(`[WA] pendiente: msg ${sentMsg.id.id} → conv ${data.conversation_id}`);
+    }
   }
 }
 
