@@ -53,12 +53,15 @@ client.on("qr", (qr) => {
   qrcode.generate(qr, { small: true });
 });
 
+let _clientReady = false;
+
 client.on("authenticated", () => {
   console.log("[WA] Sesión autenticada");
 });
 
 client.on("ready", () => {
   console.log(`[WA] Cliente listo. Core: ${CORE_URL}`);
+  _clientReady = true;
 });
 
 client.on("auth_failure", (msg) => {
@@ -68,6 +71,7 @@ client.on("auth_failure", (msg) => {
 
 client.on("disconnected", (reason) => {
   console.log(`[WA] Desconectado (${reason}). Reconectando en 10s...`);
+  _clientReady = false;
   setTimeout(() => client.initialize(), 10_000);
 });
 
@@ -285,6 +289,11 @@ http.createServer(async (req, res) => {
   let body = "";
   req.on("data", (chunk) => { body += chunk; });
   req.on("end", async () => {
+    if (!_clientReady) {
+      res.writeHead(503, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "WA client not ready" }));
+      return;
+    }
     try {
       const { to, text, audio_b64, media_url, link_preview } = JSON.parse(body);
       if (!to || (!text && !audio_b64 && !media_url)) {
