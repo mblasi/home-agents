@@ -153,6 +153,13 @@ async function handleText(msg, phone, fromLid, text) {
   }
 
   const data = await res.json();
+
+  // Marcar como leído siempre — incluso cuando la respuesta es vacía (ej. ack silencioso)
+  try {
+    const chat = await msg.getChat();
+    await chat.sendSeen();
+  } catch (_) { /* noop */ }
+
   if (data.response) {
     let sentMsg = null;
 
