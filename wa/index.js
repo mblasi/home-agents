@@ -76,29 +76,35 @@ client.on("disconnected", (reason) => {
 });
 
 // ── Estado de mensajes pendientes ──────────────────────────────────────────────
-// msg_id → { conversation_id?, intent_id?, ts }
 //
-// _pendingConvs:  cuando core responde needs_reply=true → quoted-reply retoma conversación
-// _pendingIntents: cuando core envía notif proactiva con intent_id → quoted-reply cierra intent
+// _pendingByPhone: phone/lid → { conversation_id, ts }
+//   Cuando core responde needs_reply=true, el SIGUIENTE mensaje del usuario
+//   (sin importar si cita o no) se enruta a esa conversación.
+//   TTL 30 min — suficiente para adjuntar un PDF.
+//
+// _pendingIntents: sent_msg_id → { intent_id, ts }
+//   Para notificaciones proactivas: quoted-reply "Ok" cierra el intent.
+//   TTL 5 min (flujo de confirmación inmediata).
 
-const PENDING_TTL_MS = 5 * 60 * 1000; // 5 min
+const PENDING_PHONE_TTL_MS  = 30 * 60 * 1000;
+const PENDING_INTENT_TTL_MS =  5 * 60 * 1000;
 
-const _pendingConvs    = new Map();
+const _pendingByPhone  = new Map();
 const _pendingIntents  = new Map();
 
-function _storePending(msgId, conversationId) {
-  _pendingConvs.set(msgId, { conversation_id: conversationId, ts: Date.now() });
-  const cutoff = Date.now() - PENDING_TTL_MS;
-  for (const [k, v] of _pendingConvs) {
-    if (v.ts < cutoff) _pendingConvs.delete(k);
+function _storePendingByPhone(sender, conversationId) {
+  _pendingByPhone.set(sender, { conversation_id: conversationId, ts: Date.now() });
+  const cutoff = Date.now() - PENDING_PHONE_TTL_MS;
+  for (const [k, v] of _pendingByPhone) {
+    if (v.ts < cutoff) _pendingByPhone.delete(k);
   }
 }
 
-function _resolvePending(quotedMsgId) {
-  const entry = _pendingConvs.get(quotedMsgId);
+function _resolvePendingByPhone(sender) {
+  const entry = _pendingByPhone.get(sender);
   if (!entry) return null;
-  if (Date.now() - entry.ts > PENDING_TTL_MS) {
-    _pendingConvs.delete(quotedMsgId);
+  if (Date.now() - entry.ts > PENDING_PHONE_TTL_MS) {
+    _pendingByPhone.delete(sender);
     return null;
   }
   return entry.conversation_id;
@@ -106,7 +112,7 @@ function _resolvePending(quotedMsgId) {
 
 function _storePendingIntent(msgId, intentId) {
   _pendingIntents.set(msgId, { intent_id: intentId, ts: Date.now() });
-  const cutoff = Date.now() - PENDING_TTL_MS;
+  const cutoff = Date.now() - PENDING_INTENT_TTL_MS;
   for (const [k, v] of _pendingIntents) {
     if (v.ts < cutoff) _pendingIntents.delete(k);
   }
@@ -115,28 +121,83 @@ function _storePendingIntent(msgId, intentId) {
 function _resolvePendingIntent(quotedMsgId) {
   const entry = _pendingIntents.get(quotedMsgId);
   if (!entry) return null;
-  if (Date.now() - entry.ts > PENDING_TTL_MS) {
+  if (Date.now() - entry.ts > PENDING_INTENT_TTL_MS) {
     _pendingIntents.delete(quotedMsgId);
     return null;
   }
   return entry.intent_id;
 }
 
+function _updatePendingState(sender, data) {
+  if (data.needs_reply) {
+    _storePendingByPhone(sender, data.conversation_id);
+  } else {
+    _pendingByPhone.delete(sender);
+  }
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
+async function _sendResponse(msg, phone, fromLid, data) {
+  try {
+    const chat = await msg.getChat();
+    await chat.sendSeen();
+  } catch (_) { /* noop */ }
+
+  if (!data.response) return null;
+
+  let sentMsg = null;
+  if (data.media_url) {
+    try {
+      const media = await MessageMedia.fromUrl(data.media_url, { unsafeMime: true });
+      const chat = await msg.getChat();
+      sentMsg = await chat.sendMessage(media, { caption: data.response });
+    } catch (err) {
+      console.error(`[WA] Error enviando media: ${err.message}`);
+      sentMsg = await msg.reply(data.response).catch(() => null);
+    }
+  } else if (data.link_preview) {
+    try {
+      const chat = await msg.getChat();
+      sentMsg = await chat.sendMessage(data.response, {
+        linkPreview: true,
+        quotedMessageId: msg.id._serialized,
+      });
+    } catch (err) {
+      sentMsg = await msg.reply(data.response).catch(() => null);
+    }
+  } else {
+    sentMsg = await msg.reply(data.response).catch(() => null);
+  }
+
+  console.log(`[WA] → ${phone || fromLid}: ${data.response.slice(0, 80)}`);
+
+  if (!data.needs_reply) {
+    try { await msg.react("✅"); } catch (_) { /* noop */ }
+  }
+
+  return sentMsg;
+}
+
 async function handleText(msg, phone, fromLid, text) {
+  const sender = phone || fromLid;
   const body = { text, message_id: msg.id.id };
   if (phone)   body.from_number = phone;
   if (fromLid) body.from_lid    = fromLid;
 
-  // 19.1: si es un quoted-reply, retomar conversación pendiente o cerrar intent
+  // Retomar conversación pendiente por teléfono (pending_field en curso)
+  const pendingConvId = _resolvePendingByPhone(sender);
+  if (pendingConvId) {
+    body.conversation_id = pendingConvId;
+    console.log(`[WA] pending phone → conv ${pendingConvId}`);
+  }
+
+  // quoted-reply: solo cierra intents (conversación se resuelve por teléfono)
   if (msg.hasQuotedMsg) {
     try {
-      const quoted = await msg.getQuotedMessage();
-      const convId   = _resolvePending(quoted.id.id);
+      const quoted  = await msg.getQuotedMessage();
       const intentId = _resolvePendingIntent(quoted.id.id);
-      if (convId)   { body.conversation_id = convId;   console.log(`[WA] quoted-reply → conv ${convId}`); }
-      if (intentId) { body.intent_id       = intentId; console.log(`[WA] quoted-reply → intent ${intentId}`); }
+      if (intentId) { body.intent_id = intentId; console.log(`[WA] quoted-reply → intent ${intentId}`); }
     } catch (_) { /* noop */ }
   }
 
@@ -153,57 +214,60 @@ async function handleText(msg, phone, fromLid, text) {
   }
 
   const data = await res.json();
+  _updatePendingState(sender, data);
+  await _sendResponse(msg, phone, fromLid, data);
+}
 
-  // Marcar como leído siempre — incluso cuando la respuesta es vacía (ej. ack silencioso)
-  try {
-    const chat = await msg.getChat();
-    await chat.sendSeen();
-  } catch (_) { /* noop */ }
+async function handleMedia(msg, phone, fromLid, mediaType) {
+  const sender = phone || fromLid;
+  const pendingConvId = _resolvePendingByPhone(sender);
 
-  if (data.response) {
-    let sentMsg = null;
-
-    // 19.3: imagen adjunta
-    if (data.media_url) {
-      try {
-        const media = await MessageMedia.fromUrl(data.media_url, { unsafeMime: true });
-        const chat = await msg.getChat();
-        sentMsg = await chat.sendMessage(media, { caption: data.response });
-      } catch (err) {
-        console.error(`[WA] Error enviando media: ${err.message}`);
-        sentMsg = await msg.reply(data.response).catch(() => null);
-      }
-    } else if (data.link_preview) {
-      // 19.3: link preview — sendMessage con quoted manual
-      try {
-        const chat = await msg.getChat();
-        sentMsg = await chat.sendMessage(data.response, {
-          linkPreview: true,
-          quotedMessageId: msg.id._serialized,
-        });
-      } catch (err) {
-        sentMsg = await msg.reply(data.response).catch(() => null);
-      }
-    } else {
-      sentMsg = await msg.reply(data.response).catch(() => null);
-    }
-
-    console.log(`[WA] → ${phone || fromLid}: ${data.response.slice(0, 80)}`);
-
-    // 19.1: si el agente espera respuesta, trackear el mensaje enviado
-    if (data.needs_reply && sentMsg?.id?.id) {
-      _storePending(sentMsg.id.id, data.conversation_id);
-      console.log(`[WA] pendiente: msg ${sentMsg.id.id} → conv ${data.conversation_id}`);
-    }
-    // 19.2: si el intent fue procesado sin necesidad de respuesta, confirmar con reacción
-    if (!data.needs_reply) {
-      try {
-        await msg.react("✅");
-      } catch (_) {
-        // react no soportado; fallback silencioso (la respuesta ya fue enviada)
-      }
-    }
+  if (!pendingConvId) {
+    console.log(`[WA] media ${mediaType} de ${sender} sin conversación pendiente — ignorando`);
+    try {
+      const chat = await msg.getChat();
+      await chat.sendSeen();
+    } catch (_) { /* noop */ }
+    await msg.reply("No entiendo este tipo de mensaje.").catch(() => {});
+    return;
   }
+
+  const media = await msg.downloadMedia();
+  if (!media) {
+    console.error(`[WA] No se pudo descargar ${mediaType} de ${sender}`);
+    await msg.reply("No pude descargar el archivo. Intentá de nuevo.").catch(() => {});
+    return;
+  }
+
+  console.log(`[WA] media ${mediaType} de ${sender} → conv ${pendingConvId}`);
+
+  const body = {
+    text:           "",
+    message_id:     msg.id.id,
+    conversation_id: pendingConvId,
+    media_b64:      media.data,
+    media_mimetype: media.mimetype,
+    media_type:     mediaType,
+    media_filename: media.filename || null,
+  };
+  if (phone)   body.from_number = phone;
+  if (fromLid) body.from_lid    = fromLid;
+
+  const res = await fetch(`${CORE_URL}/wa/inbound`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    console.error(`[WA] Error del core (media): HTTP ${res.status}`);
+    await msg.reply("Ocurrió un error al procesar el archivo.").catch(() => {});
+    return;
+  }
+
+  const data = await res.json();
+  _updatePendingState(sender, data);
+  await _sendResponse(msg, phone, fromLid, data);
 }
 
 async function handleAudio(msg, phone, fromLid) {
@@ -295,6 +359,9 @@ client.on("message", async (msg) => {
     } else if (msg.type === "ptt" || msg.type === "audio") {
       console.log(`[WA] audio ${phone || fromLid} (${msg.type})`);
       await handleAudio(msg, phone, fromLid);
+    } else if (msg.type === "image" || msg.type === "document") {
+      console.log(`[WA] media ${msg.type} ${phone || fromLid}`);
+      await handleMedia(msg, phone, fromLid, msg.type);
     }
   } catch (err) {
     console.error(`[WA] Error inesperado: ${err.message}`);
