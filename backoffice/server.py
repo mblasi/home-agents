@@ -503,7 +503,7 @@ async def agent_new_submit(request: Request):
 
 
 @app.get("/agents/{agent_id}/edit", response_class=HTMLResponse)
-def agent_edit_page(request: Request, agent_id: str, connected: str = ""):
+def agent_edit_page(request: Request, agent_id: str, connected: str = "", oauth_error: str = ""):
     agent = _core(f"/agents/{agent_id}")
     if not agent:
         return RedirectResponse("/agents", status_code=303)
@@ -523,7 +523,8 @@ def agent_edit_page(request: Request, agent_id: str, connected: str = ""):
                    role_perms=role_perms, roles=_ROLES_AGENTS,
                    llm_models=_get_llm_models(),
                    users=users, oauth_statuses=oauth_statuses,
-                   just_connected=connected, oauth_app_url=OAUTH_APP_URL)
+                   just_connected=connected, oauth_error=oauth_error,
+                   oauth_app_url=OAUTH_APP_URL)
 
 
 @app.post("/agents/{agent_id}/edit")
@@ -649,26 +650,31 @@ async def oauth_disconnect(request: Request, service: str):
 @app.post("/auth/{service}/fetch-shortcode")
 async def oauth_fetch_shortcode(request: Request, service: str):
     """Recupera el token del oauth app por short_code y lo persiste localmente."""
-    if service not in _OAUTH_SERVICES:
-        raise HTTPException(status_code=404)
-    if not OAUTH_APP_URL:
-        raise HTTPException(status_code=503, detail="OAUTH_APP_URL no configurado")
     form = await request.form()
+    user_id  = str(form.get("user_id", "")).strip()
+    agent_id = str(form.get("agent_id", "")).strip()
+
+    def _err(msg: str):
+        err_redirect = f"/agents/{agent_id}/edit?oauth_error={msg}" if agent_id else "/agents"
+        return RedirectResponse(err_redirect, status_code=303)
+
+    if service not in _OAUTH_SERVICES:
+        return _err("Servicio+desconocido")
+    if not OAUTH_APP_URL:
+        return _err("OAUTH_APP_URL+no+configurado")
     short_code = str(form.get("short_code", "")).strip()
-    user_id    = str(form.get("user_id", "")).strip()
-    agent_id   = str(form.get("agent_id", "")).strip()
     if not short_code or not user_id:
-        raise HTTPException(status_code=400, detail="short_code y user_id son requeridos")
+        return _err("short_code+y+user_id+son+requeridos")
     try:
         r = requests.get(f"{OAUTH_APP_URL}/tokens/{short_code}", timeout=10)
         if r.status_code == 404:
-            raise HTTPException(status_code=404, detail="Token no encontrado o expirado (TTL 5 min)")
+            return _err("short_code+no+encontrado+o+expirado+(TTL+5+min)")
         r.raise_for_status()
         data = r.json()
-    except HTTPException:
+    except RedirectResponse:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Error al contactar oauth app: {exc}")
+        return _err(f"Error+al+contactar+oauth+app:+{exc}")
     import datetime as _dt3
     token_data = {
         "access_token":  data.get("access_token", ""),
@@ -687,15 +693,20 @@ async def oauth_fetch_shortcode(request: Request, service: str):
 @app.post("/auth/{service}/set-token")
 async def oauth_set_token(request: Request, service: str):
     """Configura tokens OAuth manualmente, como fallback al circuito WA."""
-    if service not in _OAUTH_SERVICES:
-        raise HTTPException(status_code=404)
     form = await request.form()
     user_id       = str(form.get("user_id", "")).strip()
     agent_id      = str(form.get("agent_id", "")).strip()
     access_token  = str(form.get("access_token", "")).strip()
     refresh_token = str(form.get("refresh_token", "")).strip()
+
+    def _err(msg: str):
+        err_redirect = f"/agents/{agent_id}/edit?oauth_error={msg}" if agent_id else "/agents"
+        return RedirectResponse(err_redirect, status_code=303)
+
+    if service not in _OAUTH_SERVICES:
+        return _err("Servicio+desconocido")
     if not user_id or not access_token:
-        raise HTTPException(status_code=400, detail="user_id y access_token son requeridos")
+        return _err("user_id+y+access_token+son+requeridos")
     import datetime as _dt2
     token_data = {
         "access_token":  access_token,

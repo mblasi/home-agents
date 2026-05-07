@@ -148,6 +148,11 @@
       Cuenta conectada correctamente.
     </div>
     {% endif %}
+    {% if oauth_error %}
+    <div class="mb-3 bg-red-900/30 border border-red-700 text-red-300 px-3 py-2 rounded-lg text-xs">
+      Error OAuth: {{ oauth_error | replace("+", " ") }}
+    </div>
+    {% endif %}
 
     <div class="space-y-4">
       {% for b in agent.backends %}
