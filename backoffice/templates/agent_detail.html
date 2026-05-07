@@ -108,6 +108,8 @@
         <span class="text-sm text-gray-400">Conectividad</span>
         {% if agent.reachable is none %}
           <span class="text-gray-600 text-xs">sin health check</span>
+        {% elif agent.reachable == "partial" %}
+          <span class="flex items-center gap-1.5 text-amber-400 text-sm">● parcialmente accesible</span>
         {% elif agent.reachable %}
           <span class="flex items-center gap-1.5 text-emerald-400 text-sm">● accesible</span>
         {% else %}
@@ -142,6 +144,8 @@
                   {% endif %}
                   {% if b.reachable is none %}
                     <span class="text-xs text-gray-600">sin check</span>
+                  {% elif b.reachable == "partial" %}
+                    <span class="flex items-center gap-1 text-xs text-amber-400">● parcial</span>
                   {% elif b.reachable %}
                     <span class="flex items-center gap-1 text-xs text-emerald-400">● online</span>
                   {% else %}
@@ -150,6 +154,11 @@
                 </div>
               </div>
               <div class="text-xs text-gray-600 mt-0.5">{{ meta.name }}</div>
+              {% if b.reachable == "partial" and b.users_fail is defined %}
+                <div class="text-xs text-amber-600 mt-1">
+                  Sin token: {{ b.users_fail | join(", ") }}
+                </div>
+              {% endif %}
               {% if b.model %}
                 <code class="text-xs bg-gray-800 text-indigo-300 px-1.5 py-0.5 rounded mt-1 inline-block">
                   {{ b.model }}
