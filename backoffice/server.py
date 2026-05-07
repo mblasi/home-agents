@@ -42,13 +42,24 @@ app = FastAPI(title="capitan-backoffice", version="1.0")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 import datetime as _dt
+import json as _json_mod
+
 def _datetimefmt(ts: float | int) -> str:
     try:
         return _dt.datetime.fromtimestamp(float(ts)).strftime("%d/%m %H:%M")
     except Exception:
         return "—"
 
+def _tojson_filter(value, indent=None):
+    """tojson que serializa objetos con ._d (wrapper de dicts del trace)."""
+    def _default(o):
+        if hasattr(o, "_d"):
+            return o._d
+        raise TypeError(type(o))
+    return _json_mod.dumps(value, default=_default, ensure_ascii=False, indent=indent)
+
 templates.env.filters["datetimefmt"] = _datetimefmt
+templates.env.filters["tojson"]      = _tojson_filter
 
 # ── Auth ───────────────────────────────────────────────────────────────────────
 
@@ -867,7 +878,7 @@ def trace_detail(request: Request, conv_id: str, trace_id: str):
         return HTMLResponse("<p>Trace no encontrado</p>", status_code=404)
 
     class _Obj:
-        """Objeto simple para acceder al trace como atributos en la template."""
+        """Acceso por atributo a un dict JSON del trace."""
         def __init__(self, d: dict):
             self._d = d
             for k, v in d.items():
@@ -877,8 +888,17 @@ def trace_detail(request: Request, conv_id: str, trace_id: str):
                     setattr(self, k, [_Obj(i) if isinstance(i, dict) else i for i in v])
                 else:
                     setattr(self, k, v)
+        # Dict protocol — necesario para tojson, .items(), for k,v in ...
         def get(self, k, default=None):
             return getattr(self, k, default)
+        def items(self):
+            return self._d.items()
+        def keys(self):
+            return self._d.keys()
+        def values(self):
+            return self._d.values()
+        def __iter__(self):
+            return iter(self._d)
         def __len__(self):
             return len(self._d)
 
