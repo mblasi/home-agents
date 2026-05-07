@@ -1526,6 +1526,21 @@ Site:     MLU (Uruguay) por defecto; configurable via ML_SITE en .env (MLA, MLB,
             `add_to_wishlist(item_id)` — guardar ítem desde el flujo conversacional.
             Si el usuario no autenticó, operaciones degradan a modo público con aviso.
 
+- [x] 20.13 **oauth-app Cloud Run** — migración del servidor OAuth temporal (local :8766) a
+            servicio permanente en `capitan.blasi.ar` (repo `home-agents-oauth`). App FastAPI que
+            gestiona flujos ML y MP: recibe callback, intercambia code por tokens, guarda
+            temporalmente con `short_code` (TTL 5 min), notifica al bot via WA Cloud API.
+            Estado: elimina el servidor temporal en core; oauth-app es el punto de entrada público.
+
+- [x] 20.14 **Backoffice: fallback de token por short_code** — cuando WA falla (ej: token 401),
+            el token queda disponible en el oauth app por `GET /tokens/{short_code}`.
+            Nuevo endpoint `POST /auth/{service}/fetch-shortcode` en `backoffice/server.py`:
+            llama al oauth app y persiste el token en `~/.local/share/capitan/{svc}_token_{uid}.json`.
+            UI en `agent_edit.html`: botón "Recuperar por short_code" (indigo) en la sección OAuth2
+            de cada usuario del agente; los dos formularios (short_code y manual) se muestran
+            exclusivos entre sí. El short_code aparece en los logs del oauth app y en la página de
+            confirmación de ML.
+
 Estado:   COMPLETA
 
 ---

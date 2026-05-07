@@ -646,6 +646,70 @@ async def oauth_disconnect(request: Request, service: str):
     return RedirectResponse(f"/agents/{agent_id}/edit", status_code=303)
 
 
+@app.post("/auth/{service}/fetch-shortcode")
+async def oauth_fetch_shortcode(request: Request, service: str):
+    """Recupera el token del oauth app por short_code y lo persiste localmente."""
+    if service not in _OAUTH_SERVICES:
+        raise HTTPException(status_code=404)
+    if not OAUTH_APP_URL:
+        raise HTTPException(status_code=503, detail="OAUTH_APP_URL no configurado")
+    form = await request.form()
+    short_code = str(form.get("short_code", "")).strip()
+    user_id    = str(form.get("user_id", "")).strip()
+    agent_id   = str(form.get("agent_id", "")).strip()
+    if not short_code or not user_id:
+        raise HTTPException(status_code=400, detail="short_code y user_id son requeridos")
+    try:
+        r = requests.get(f"{OAUTH_APP_URL}/tokens/{short_code}", timeout=10)
+        if r.status_code == 404:
+            raise HTTPException(status_code=404, detail="Token no encontrado o expirado (TTL 5 min)")
+        r.raise_for_status()
+        data = r.json()
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Error al contactar oauth app: {exc}")
+    import datetime as _dt3
+    token_data = {
+        "access_token":  data.get("access_token", ""),
+        "refresh_token": data.get("refresh_token", ""),
+        "expires_in":    data.get("expires_in", 21600),
+        "expires_at":    time.time() + data.get("expires_in", 21600),
+        "user_id":       data.get("api_user_id", ""),
+        "saved_at":      _dt3.datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+    }
+    _CAPITAN_DIR.mkdir(parents=True, exist_ok=True)
+    _oauth_token_path(service, user_id).write_text(json.dumps(token_data, indent=2))
+    redirect = f"/agents/{agent_id}/edit?connected=1" if agent_id else "/agents"
+    return RedirectResponse(redirect, status_code=303)
+
+
+@app.post("/auth/{service}/set-token")
+async def oauth_set_token(request: Request, service: str):
+    """Configura tokens OAuth manualmente, como fallback al circuito WA."""
+    if service not in _OAUTH_SERVICES:
+        raise HTTPException(status_code=404)
+    form = await request.form()
+    user_id       = str(form.get("user_id", "")).strip()
+    agent_id      = str(form.get("agent_id", "")).strip()
+    access_token  = str(form.get("access_token", "")).strip()
+    refresh_token = str(form.get("refresh_token", "")).strip()
+    if not user_id or not access_token:
+        raise HTTPException(status_code=400, detail="user_id y access_token son requeridos")
+    import datetime as _dt2
+    token_data = {
+        "access_token":  access_token,
+        "refresh_token": refresh_token,
+        "expires_in":    21600,
+        "expires_at":    time.time() + 21600,
+        "saved_at":      _dt2.datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+    }
+    _CAPITAN_DIR.mkdir(parents=True, exist_ok=True)
+    _oauth_token_path(service, user_id).write_text(json.dumps(token_data, indent=2))
+    redirect = f"/agents/{agent_id}/edit?connected=1" if agent_id else "/agents"
+    return RedirectResponse(redirect, status_code=303)
+
+
 @app.get("/intents", response_class=HTMLResponse)
 def intents_page(request: Request):
     """Vista de primer nivel: todas las intenciones activas de todos los usuarios."""
