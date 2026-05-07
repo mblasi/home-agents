@@ -1753,3 +1753,68 @@ Deps:     FASE 9 (intent_state básico), FASE 3.5 (WA para captura de request),
 - [x] 22.12 **Backoffice** — `intents.html` con badges de tipo, botón 'visto' para advise, form
             de captura para request, muestra `captured_reply`. `goals.html` nuevo: árbol,
             notas, colaboradores, transiciones. Sidebar con link Goals.
+
+---
+
+### FASE 23 - Routing LLM Genérico + Mejora Continua Bidireccional
+
+```
+Objetivo: Eliminar todo el keyword matching de los agentes. Reemplazarlo por routing
+          LLM en dos niveles: coordinador elige agente (AgentCard) y cada agente elige
+          su acción interna (BackendCard). Ambos niveles aprenden con cada interacción
+          y mantienen un score de utilidad.
+Estado:   COMPLETA
+Deps:     FASE 9 (coordinator + FastClassifier), FASE 20 (ML), FASE 21 (MP),
+          FASE 8 (CalendarAgent).
+```
+
+- [x] 23.1  **`core/backend_router.py`** — módulo nuevo. `BackendCard` dataclass con
+            `action_id`, `label`, `description`, `requires_auth`, `auth_service`, `examples`.
+            `to_catalog_text(extra_examples=None)` para enriquecer el catálogo con
+            ejemplos aprendidos. `select_action(text, actions, model, auth_status,
+            conv_context, agent_id)` — llama al LLM del agente con las BackendCards
+            disponibles; filtra por `auth_status`; si solo hay una acción, retorna sin LLM;
+            cuando se pasa `agent_id`, carga los ejemplos aprendidos de `agents.json` y los
+            incluye en el catálogo.
+
+- [x] 23.2  **`core/ml_agent.py` reescrito** — elimina todo keyword matching. Define
+            `_ACTIONS: list[BackendCard]` con 5 acciones: `search_public`, `search_refine`
+            (gated por contexto activo), `orders` (auth ml), `wishlist` (auth ml),
+            `price_track` (gated). `process()` llama `select_action()` con `agent_id`.
+            Fix incluido: `get_my_orders()` requiere `buyer={user_id}` en la API.
+
+- [x] 23.3  **`core/mp_agent.py` reescrito** — elimina todo keyword matching. Define
+            `_ACTIONS: list[BackendCard]` con 6 acciones: `balance`, `movements`,
+            `pending_payments`, `summary`, `payment_link`, `request_money`.
+            `process()` llama `select_action()` con `agent_id`.
+            Flujo de confirmación (sí/no) se mantiene como máquina de estados antes del routing
+            — es estado binario, no routing semántico.
+
+- [x] 23.4  **`core/calendar_agent.py` — routing BackendCard** — define `_ACTIONS` con
+            2 BackendCards: `holidays` (lookahead 365 días) y `calendar` (lookahead normal).
+            `process()` llama `select_action()` con `agent_id` para determinar el lookahead
+            en lugar del keyword matching anterior.
+
+- [x] 23.5  **Mejora continua Nivel 1 — AgentCard** — `agent_config.append_learned_example()`
+            + `agent_config.record_agent_outcome()`. `get_registry()` combina curados +
+            `learned_examples` (deduplicados). FastClassifier se entrena con ejemplos combinados.
+            `server.py` llama `record_agent_outcome()` con `success=not _is_error_result(resp)`
+            después de cada request.
+
+- [x] 23.6  **Mejora continua Nivel 2 — BackendCard** — `agent_config.record_action_outcome()`
+            persiste en `action_examples.{action_id}`. `backend_router._load_action_examples()`
+            los inyecta en el catálogo cuando se pasa `agent_id`. Cada agente llama
+            `record_action_outcome()` con `success=desc is not None` después del dispatch.
+
+- [x] 23.7  **Scoring de utilidad** — `agent_config.record_agent_outcome()` y
+            `record_action_outcome()` actualizan contadores `{calls, successes}` en
+            `agent_stats` y `action_stats[action_id]` respectivamente.
+            `get_agent_stats(agent_id) → {calls, successes, score}` y
+            `get_action_stats(agent_id) → {action_id: {calls, successes, score}}`.
+            `score = successes/calls` con mínimo de 5 llamadas (None si < 5).
+            Storage en `~/.local/share/capitan/agents.json`.
+
+- [x] 23.8  **`backend_router.py` API unificada** — `record_agent_outcome(agent_id, text, success)`
+            delega a `agent_config.record_agent_outcome()`. `record_action_outcome(agent_id,
+            action_id, text, success)` delega a `agent_config.record_action_outcome()`.
+            Las funciones anteriores `record_success` y `record_action_success` eliminadas.
