@@ -1680,3 +1680,61 @@ agente debe estar estable primero.
 **Restricción no negociable**: todo el procesamiento pesado (STT, LLM, TTS) corre
 en la laptop central. Los nodos son clientes ligeros — solo corren wake word detection
 y streaming de audio. Nada sale de la LAN local.
+
+
+### FASE 22 - Modelo de Intents Tipado (Intent Model 2.0)
+
+```
+Objetivo: Modelar correctamente los tres tipos de intents: advise (notificación TTL),
+          request (el agente pide info al usuario; el siguiente mensaje ES la respuesta),
+          goal (intención real cross-agente con árbol de sub-goals, ciclo de vida complejo
+          y goal reviewer proactivo que busca cumplirlos con colaboración multi-agente).
+Estado:   COMPLETA
+Deps:     FASE 9 (intent_state básico), FASE 3.5 (WA para captura de request),
+          FASE 12 (backoffice para vista de goals).
+```
+
+- [x] 22.1  **`core/intent_model.py`** — TypedDicts `AdviseIntent`, `RequestIntent`, `GoalIntent`,
+            `GoalNote`. `VALID_TRANSITIONS` por tipo. `validate_transition()`, `is_active()`,
+            `is_terminal()`. Sin dependencias — módulo puro de schema.
+
+- [x] 22.2  **Refactorizar `core/intent_state.py`** — soporte de `intent_type` en `upsert()`,
+            nuevos status (`active`, `acknowledged`, `succeeded`, `expired`). `acknowledge()`,
+            `capture_reply()`, `get_pending_request()`. `_coerce_legacy()` para migración
+            transparente sin script. Advise no genera recordatorios. Compat backward total.
+
+- [x] 22.3  **`core/goal_store.py`** — storage separado en
+            `~/.local/share/capitan/goals/{user_id}.json`. CRUD completo, árbol parent/child
+            con cascade de completitud automático, `get_goals_for_agent()`, `get_goals_needing_review()`.
+
+- [x] 22.4  **`_build_agent_prefix()` tipado** — advise `[AVISO]`, request `[PENDIENTE TU RESPUESTA]`,
+            goals via `goal_store.get_goals_for_agent()` en sección separada. Filtra estados terminales.
+
+- [x] 22.5  **Pipeline de captura de Request** en `process()` y `wa_inbound()` — el siguiente
+            mensaje del usuario se captura sin pasar por el coordinador LLM. Hook opcional
+            `handle_captured_reply()` en el agente origen.
+
+- [x] 22.6  **`_apply_agent_updates()` tipado** — routea por `intent_type`. Soporte de `goal_updates`
+            para transiciones explícitas de goals desde agentes.
+
+- [x] 22.7  **`core/proactive.py` tipado** — `_persist_proactive_item()` routea por tipo.
+            `_should_skip()` chequea `goal_store` para items tipo goal. WA notifications
+            diferenciadas por tipo (question para request, detección de objetivo para goal).
+
+- [x] 22.8  **Endpoints REST — Request capture** — `POST /users/{id}/intents/{id}/capture`,
+            `GET /users/{id}/intents/pending-request`.
+
+- [x] 22.9  **Endpoints REST — Goals** — CRUD completo + transition + notes + children.
+            `GET /goals` (admin). Modelos Pydantic: `GoalCreate`, `GoalTransition`, `GoalNoteCreate`.
+
+- [x] 22.10 **`core/base_agent.py` hooks opcionales** — `handle_captured_reply()`, `review_goal()`,
+            `on_goal_transition()`. Duck-typed, sin herencia requerida.
+
+- [x] 22.11 **Goal Reviewer en `ProactiveScheduler._loop()`** — `_review_goals()` itera goals
+            activos vencidos por `review_interval_hours`. `discovered`→`planning` automático,
+            `planning`/`in_progress` → llama `review_goal()` en colaboradores, `blocked` →
+            reintenta o notifica. Hook opcional `review_goal(user_id, goal) -> {status?, note?}`.
+
+- [x] 22.12 **Backoffice** — `intents.html` con badges de tipo, botón 'visto' para advise, form
+            de captura para request, muestra `captured_reply`. `goals.html` nuevo: árbol,
+            notas, colaboradores, transiciones. Sidebar con link Goals.
