@@ -186,30 +186,36 @@
     <div>
       <p class="text-xs text-gray-500 uppercase tracking-wider mb-2">Llamadas a API externas</p>
       {% for api in step.api_calls %}
-      <div class="bg-gray-950 rounded-lg p-4 mb-2 border {% if api.response_summary.get('has_results', True) == False or api.response_status == 0 %}border-red-900/40{% else %}border-gray-800/50{% endif %}">
-        <div class="flex items-center gap-2 text-xs mb-2">
+      {% set is_error = api.response_status == 0 or (api.response_status >= 400) %}
+      <div class="bg-gray-950 rounded-lg p-4 mb-2 border {% if is_error %}border-red-900/40{% else %}border-gray-800/50{% endif %}">
+        <div class="flex items-center gap-2 text-xs mb-3">
           <span class="text-cyan-400 font-mono">{{ api.service }}</span>
           <span class="text-gray-600">{{ api.method }}</span>
           <span class="text-gray-500">{{ api.latency_ms }}ms</span>
           {% if api.response_status == 0 %}
-          <span class="px-1.5 py-0.5 bg-red-900/30 text-red-400 rounded border border-red-800/50">error</span>
+          <span class="px-1.5 py-0.5 bg-red-900/30 text-red-400 rounded border border-red-800/50">excepción</span>
           {% elif api.response_status == -1 %}
           <span class="px-1.5 py-0.5 bg-yellow-900/20 text-yellow-600 rounded border border-yellow-900/40">caché</span>
+          {% elif api.response_status >= 400 %}
+          <span class="px-1.5 py-0.5 bg-red-900/30 text-red-400 rounded border border-red-800/50">HTTP {{ api.response_status }}</span>
           {% else %}
-          <span class="text-gray-600">HTTP {{ api.response_status }}</span>
+          <span class="px-1.5 py-0.5 bg-emerald-900/30 text-emerald-400 rounded border border-emerald-800/50">HTTP {{ api.response_status }}</span>
           {% endif %}
         </div>
-        <!-- Resumen de respuesta -->
-        <div class="flex flex-wrap gap-3 text-xs mb-2">
-          {% for k, v in api.response_summary.items() %}
-          <span class="text-gray-400"><span class="text-gray-600">{{ k }}:</span>
-            <span class="{% if k == 'has_results' and not v %}text-red-400{% elif k == 'total' or k == 'results_count' %}text-teal-400{% else %}text-gray-300{% endif %}">{{ v }}</span>
+        <!-- Response summary -->
+        {% if is_error and api.response_summary.get('error') %}
+        <div class="text-xs text-red-300 bg-red-950/30 rounded p-2 mb-2 font-mono">{{ api.response_summary.get('error') }}</div>
+        {% endif %}
+        <div class="flex flex-wrap gap-3 text-xs mb-3">
+          {% for k, v in api.response_summary.items() if k != 'error' and k != 'cause' %}
+          <span><span class="text-gray-600">{{ k }}:</span>
+            <span class="text-gray-300 ml-1">{{ v }}</span>
           </span>
           {% endfor %}
         </div>
-        <!-- Params de request -->
+        <!-- Request params -->
         <details class="group">
-          <summary class="text-xs text-gray-600 cursor-pointer hover:text-gray-400 select-none">Parámetros de búsqueda ▸</summary>
+          <summary class="text-xs text-gray-600 cursor-pointer hover:text-gray-400 select-none">Request params ▸</summary>
           <pre class="mt-2 text-xs text-gray-400 bg-gray-900 rounded p-3 overflow-x-auto">{{ api.request_params | tojson(indent=2) }}</pre>
         </details>
       </div>
