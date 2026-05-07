@@ -1828,11 +1828,11 @@ Objetivo: Guardar un trace completo de cada request — interacciones del coordi
           el LLM, catálogo de agentes analizado, agente seleccionado, acción del backend
           router, llamadas LLM del agente — y navegarlo en el backoffice para identificar
           oportunidades de mejora (ej: routing incorrecto, no-resultados evitables).
-Estado:   Pendiente
+Estado:   COMPLETA
 Deps:     FASE 9 (coordinator), FASE 23 (backend_router).
 ```
 
-- [ ] 24.1  **`core/trace_store.py`** — módulo nuevo. Dataclasses: `LLMCall` (source, model,
+- [x] 24.1  **`core/trace_store.py`** — módulo nuevo. Dataclasses: `LLMCall` (source, model,
             system, prompt, raw_response, latency_ms, ts), `BackendRouterTrace` (catalog_text,
             action_selected, reason, llm_call), `AgentStepTrace` (agent_id, query,
             injected_prefix, backend_router, agent_llm_calls, response, success, latency_ms),
@@ -1844,35 +1844,31 @@ Deps:     FASE 9 (coordinator), FASE 23 (backend_router).
             por línea). `append_trace(t)`, `get_traces(conv_id)` → lista reversed (más reciente
             primero), `get_trace(conv_id, trace_id)`. Retención: max 100 traces por conv_id.
 
-- [ ] 24.2  **Instrumentar `coordinator.py`** — `_call_llm()` registra `LLMCall` al trace
-            actual si hay contexto activo. `coordinate()` captura: catalog_text, path tomado
-            (fast_classifier o LLM), fast_agent/conf si aplica, y el plan resultante como JSON.
-            `aggregate()` registra su llamada LLM como `aggregation_call` en el trace.
-            Sin cambios en la lógica ni en las firmas públicas.
+- [x] 24.2  **Instrumentar `coordinator.py`** — `_call_llm()` retorna `(str, LLMCall|None)`.
+            `coordinate()` captura: catalog_text, path tomado (fast_classifier o LLM),
+            fast_agent/conf si aplica, y el plan resultante como JSON. `aggregate()` registra
+            su llamada LLM como `aggregation_call` en el trace. Sin cambios en lógica ni firmas públicas.
 
-- [ ] 24.3  **Instrumentar `backend_router.py`** — `select_action()` captura catalog_text,
+- [x] 24.3  **Instrumentar `backend_router.py`** — `select_action()` captura catalog_text,
             system prompt, prompt enviado, respuesta raw del LLM, action seleccionada y reason.
             Persiste como `BackendRouterTrace` en el `AgentStepTrace` activo del trace actual.
             Si solo hay una acción (no se llama LLM), registra igual con `llm_call=None`.
 
-- [ ] 24.4  **Instrumentar `agent.py` (HAOS)** — `_ask_llm()` y `_ask_and_parse()` registran
-            cada llamada LLM como `LLMCall` en `agent_llm_calls` del step activo. Captura: model,
-            messages como system+prompt, raw_response, latency_ms.
+- [x] 24.4  **Instrumentar `agent.py` (HAOS)** — `_ask_llm()` registra cada llamada LLM del
+            agente HAOS en `agent_llm_calls` del step activo. Captura: model, system/prompt
+            extraídos del messages[], raw_response, latency_ms.
 
-- [ ] 24.5  **Instrumentar `server.py`** — en `/process` y `/process/stream`: crear
-            `RequestTrace` antes de llamar al coordinador, setearlo como contexto thread-local
-            con `trace_store.set_current_trace()`, capturar tiempos por step en `_run_plan()`,
-            llamar `trace_store.append_trace()` al finalizar (en background para no sumar
-            latencia). Agregar `trace_id` al `ProcessResponse`.
+- [x] 24.5  **Instrumentar `server.py`** — en `/process`: crea `RequestTrace`, lo activa como
+            contexto thread-local, `_run_plan()` hace `push_step()` antes y `finish()` después
+            de cada agente. Guarda trace en background al finalizar. `ProcessResponse` incluye
+            `trace_id`.
 
-- [ ] 24.6  **REST endpoints en `core/server.py`** — `GET /conversations/{id}/traces` →
+- [x] 24.6  **REST endpoints en `core/server.py`** — `GET /conversations/{id}/traces` →
             lista de traces (summary: trace_id, ts, user_text, agents, latency, success).
             `GET /conversations/{id}/traces/{trace_id}` → trace completo como JSON.
-            Sin paginación en esta etapa (máximo 100 por conv).
 
-- [ ] 24.7  **Backoffice** — `trace_detail.html`: árbol visual expandible del trace con
-            secciones Coordinador, Steps (uno por agente con su backend router y LLM calls),
-            Respuesta final. Expandible/colapsable por sección. Highlight de errores y
-            no-resultados. Link "Traces" desde `conversations.html` y desde chat. Ruta:
-            `/conversations/{id}/traces` (lista) y `/conversations/{id}/traces/{trace_id}`
-            (detalle).
+- [x] 24.7  **Backoffice** — `trace_list.html`: lista de traces por conversación con badges.
+            `trace_detail.html`: árbol visual expandible — Coordinador (fast-clf vs LLM, catálogo,
+            plan), Steps (query, BackendRouter con catálogo + LLM call, llamadas LLM del agente,
+            respuesta con highlight de errores), Agregación multi-step. Link "Traces" en
+            `conversations.html`. Rutas `/conversations/{id}/traces` y `/{id}/traces/{trace_id}`.
