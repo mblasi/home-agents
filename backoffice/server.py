@@ -853,6 +853,39 @@ def close_conv(conv_id: str):
     return HTMLResponse("")
 
 
+@app.get("/conversations/{conv_id}/traces", response_class=HTMLResponse)
+def trace_list(request: Request, conv_id: str):
+    traces = _core(f"/conversations/{conv_id}/traces") or []
+    return _render(request, "trace_list.html", "conversations",
+                   traces=traces, conv_id=conv_id)
+
+
+@app.get("/conversations/{conv_id}/traces/{trace_id}", response_class=HTMLResponse)
+def trace_detail(request: Request, conv_id: str, trace_id: str):
+    t = _core(f"/conversations/{conv_id}/traces/{trace_id}")
+    if not t:
+        return HTMLResponse("<p>Trace no encontrado</p>", status_code=404)
+
+    class _Obj:
+        """Objeto simple para acceder al trace como atributos en la template."""
+        def __init__(self, d: dict):
+            self._d = d
+            for k, v in d.items():
+                if isinstance(v, dict):
+                    setattr(self, k, _Obj(v))
+                elif isinstance(v, list):
+                    setattr(self, k, [_Obj(i) if isinstance(i, dict) else i for i in v])
+                else:
+                    setattr(self, k, v)
+        def get(self, k, default=None):
+            return getattr(self, k, default)
+        def __len__(self):
+            return len(self._d)
+
+    return _render(request, "trace_detail.html", "conversations",
+                   t=_Obj(t))
+
+
 @app.get("/stats", response_class=HTMLResponse)
 def stats_page(request: Request):
     history = _read_json("history.json") or []

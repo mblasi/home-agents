@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+{% block title %}Trace {{ t.trace_id }}{% endblock %}
+
+{% block content %}
+<div class="flex items-center gap-3 mb-6">
+  <a href="/conversations" class="text-gray-500 hover:text-gray-300 text-sm">← Conversaciones</a>
+  <span class="text-gray-700">/</span>
+  <a href="/conversations/{{ t.conv_id }}/traces" class="text-gray-500 hover:text-gray-300 text-sm">Traces</a>
+  <span class="text-gray-700">/</span>
+  <span class="font-mono text-xs text-gray-400">{{ t.trace_id }}</span>
+</div>
+
+<!-- Header -->
+<div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-4">
+  <div class="flex items-start justify-between gap-4">
+    <div>
+      <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">Request</p>
+      <p class="text-lg text-gray-100 font-medium">"{{ t.user_text }}"</p>
+    </div>
+    <div class="text-right text-xs text-gray-500 shrink-0">
+      <p>{{ t.ts | datetimefmt }}</p>
+      <p class="mt-1 font-mono text-gray-400">{{ (t.total_latency_ms / 1000) | round(1) }}s total</p>
+    </div>
+  </div>
+  {% if t.final_response %}
+  <div class="mt-3 pt-3 border-t border-gray-800">
+    <p class="text-xs text-gray-500 mb-1">Respuesta final</p>
+    <p class="text-sm text-gray-200">{{ t.final_response }}</p>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Coordinator -->
+{% if t.coordinator %}
+{% set coord = t.coordinator %}
+<div class="mb-4">
+  <button onclick="toggleSection('coordinator')"
+          class="w-full flex items-center gap-3 bg-gray-900 border border-gray-800 rounded-xl px-5 py-3 hover:border-gray-700 transition-colors text-left">
+    <span class="text-indigo-400 font-mono text-xs">COORDINADOR</span>
+    <span class="text-xs text-gray-500">{{ coord.latency_ms }}ms</span>
+    {% if coord.fast_classifier_used %}
+    <span class="px-1.5 py-0.5 bg-green-900/30 text-green-400 rounded border border-green-800/50 text-xs">fast-clf</span>
+    <span class="text-xs text-gray-400">→ {{ coord.fast_agent }}
+      {% if coord.fast_conf %}<span class="text-gray-600">({{ (coord.fast_conf * 100) | round(0) | int }}%)</span>{% endif %}
+    </span>
+    {% else %}
+    <span class="px-1.5 py-0.5 bg-yellow-900/30 text-yellow-400 rounded border border-yellow-800/50 text-xs">LLM</span>
+    {% endif %}
+    <span class="ml-auto text-gray-600 text-xs" id="coordinator-toggle-icon">▼</span>
+  </button>
+
+  <div id="section-coordinator" class="bg-gray-900/50 border border-t-0 border-gray-800 rounded-b-xl px-5 py-4 space-y-4">
+
+    <!-- Plan resultante -->
+    {% if coord.plan_json %}
+    <div>
+      <p class="text-xs text-gray-500 uppercase tracking-wider mb-2">Plan generado</p>
+      <div class="space-y-1">
+        {% for step in coord.plan_json.get('steps', []) %}
+        <div class="flex items-center gap-2 text-sm">
+          <span class="text-indigo-400 font-mono text-xs">{{ loop.index0 }}</span>
+          <span class="px-1.5 py-0.5 bg-indigo-900/40 text-indigo-300 rounded text-xs border border-indigo-800/50">{{ step.agent }}</span>
+          {% if step.query %}<span class="text-gray-300 italic">"{{ step.query }}"</span>{% endif %}
+          {% if step.condition %}<span class="text-yellow-600 text-xs">si: {{ step.condition }}</span>{% endif %}
+          {% if step.depends_on %}<span class="text-gray-600 text-xs">deps: {{ step.depends_on }}</span>{% endif %}
+        </div>
+        {% endfor %}
+        {% if coord.plan_json.get('aggregation') %}
+        <p class="text-xs text-gray-500 mt-2">Agregación: {{ coord.plan_json.aggregation }}</p>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- LLM call del coordinador -->
+    {% if coord.llm_call %}
+    <div>
+      <p class="text-xs text-gray-500 uppercase tracking-wider mb-2">Llamada LLM</p>
+      {% include "_llm_call.html" with context %}
+      {% set llm = coord.llm_call %}
+      {% include "_llm_call_block.html" %}
+    </div>
+    {% endif %}
+
+    <!-- Catálogo mostrado -->
+    {% if coord.catalog_text %}
+    <details class="group">
+      <summary class="text-xs text-gray-500 cursor-pointer hover:text-gray-300 select-none">Catálogo de agentes mostrado al LLM ▸</summary>
+      <pre class="mt-2 text-xs text-gray-400 bg-gray-950 rounded p-3 overflow-x-auto whitespace-pre-wrap">{{ coord.catalog_text }}</pre>
+    </details>
+    {% endif %}
+
+  </div>
+</div>
+{% endif %}
+
+<!-- Steps -->
+{% for step in t.steps %}
+<div class="mb-4">
+  <button onclick="toggleSection('step{{ loop.index0 }}')"
+          class="w-full flex items-center gap-3 rounded-xl px-5 py-3 hover:border-gray-700 transition-colors text-left border
+                 {% if step.success %}bg-gray-900 border-gray-800{% else %}bg-red-950/20 border-red-900/50{% endif %}">
+    <span class="text-xs font-mono text-gray-400">PASO {{ loop.index }}</span>
+    <span class="px-1.5 py-0.5 bg-indigo-900/40 text-indigo-300 rounded border border-indigo-800/50 text-xs">{{ step.agent_id }}</span>
+    <span class="text-xs text-gray-500">{{ step.latency_ms }}ms</span>
+    {% if step.backend_router %}
+    <span class="text-xs text-gray-500">→ <span class="text-teal-400">{{ step.backend_router.action_selected }}</span></span>
+    {% endif %}
+    {% if not step.success %}
+    <span class="px-1.5 py-0.5 bg-red-900/30 text-red-400 rounded border border-red-800/50 text-xs">sin resultado</span>
+    {% endif %}
+    <span class="ml-auto text-gray-600 text-xs" id="step{{ loop.index0 }}-toggle-icon">▼</span>
+  </button>
+
+  <div id="section-step{{ loop.index0 }}" class="bg-gray-900/50 border border-t-0 border-gray-800 rounded-b-xl px-5 py-4 space-y-4">
+
+    <!-- Query reformulada -->
+    <div>
+      <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">Query enviada al agente</p>
+      <p class="text-sm text-gray-200 italic">"{{ step.query }}"</p>
+    </div>
+
+    <!-- Prefijo inyectado (user context) -->
+    {% if step.injected_prefix %}
+    <details class="group">
+      <summary class="text-xs text-gray-500 cursor-pointer hover:text-gray-300 select-none">Contexto inyectado (user context / intents) ▸</summary>
+      <pre class="mt-2 text-xs text-gray-400 bg-gray-950 rounded p-3 overflow-x-auto whitespace-pre-wrap">{{ step.injected_prefix }}</pre>
+    </details>
+    {% endif %}
+
+    <!-- Backend Router -->
+    {% if step.backend_router %}
+    {% set brt = step.backend_router %}
+    <div class="bg-gray-950 rounded-lg p-4">
+      <p class="text-xs text-teal-500 uppercase tracking-wider mb-3">Backend Router</p>
+      <div class="flex items-center gap-2 mb-3">
+        <span class="text-xs text-gray-400">Acción elegida:</span>
+        <span class="font-mono text-sm text-teal-300">{{ brt.action_selected }}</span>
+        {% if brt.reason %}
+        <span class="text-xs text-gray-500 italic">— {{ brt.reason }}</span>
+        {% endif %}
+      </div>
+
+      {% if brt.llm_call %}
+      {% set llm = brt.llm_call %}
+      <div class="space-y-2">
+        <div class="flex items-center gap-2 text-xs text-gray-500">
+          <span>LLM: {{ llm.model }}</span>
+          <span>{{ llm.latency_ms }}ms</span>
+        </div>
+        <details class="group">
+          <summary class="text-xs text-gray-500 cursor-pointer hover:text-gray-300 select-none">Catálogo de acciones ▸</summary>
+          <pre class="mt-2 text-xs text-gray-400 bg-gray-900 rounded p-3 overflow-x-auto whitespace-pre-wrap">{{ llm.system }}</pre>
+        </details>
+        <details class="group">
+          <summary class="text-xs text-gray-500 cursor-pointer hover:text-gray-300 select-none">Respuesta raw del LLM ▸</summary>
+          <pre class="mt-2 text-xs text-gray-300 bg-gray-900 rounded p-3 overflow-x-auto whitespace-pre-wrap">{{ llm.raw_response }}</pre>
+        </details>
+      </div>
+      {% else %}
+      <p class="text-xs text-gray-600 italic">Única acción disponible — no se llamó al LLM</p>
+      {% endif %}
+
+      {% if brt.catalog_text and brt.llm_call %}
+      {# El catálogo ya se muestra dentro del system de la LLM call #}
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- LLM calls internas del agente -->
+    {% if step.agent_llm_calls %}
+    <div>
+      <p class="text-xs text-gray-500 uppercase tracking-wider mb-2">Llamadas LLM del agente</p>
+      {% for llm in step.agent_llm_calls %}
+      <div class="bg-gray-950 rounded-lg p-4 mb-2">
+        <div class="flex items-center gap-2 text-xs text-gray-500 mb-2">
+          <span class="text-orange-400">{{ llm.source }}</span>
+          <span>{{ llm.model }}</span>
+          <span>{{ llm.latency_ms }}ms</span>
+        </div>
+        <details class="group">
+          <summary class="text-xs text-gray-500 cursor-pointer hover:text-gray-300 select-none">System prompt ▸</summary>
+          <pre class="mt-2 text-xs text-gray-400 bg-gray-900 rounded p-3 overflow-x-auto whitespace-pre-wrap max-h-60">{{ llm.system[:2000] }}{% if llm.system | length > 2000 %}...{% endif %}</pre>
+        </details>
+        <details class="group mt-2">
+          <summary class="text-xs text-gray-500 cursor-pointer hover:text-gray-300 select-none">Prompt ▸</summary>
+          <pre class="mt-2 text-xs text-gray-400 bg-gray-900 rounded p-3 overflow-x-auto whitespace-pre-wrap">{{ llm.prompt }}</pre>
+        </details>
+        <details class="group mt-2">
+          <summary class="text-xs text-gray-500 cursor-pointer hover:text-gray-300 select-none">Respuesta raw ▸</summary>
+          <pre class="mt-2 text-xs text-gray-300 bg-gray-900 rounded p-3 overflow-x-auto whitespace-pre-wrap">{{ llm.raw_response }}</pre>
+        </details>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Respuesta del agente -->
+    <div>
+      <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">Respuesta</p>
+      {% if step.response %}
+      <p class="text-sm {% if step.success %}text-gray-200{% else %}text-red-300{% endif %}">{{ step.response }}</p>
+      {% else %}
+      <p class="text-xs text-gray-600 italic">Sin respuesta</p>
+      {% endif %}
+    </div>
+
+  </div>
+</div>
+{% endfor %}
+
+<!-- Aggregation call -->
+{% if t.aggregation_call %}
+{% set llm = t.aggregation_call %}
+<div class="mb-4">
+  <button onclick="toggleSection('aggregation')"
+          class="w-full flex items-center gap-3 bg-gray-900 border border-gray-800 rounded-xl px-5 py-3 hover:border-gray-700 transition-colors text-left">
+    <span class="text-purple-400 font-mono text-xs">AGREGACIÓN</span>
+    <span class="text-xs text-gray-500">{{ llm.latency_ms }}ms</span>
+    <span class="text-xs text-gray-500">{{ llm.model }}</span>
+    <span class="ml-auto text-gray-600 text-xs">▼</span>
+  </button>
+  <div id="section-aggregation" class="bg-gray-900/50 border border-t-0 border-gray-800 rounded-b-xl px-5 py-4 space-y-3">
+    <details class="group">
+      <summary class="text-xs text-gray-500 cursor-pointer hover:text-gray-300 select-none">Prompt de síntesis ▸</summary>
+      <pre class="mt-2 text-xs text-gray-400 bg-gray-950 rounded p-3 overflow-x-auto whitespace-pre-wrap">{{ llm.prompt }}</pre>
+    </details>
+    <details class="group">
+      <summary class="text-xs text-gray-500 cursor-pointer hover:text-gray-300 select-none">Respuesta raw del LLM ▸</summary>
+      <pre class="mt-2 text-xs text-gray-300 bg-gray-950 rounded p-3 overflow-x-auto whitespace-pre-wrap">{{ llm.raw_response }}</pre>
+    </details>
+  </div>
+</div>
+{% endif %}
+
+<script>
+function toggleSection(id) {
+  const el = document.getElementById('section-' + id);
+  if (!el) return;
+  el.classList.toggle('hidden');
+}
+// Start all sections expanded
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('[id^="section-"]').forEach(el => el.classList.remove('hidden'));
+});
+</script>
+{% endblock %}
