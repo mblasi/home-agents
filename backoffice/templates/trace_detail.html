@@ -74,11 +74,25 @@
 
     <!-- LLM call del coordinador -->
     {% if coord.llm_call %}
-    <div>
-      <p class="text-xs text-gray-500 uppercase tracking-wider mb-2">Llamada LLM</p>
-      {% include "_llm_call.html" with context %}
-      {% set llm = coord.llm_call %}
-      {% include "_llm_call_block.html" %}
+    {% set llm = coord.llm_call %}
+    <div class="bg-gray-950 rounded-lg p-4">
+      <div class="flex items-center gap-2 text-xs text-gray-500 mb-2">
+        <span class="text-indigo-400">{{ llm.source }}</span>
+        <span>{{ llm.model }}</span>
+        <span>{{ llm.latency_ms }}ms</span>
+      </div>
+      <details class="group">
+        <summary class="text-xs text-gray-500 cursor-pointer hover:text-gray-300 select-none">System prompt ▸</summary>
+        <pre class="mt-2 text-xs text-gray-400 bg-gray-900 rounded p-3 overflow-x-auto whitespace-pre-wrap max-h-60">{{ llm.system[:2000] }}{% if llm.system | length > 2000 %}...{% endif %}</pre>
+      </details>
+      <details class="group mt-2">
+        <summary class="text-xs text-gray-500 cursor-pointer hover:text-gray-300 select-none">Prompt enviado ▸</summary>
+        <pre class="mt-2 text-xs text-gray-400 bg-gray-900 rounded p-3 overflow-x-auto whitespace-pre-wrap">{{ llm.prompt }}</pre>
+      </details>
+      <details class="group mt-2">
+        <summary class="text-xs text-gray-500 cursor-pointer hover:text-gray-300 select-none">Respuesta raw del LLM ▸</summary>
+        <pre class="mt-2 text-xs text-gray-300 bg-gray-900 rounded p-3 overflow-x-auto whitespace-pre-wrap">{{ llm.raw_response }}</pre>
+      </details>
     </div>
     {% endif %}
 
