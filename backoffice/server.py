@@ -503,7 +503,7 @@ async def agent_new_submit(request: Request):
 
 
 @app.get("/agents/{agent_id}/edit", response_class=HTMLResponse)
-def agent_edit_page(request: Request, agent_id: str, connected: str = "", oauth_error: str = ""):
+def agent_edit_page(request: Request, agent_id: str, connected: str = "", oauth_error: str = "", saved: str = ""):
     agent = _core(f"/agents/{agent_id}")
     if not agent:
         return RedirectResponse("/agents", status_code=303)
@@ -524,7 +524,7 @@ def agent_edit_page(request: Request, agent_id: str, connected: str = "", oauth_
                    llm_models=_get_llm_models(),
                    users=users, oauth_statuses=oauth_statuses,
                    just_connected=connected, oauth_error=oauth_error,
-                   oauth_app_url=OAUTH_APP_URL)
+                   just_saved=saved, oauth_app_url=OAUTH_APP_URL)
 
 
 @app.post("/agents/{agent_id}/edit")
@@ -605,7 +605,7 @@ async def agent_edit_submit(request: Request, agent_id: str):
             _core(f"/rbac/roles/{role}", method="PATCH",
                   json={"agents": sorted(current_agents - {agent_id})})
 
-    return RedirectResponse("/agents", status_code=303)
+    return RedirectResponse(f"/agents/{agent_id}/edit?saved=1", status_code=303)
 
 
 @app.delete("/agents/{agent_id}", response_class=HTMLResponse)
