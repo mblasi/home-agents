@@ -674,6 +674,56 @@ def delete_intent_proxy(uid: str, intent_id: str):
     return HTMLResponse("")
 
 
+@app.post("/users/{uid}/intents/{intent_id}/capture", response_class=HTMLResponse)
+async def capture_intent_proxy(uid: str, intent_id: str, request: Request):
+    """Captura manual de respuesta para un request intent (22.10)."""
+    ct = request.headers.get("content-type", "")
+    if "application/json" in ct:
+        body = await request.json()
+    else:
+        form = await request.form()
+        body = dict(form)
+    reply = body.get("reply", "").strip()
+    if reply:
+        _core(f"/users/{uid}/intents/{intent_id}/capture", method="POST", json={"reply": reply})
+    row_id = f"intent-row-{intent_id}"
+    return HTMLResponse(
+        f'<div id="{row_id}" class="px-4 py-3 text-xs text-orange-400 bg-orange-950/30 border border-orange-900/40 rounded-xl">'
+        f'✓ Respuesta capturada'
+        f'<script>setTimeout(()=>document.getElementById("{row_id}")?.remove(),2000)</script>'
+        f'</div>'
+    )
+
+
+# ── Goals (22.10) ─────────────────────────────────────────────────────────────
+
+@app.get("/goals", response_class=HTMLResponse)
+def goals_page(request: Request):
+    users_data  = _core("/users") or {}
+    agents_data = _core("/agents", timeout=10) or {}
+    all_goals   = _core("/goals") or []
+    return _render(request, "goals.html", "goals",
+                   goals=all_goals, users=users_data, agents=agents_data)
+
+
+@app.post("/goals/{uid}/{goal_id}/transition", response_class=HTMLResponse)
+async def transition_goal_proxy(uid: str, goal_id: str, request: Request):
+    ct = request.headers.get("content-type", "")
+    if "application/json" in ct:
+        body = await request.json()
+    else:
+        form = await request.form()
+        body = dict(form)
+    _core(f"/users/{uid}/goals/{goal_id}/transition", method="POST", json=body)
+    return HTMLResponse("")
+
+
+@app.delete("/goals/{uid}/{goal_id}", response_class=HTMLResponse)
+def delete_goal_proxy(uid: str, goal_id: str):
+    _core(f"/users/{uid}/goals/{goal_id}", method="DELETE")
+    return HTMLResponse("")
+
+
 @app.post("/users/{uid}/intents/{intent_id}/respond", response_class=HTMLResponse)
 async def respond_intent_proxy(uid: str, intent_id: str, request: Request):
     ct = request.headers.get("content-type", "")

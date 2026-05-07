@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% block title %}Goals{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <div>
+    <h1 class="text-2xl font-bold">Goals activos</h1>
+    <p class="text-xs text-gray-500 mt-1">
+      Objetivos cross-agente descubiertos proactivamente — árbol de sub-goals, colaboración multi-agente.
+    </p>
+  </div>
+  <div class="flex items-center gap-3">
+    <a href="/intents" class="text-xs text-gray-500 hover:text-gray-400 transition-colors">← Intenciones</a>
+    <span class="text-xs text-gray-600">{{ goals | length }} goal{{ 's' if goals | length != 1 }}</span>
+  </div>
+</div>
+
+{% if not goals %}
+<div class="bg-gray-900 border border-gray-800 rounded-xl p-8 text-center">
+  <div class="text-4xl mb-3">🎯</div>
+  <p class="text-gray-400 text-sm">No hay goals activos.</p>
+  <p class="text-gray-600 text-xs mt-1">
+    Los agentes crean goals cuando detectan intenciones reales del usuario que requieren múltiples pasos.
+  </p>
+</div>
+{% else %}
+
+{% set status_colors = {
+  'discovered':  'bg-indigo-900/40 text-indigo-400 border-indigo-800/50',
+  'planning':    'bg-yellow-900/40 text-yellow-400 border-yellow-800/50',
+  'in_progress': 'bg-blue-900/40 text-blue-400 border-blue-800/50',
+  'completed':   'bg-emerald-900/40 text-emerald-400 border-emerald-800/50',
+  'abandoned':   'bg-gray-800 text-gray-500 border-gray-700/50',
+  'blocked':     'bg-red-900/40 text-red-400 border-red-800/50',
+} %}
+{% set status_labels = {
+  'discovered':  'descubierto',
+  'planning':    'planificando',
+  'in_progress': 'en curso',
+  'completed':   'completado',
+  'abandoned':   'abandonado',
+  'blocked':     'bloqueado',
+} %}
+{% set next_statuses = {
+  'discovered':  [['planning', 'planificar'], ['abandoned', 'abandonar']],
+  'planning':    [['in_progress', 'iniciar'], ['abandoned', 'abandonar']],
+  'in_progress': [['completed', 'completar'], ['blocked', 'bloquear'], ['abandoned', 'abandonar']],
+  'blocked':     [['in_progress', 'reintentar'], ['abandoned', 'abandonar']],
+} %}
+
+<div class="space-y-4">
+{% for goal in goals %}
+{% set scolor = status_colors.get(goal.status, 'bg-gray-800 text-gray-400 border-gray-700') %}
+{% set slabel = status_labels.get(goal.status, goal.status) %}
+{% set user_info = users.get(goal.user_id, {}) %}
+{% set days_old = ((now - goal.updated_at) / 86400) | round(0, 'floor') | int %}
+{% set transitions = next_statuses.get(goal.status, []) %}
+{% set notes = goal.get('notes', []) %}
+{% set is_root = not goal.get('parent_id') %}
+
+<div class="bg-gray-900 border {% if goal.status == 'blocked' %}border-red-800/50{% else %}border-gray-800{% endif %} rounded-xl p-4"
+     id="goal-row-{{ goal.intent_id }}">
+
+  <div class="flex items-start gap-3">
+    <!-- Indicador de root/child -->
+    <div class="text-xl shrink-0 pt-0.5">{{ '🎯' if is_root else '↳' }}</div>
+
+    <!-- Contenido principal -->
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center gap-2 flex-wrap mb-1">
+        <span class="text-sm font-semibold text-gray-100">{{ goal.title }}</span>
+        <span class="px-2 py-0.5 rounded-full text-[10px] font-medium border {{ scolor }}">
+          {{ slabel }}
+        </span>
+        {% if goal.get('child_ids') %}
+        <span class="px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-800 text-gray-400 border border-gray-700">
+          {{ goal.child_ids | length }} sub-goal{{ 's' if goal.child_ids | length != 1 }}
+        </span>
+        {% endif %}
+      </div>
+
+      {% if goal.description %}
+      <p class="text-xs text-gray-400 mb-2">{{ goal.description }}</p>
+      {% endif %}
+
+      <!-- Colaboradores -->
+      {% set collabs = goal.get('collaborating_agents', []) %}
+      {% if collabs %}
+      <div class="flex flex-wrap gap-1 mb-2">
+        {% for aid in collabs %}
+        {% set ainfo = agents.get(aid, {}) %}
+        <span class="text-[10px] bg-gray-800 text-gray-400 px-2 py-0.5 rounded border border-gray-700/50">
+          {{ ainfo.get('icon', '🤖') }} {{ ainfo.get('name', aid) }}
+        </span>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <!-- Notas (últimas 3) -->
+      {% if notes %}
+      <div class="mb-2 space-y-1">
+        {% for note in notes[-3:] %}
+        {% set nainfo = agents.get(note.agent_id, {}) %}
+        <div class="flex items-start gap-2 text-[10px] text-gray-500">
+          <span class="shrink-0">{{ nainfo.get('icon', '·') }}</span>
+          <span class="text-gray-400">{{ note.text }}</span>
+        </div>
+        {% endfor %}
+        {% if notes | length > 3 %}
+        <span class="text-[10px] text-gray-600">+ {{ notes | length - 3 }} nota{{ 's' if notes | length - 3 != 1 }} más</span>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <div class="flex items-center gap-3 text-[10px] text-gray-600">
+        <span>descubierto por {{ agents.get(goal.discovered_by, {}).get('name', goal.discovered_by) }}</span>
+        <span>·</span>
+        <a href="/users/{{ goal.user_id }}/edit" class="hover:text-gray-400 transition-colors">
+          {{ user_info.get('name', goal.user_id) }}
+        </a>
+        <span>·</span>
+        <span>actualizado hace {{ days_old }}d</span>
+      </div>
+    </div>
+
+    <!-- Acciones de transición -->
+    <div class="shrink-0 flex flex-col gap-1.5 items-end">
+      {% for new_status, label in transitions %}
+      <button
+        hx-post="/goals/{{ goal.user_id }}/{{ goal.intent_id }}/transition"
+        hx-vals='{"new_status": "{{ new_status }}", "agent_id": "backoffice"}'
+        hx-target="#goal-row-{{ goal.intent_id }}"
+        hx-swap="outerHTML"
+        hx-headers='{"Content-Type": "application/json"}'
+        class="px-2 py-1 text-xs rounded transition-colors border whitespace-nowrap
+               {% if new_status == 'abandoned' %}
+               text-gray-600 hover:text-red-400 hover:bg-red-900/20 border-gray-700/50
+               {% elif new_status == 'completed' %}
+               text-emerald-400 hover:text-emerald-300 hover:bg-emerald-900/20 border-emerald-800/50
+               {% elif new_status == 'blocked' %}
+               text-red-400 hover:text-red-300 hover:bg-red-900/20 border-red-800/50
+               {% else %}
+               text-blue-400 hover:text-blue-300 hover:bg-blue-900/20 border-blue-800/50
+               {% endif %}">
+        {{ label }}
+      </button>
+      {% endfor %}
+      <button
+        hx-delete="/goals/{{ goal.user_id }}/{{ goal.intent_id }}"
+        hx-target="#goal-row-{{ goal.intent_id }}"
+        hx-swap="outerHTML"
+        hx-confirm="¿Eliminar este goal?"
+        class="px-2 py-1 text-xs text-gray-600 hover:text-red-400 hover:bg-red-900/20
+               rounded transition-colors">
+        ✕
+      </button>
+    </div>
+  </div>
+</div>
+{% endfor %}
+</div>
+{% endif %}
+{% endblock %}
