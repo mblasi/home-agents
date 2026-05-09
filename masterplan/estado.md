@@ -1545,76 +1545,6 @@ Estado:   COMPLETA
 
 ---
 
-### FASE 21 - Agente MercadoPago
-
-```
-Objetivo: Consulta de saldo, movimientos, cobros y pagos via MercadoPago,
-          con OAuth propio (ecosistema MP distinto al de ML aunque mismo developer portal).
-          Foco en consulta y monitoreo; operaciones de pago requieren confirmación explícita.
-Estado:   COMPLETA
-Deps:     FASE 20.10-20.11 (patrón OAuth ya establecido, reutilizable); FASE 9 (coordinador).
-          Si 20.11 ya implementó ml_auth.py, mp_auth.py puede ser una generalización.
-```
-
-#### Etapa A — OAuth y cliente MP
-
-- [x] 21.1  **Registro de app MP** — setup único en https://www.mercadopago.com.uy/developers:
-            Crear app distinta a la de ML (misma cuenta de developer, diferente `client_id`).
-            Redirect URI: `http://localhost:8767/mp/callback` (puerto separado de ML y core).
-            Scopes: `read` + `offline_access` mínimo; `write` + `money_transfer` solo si se
-            implementan pagos (etapa C). Vars `MP_CLIENT_ID`, `MP_CLIENT_SECRET` en `core/.env`.
-
-- [x] 21.2  **OAuth 2.0 y cliente MP** (`mp_auth.py`, `mp_client.py`) — mismo patrón que
-            `ml_auth.py` (20.11): URL auth → servidor temporal :8767 → code → tokens → refresh.
-            `mp_client.py` wrappea la API REST de MP con auth header `Bearer {access_token}`;
-            auto-refresh transparente; tokens en `~/.local/share/capitan/mp_token_{user_id}.json`.
-            Si las vars no están configuradas, el agente informa que necesita autorización y
-            guía el proceso al usuario.
-
-#### Etapa B — Consultas de cuenta (solo lectura)
-
-- [x] 21.3  **Saldo y cuenta** — `get_balance()`: saldo disponible y en proceso por moneda
-            (ARS, UYU, USD si aplica). Respuesta natural: "Tenés $X disponibles y $Y en proceso".
-            `get_account_info()`: nombre del titular, email, nivel de cuenta (mercadolíder, etc.).
-
-- [x] 21.4  **Movimientos y historial** — `get_movements(limit, date_from, date_to)`:
-            lista de transacciones con tipo (pago recibido, retiro, transferencia, compra ML),
-            monto, estado, descripción y fecha. Parsing de consultas: "¿cuánto cobré esta semana?",
-            "¿cuándo fue el último retiro?", "¿hay algún pago pendiente?".
-            Cache 5min (los movimientos son sensibles a tiempo real).
-
-- [x] 21.5  **Cobros pendientes y rechazados** — `get_pending_payments()`: filtra movimientos
-            por estado `pending` o `in_process`; `get_rejected_payments()`: estado `rejected` con
-            motivo de rechazo. Útil para: "¿hay algún cobro que no se acreditó?".
-
-- [x] 21.6  **Resumen periódico** — método `summary(period)` que agrega: cobros totales,
-            pagos totales, saldo neto, transacción más grande, del período indicado (hoy/semana/mes).
-            Integrado al sistema de alertas: resumen diario opcional a hora configurable
-            via `MP_BRIEFING_HOUR` en `.env` (análogo a `FINANCE_BRIEFING_HOUR`).
-
-#### Etapa C — Cobros y solicitudes de dinero (operaciones escritura)
-
-- [x] 21.7  **Link de cobro / QR** — `create_payment_link(amount, description, payer_email?)`:
-            genera un `checkout/preference` y devuelve el `init_point` (URL de pago MP) listo
-            para compartir. Uso: "generá un link de cobro por $500 con descripción 'alquiler'".
-            Para uso presencial: `create_qr(amount, description)` via `instore/orders/qr`
-            (requiere `pos_id`, documentar setup previo).
-
-- [x] 21.8  **Solicitud de dinero (money request)** — `request_money(amount, payer_id_or_email, description)`:
-            crea una solicitud de cobro a otro usuario MP. Uso: "pedile $200 a Juan por la cena".
-            Requiere confirmación explícita antes de ejecutar: el agente muestra el resumen
-            ("¿Confirmo solicitud de $200 a juan@mail.com por 'cena'?") y espera `needs_reply: true`
-            (integrado con FASE 19.1). Scope `money_transfer` requerido.
-
-- [x] 21.9  **Transferencia entre cuentas MP propias** — `transfer_to_bank(amount, account)`:
-            extracción a CBU/CVU bancaria. Solo ejecuta con doble confirmación (confirmar monto
-            y confirmar destino en dos mensajes separados). Scope `money_transfer`. Registrar
-            en log local con timestamp para auditoría.
-
-Estado:   COMPLETA
-
----
-
 ## NOTAS Y DECISIONES TOMADAS
 
 ### 2026-04-27
@@ -1764,8 +1694,7 @@ Objetivo: Eliminar todo el keyword matching de los agentes. Reemplazarlo por rou
           su acción interna (BackendCard). Ambos niveles aprenden con cada interacción
           y mantienen un score de utilidad.
 Estado:   COMPLETA
-Deps:     FASE 9 (coordinator + FastClassifier), FASE 20 (ML), FASE 21 (MP),
-          FASE 8 (CalendarAgent).
+Deps:     FASE 9 (coordinator + FastClassifier), FASE 20 (ML), FASE 8 (CalendarAgent).
 ```
 
 - [x] 23.1  **`core/backend_router.py`** — módulo nuevo. `BackendCard` dataclass con
@@ -1872,3 +1801,61 @@ Deps:     FASE 9 (coordinator), FASE 23 (backend_router).
             plan), Steps (query, BackendRouter con catálogo + LLM call, llamadas LLM del agente,
             respuesta con highlight de errores), Agregación multi-step. Link "Traces" en
             `conversations.html`. Rutas `/conversations/{id}/traces` y `/{id}/traces/{trace_id}`.
+
+### FASE 25 - Agente Google Maps
+
+```
+Objetivo: Agente de navegación y búsqueda de lugares usando Google Maps Platform.
+          El usuario configura su propia API key; el agente resuelve rutas,
+          búsquedas de lugares cercanos y detalles de establecimientos.
+Estado:   Pendiente
+Deps:     FASE 9 (coordinador), FASE 3 (multi-agente), FASE 12 (backoffice para config de key).
+API key:  GOOGLE_MAPS_API_KEY en core/.env — habilitadas: Geocoding, Places, Directions APIs.
+```
+
+- [ ] 25.1  **`core/maps_client.py`** — wrapper HTTP sobre Google Maps Platform. Métodos:
+            `geocode(address)` → (lat, lng); `reverse_geocode(lat, lng)` → dirección;
+            `get_directions(origin, destination, mode)` → pasos, distancia_total, duracion_total;
+            `search_nearby(location, place_type, radius_m)` → lista de places con name, rating,
+            open_now, distance; `search_text(query, location)` → idem;
+            `get_place_detail(place_id)` → name, address, phone, website, opening_hours, rating.
+            API key desde `GOOGLE_MAPS_API_KEY` en `core/.env`.
+            Lanza `MapsKeyMissing` si no está configurada, `MapsAPIError` para errores de la API.
+            Cache de 10 min para geocoding y place details; sin cache para directions (tráfico en tiempo real).
+
+- [ ] 25.2  **Onboarding de API key** — si `GOOGLE_MAPS_API_KEY` falta o es inválida, el agente
+            responde con instrucciones: URL de Google Cloud Console, APIs a habilitar (Geocoding,
+            Places, Directions), cómo agregar la key al `core/.env`.
+            En el backoffice: campo en `/settings` para ingresar `GOOGLE_MAPS_API_KEY`; botón
+            "Verificar" hace una geocoding de prueba y muestra estado (válida / inválida / sin cuota).
+            También configurable: `HOME_LOCATION` (dirección o lat,lng) usada como origen default.
+
+- [ ] 25.3  **`core/maps_agent.py`** — agente principal registrado en `agent_registry.py`.
+            LLM extrae de la consulta: `intent` (directions / nearby_search / place_detail / geocode),
+            `origin` (texto o "casa"), `destination`, `place_type` (restaurant, pharmacy, hospital…),
+            `transport_mode` (driving/walking/transit; default driving), `location_ref` (texto libre).
+            Si origin es "casa" o no se especifica, usa `HOME_LOCATION` del env.
+            Descripción en el catálogo: keywords mapa, ruta, cómo llego, cómo voy, dónde queda,
+            cerca, restaurante, farmacia, horario, abierto, google maps, direcciones.
+
+- [ ] 25.4  **Intent `directions`** — llama `get_directions()`. Respuesta para voz: distancia y
+            tiempo total + 2-3 pasos clave en lenguaje natural ("Tomá Av. Italia y en 3km girá a
+            la derecha en..."). Respuesta para WA/chat: tabla con todos los pasos, distancias
+            parciales y duración parcial + deeplink `https://maps.google.com/maps?saddr=...&daddr=...`.
+            Si `transport_mode=transit`, incluir líneas de transporte si la API las devuelve.
+
+- [ ] 25.5  **Intent `nearby_search` / `search_text`** — llama `search_nearby()` o `search_text()`.
+            Lista top-5 con: nombre, rating (★★★☆☆), open_now (abierto/cerrado), distancia.
+            Guarda resultados en `shared_state[source_key]["maps_results"]` para multi-turno:
+            "el primero" / "más detalles del segundo" → llama `get_place_detail()` del ítem
+            referenciado y responde con teléfono, web, horarios completos.
+
+- [ ] 25.6  **Intent `place_detail`** — cuando la consulta es directamente por un establecimiento
+            ("¿a qué hora cierra el Farmashop de Pocitos?"). LLM extrae el nombre y posible
+            zona; hace `search_text()` para resolver el place_id y luego `get_place_detail()`.
+            Responde con horario del día actual resaltado, teléfono y estado abierto/cerrado ahora.
+
+- [ ] 25.7  **Registro definitivo y tests** — registrar en `agent_registry.py` con `id="maps"`,
+            `description` orientada al coordinador LLM. Agregar `GOOGLE_MAPS_API_KEY` y
+            `HOME_LOCATION` como vars opcionales al bloque `.env` en el backoffice y en `CLAUDE.md`.
+            Tests manuales: ruta casa→trabajo, "farmacia cerca", "horario del McDonalds de 18 de julio".
