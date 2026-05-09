@@ -1808,12 +1808,12 @@ Deps:     FASE 9 (coordinator), FASE 23 (backend_router).
 Objetivo: Agente de navegación y búsqueda de lugares usando Google Maps Platform.
           El usuario configura su propia API key; el agente resuelve rutas,
           búsquedas de lugares cercanos y detalles de establecimientos.
-Estado:   Pendiente
+Estado:   COMPLETA
 Deps:     FASE 9 (coordinador), FASE 3 (multi-agente), FASE 12 (backoffice para config de key).
 API key:  GOOGLE_MAPS_API_KEY en core/.env — habilitadas: Geocoding, Places, Directions APIs.
 ```
 
-- [ ] 25.1  **`core/maps_client.py`** — wrapper HTTP sobre Google Maps Platform. Métodos:
+- [x] 25.1  **`core/maps_client.py`** — wrapper HTTP sobre Google Maps Platform. Métodos:
             `geocode(address)` → (lat, lng); `reverse_geocode(lat, lng)` → dirección;
             `get_directions(origin, destination, mode)` → pasos, distancia_total, duracion_total;
             `search_nearby(location, place_type, radius_m)` → lista de places con name, rating,
@@ -1823,14 +1823,14 @@ API key:  GOOGLE_MAPS_API_KEY en core/.env — habilitadas: Geocoding, Places, D
             Lanza `MapsKeyMissing` si no está configurada, `MapsAPIError` para errores de la API.
             Cache de 10 min para geocoding y place details; sin cache para directions (tráfico en tiempo real).
 
-- [ ] 25.2  **Onboarding de API key** — si `GOOGLE_MAPS_API_KEY` falta o es inválida, el agente
+- [x] 25.2  **Onboarding de API key** — si `GOOGLE_MAPS_API_KEY` falta o es inválida, el agente
             responde con instrucciones: URL de Google Cloud Console, APIs a habilitar (Geocoding,
             Places, Directions), cómo agregar la key al `core/.env`.
             En el backoffice: campo en `/settings` para ingresar `GOOGLE_MAPS_API_KEY`; botón
             "Verificar" hace una geocoding de prueba y muestra estado (válida / inválida / sin cuota).
             También configurable: `HOME_LOCATION` (dirección o lat,lng) usada como origen default.
 
-- [ ] 25.3  **`core/maps_agent.py`** — agente principal registrado en `agent_registry.py`.
+- [x] 25.3  **`core/maps_agent.py`** — agente principal registrado en `agent_registry.py`.
             LLM extrae de la consulta: `intent` (directions / nearby_search / place_detail / geocode),
             `origin` (texto o "casa"), `destination`, `place_type` (restaurant, pharmacy, hospital…),
             `transport_mode` (driving/walking/transit; default driving), `location_ref` (texto libre).
@@ -1838,24 +1838,24 @@ API key:  GOOGLE_MAPS_API_KEY en core/.env — habilitadas: Geocoding, Places, D
             Descripción en el catálogo: keywords mapa, ruta, cómo llego, cómo voy, dónde queda,
             cerca, restaurante, farmacia, horario, abierto, google maps, direcciones.
 
-- [ ] 25.4  **Intent `directions`** — llama `get_directions()`. Respuesta para voz: distancia y
+- [x] 25.4  **Intent `directions`** — llama `get_directions()`. Respuesta para voz: distancia y
             tiempo total + 2-3 pasos clave en lenguaje natural ("Tomá Av. Italia y en 3km girá a
             la derecha en..."). Respuesta para WA/chat: tabla con todos los pasos, distancias
             parciales y duración parcial + deeplink `https://maps.google.com/maps?saddr=...&daddr=...`.
             Si `transport_mode=transit`, incluir líneas de transporte si la API las devuelve.
 
-- [ ] 25.5  **Intent `nearby_search` / `search_text`** — llama `search_nearby()` o `search_text()`.
+- [x] 25.5  **Intent `nearby_search` / `search_text`** — llama `search_nearby()` o `search_text()`.
             Lista top-5 con: nombre, rating (★★★☆☆), open_now (abierto/cerrado), distancia.
             Guarda resultados en `shared_state[source_key]["maps_results"]` para multi-turno:
             "el primero" / "más detalles del segundo" → llama `get_place_detail()` del ítem
             referenciado y responde con teléfono, web, horarios completos.
 
-- [ ] 25.6  **Intent `place_detail`** — cuando la consulta es directamente por un establecimiento
+- [x] 25.6  **Intent `place_detail`** — cuando la consulta es directamente por un establecimiento
             ("¿a qué hora cierra el Farmashop de Pocitos?"). LLM extrae el nombre y posible
             zona; hace `search_text()` para resolver el place_id y luego `get_place_detail()`.
             Responde con horario del día actual resaltado, teléfono y estado abierto/cerrado ahora.
 
-- [ ] 25.7  **Registro definitivo y tests** — registrar en `agent_registry.py` con `id="maps"`,
+- [x] 25.7  **Registro definitivo y tests** — registrar en `agent_registry.py` con `id="maps"`,
             `description` orientada al coordinador LLM. Agregar `GOOGLE_MAPS_API_KEY` y
             `HOME_LOCATION` como vars opcionales al bloque `.env` en el backoffice y en `CLAUDE.md`.
             Tests manuales: ruta casa→trabajo, "farmacia cerca", "horario del McDonalds de 18 de julio".
