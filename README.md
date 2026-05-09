@@ -1,6 +1,6 @@
 # home-agents
 
-A local-first, privacy-preserving multi-agent system running entirely on a laptop — no cloud, no subscriptions, no data leaving the house.
+A local-first, privacy-preserving multi-agent AI system running entirely on a laptop — no cloud, no subscriptions, no data leaving the house.
 
 Built on Gentoo Linux with an AMD Ryzen 9 5900HX (64GB RAM). Every component runs on CPU: speech recognition, language models, text-to-speech, and home automation control.
 
@@ -8,99 +8,77 @@ Built on Gentoo Linux with an AMD Ryzen 9 5900HX (64GB RAM). Every component run
 
 ## What it does
 
-You say **"Capitán"** → the system wakes up → listens to your command → understands it → acts on it → speaks back.
+You say **"Capitán"** → the system wakes up → listens → understands → acts → speaks back.
 
-```
-ear/listen.py
-  Microphone (44100Hz)
-      ↓  resample → 16000Hz
-  openWakeWord          wake word detection
-      ↓
-  faster-whisper        ~4.6s   speech to text
-      ↓
-  HTTP POST :8765/process
-      ↓
-core/server.py
-  qwen2.5:7b (Ollama)   ~3.5s   intent + action
-      ↓
-  Home Assistant REST   execute
-      ↓
-ear/listen.py
-  Piper TTS             spoken confirmation
-```
+Multiple channels are supported:
 
-Total latency: ~8s warm / ~15.7s cold start.
+| Channel | Trigger | Response |
+|---------|---------|----------|
+| Voice (mic) | "Capitán" wake word | Piper TTS spoken reply |
+| WhatsApp text | Inbound message to authorized number | WhatsApp text reply |
+| WhatsApp audio | Voice note PTT | WhatsApp text reply |
+
+Beyond reactive commands, the system also runs **proactively**: each agent periodically scans its own history and context to detect user patterns and generate intents autonomously.
 
 ---
 
 ## Architecture
 
-```mermaid
-graph LR
-    subgraph IN["Input"]
-        MIC["🎙️ Microphone\nhw:1,0 · 44100Hz"]
-        WA_A["📱 WhatsApp\naudio PTT"]
-        WA_T["📱 WhatsApp\ntext"]
-    end
-
-    subgraph EAR["home-agents-ear"]
-        RS["scipy resample\n44100 → 16kHz"]
-        WW["openWakeWord\n'Capitán'"]
-        STT["faster-whisper\nsmall · int8 · ~4.6s"]
-        TTS["🗣️ Piper TTS\nargentine voice · offline"]
-        OGG["ffmpeg\nOGG → WAV 16kHz"]
-    end
-
-    subgraph CORE["home-agents-core · :8765"]
-        DISP["Dispatcher\nkeyword + LLM"]
-        LLM["🧠 qwen2.5:7b\nOllama :11434 · ~3.5s"]
-    end
-
-    subgraph AGENTS["Agents"]
-        A1["🏠 Domótica\nactive"]
-        A2["🌤 Clima\nplanned"]
-        A3["📅 Agenda\nplanned"]
-        A4["📈 Inversiones\nplanned"]
-        A5["✈️ Viajes\nplanned"]
-    end
-
-    subgraph PHYSICAL["Physical world"]
-        HAOS["Home Assistant OS\nREST :8123"]
-        D1["💡 Lights"]
-        D2["🪟 Blinds"]
-        D3["🌡️ A/C"]
-    end
-
-    subgraph INFO["Data sources (planned)"]
-        OM["Open-Meteo API"]
-        CD["CalDAV · Radicale"]
-        YF["Yahoo Finance · BCRA"]
-    end
-
-    subgraph OUT["Output"]
-        SP["🔊 Speaker"]
-        WA_R["📲 WhatsApp\ntext / voice note"]
-    end
-
-    MIC --> RS --> WW --> STT
-    WA_A --> OGG --> STT
-    WA_T -->|"POST /process"| CORE
-    STT -->|"POST /process"| CORE
-
-    CORE --> DISP
-    DISP <-->|"intent + action"| LLM
-    DISP --> A1 & A2 & A3 & A4 & A5
-
-    A1 --> HAOS --> D1 & D2 & D3
-    A2 -.-> OM
-    A3 -.-> CD
-    A4 -.-> YF
-
-    CORE -->|"response text"| TTS --> SP
-    CORE --> WA_R
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  INPUT                                                                  │
+│  Microphone (44100Hz) ─── scipy resample → 16kHz                       │
+│  WhatsApp audio (OGG) ─── ffmpeg → WAV 16kHz                          │
+│  WhatsApp text ────────────────────────────────────────────┐           │
+│  Microphone → openWakeWord "Capitán" → faster-whisper STT  │           │
+└───────────────────────────────────────────┬────────────────┘           │
+                                            │ POST /process               │
+┌───────────────────────────────────────────▼────────────────────────────▼┐
+│  CORE  :8765                                                             │
+│                                                                          │
+│  FastAPI ─→ Coordinator (multi-agent LLM planner)                       │
+│               │                                                          │
+│               ├─→ haos_agent       (Home Assistant — lights, A/C, etc.) │
+│               ├─→ clima_agent      (Open-Meteo weather + alerts)        │
+│               ├─→ calendar_agent   (CalDAV / Radicale)                  │
+│               ├─→ finance_agent    (portfolio, BCRA, MercadoLibre)      │
+│               ├─→ travel_agent     (documents, itinerary, alerts)       │
+│               ├─→ maps_agent       (Open-Meteo geocoding + directions)  │
+│               ├─→ ml_agent         (MercadoLibre search & price track)  │
+│               ├─→ profile_agent    (user preferences & onboarding)      │
+│               ├─→ system_agent     (health, status, diagnostics)        │
+│               └─→ user_mgmt_agent  (CRUD users, RBAC, enrollment)       │
+│                                                                          │
+│  ProactiveScheduler ─→ runs each agent's proactive_check() on schedule  │
+│  GoalEngine ─→ reviews pending goals, invokes agents to advance them    │
+│  IntentState ─→ tracks advise/request/goal lifecycle per user           │
+└──────────────────────────────────────────┬───────────────────────────────┘
+                                           │
+           ┌───────────────────────────────┼───────────────────────────────┐
+           ▼                               ▼                               ▼
+    Home Assistant OS              Piper TTS + ffplay              WhatsApp reply
+    REST :8123                     spoken response                 wa_notifier.py
+    (lights, A/C, blinds…)
 ```
 
-> Solid lines: current implementation. Dashed lines: planned integrations.
+---
+
+## Agents
+
+| Agent | ID | Source | Status |
+|-------|----|--------|--------|
+| Domótica | `haos` | Home Assistant REST | Active |
+| Clima | `clima` | Open-Meteo API | Active |
+| Agenda | `calendar` | CalDAV (Radicale) | Active |
+| Inversiones | `finance` | BCRA + Yahoo Finance + MercadoLibre | Active |
+| Viajes | `travel` | Documents RAG + weather | Active |
+| Mapas | `maps` | Open-Meteo geocoding | Active |
+| MercadoLibre | `ml` | ML API (OAuth) | Active |
+| Perfil | `profile` | User context store | Active |
+| Sistema | `system` | Internal diagnostics | Active |
+| Usuarios | `user_mgmt` | Users + RBAC | Active |
+
+Every agent inherits `ProactiveMixin`, enabling autonomous intent detection by scanning its own conversation history with the LLM.
 
 ---
 
@@ -109,15 +87,16 @@ graph LR
 | Repo | Purpose |
 |------|---------|
 | [`home-agents`](https://github.com/mblasi/home-agents) | Umbrella — masterplan, scripts, submodules |
-| [`home-agents-ear`](https://github.com/mblasi/home-agents-ear) | Audio interface: mic, wake word, STT, TTS, dashboard |
-| [`home-agents-core`](https://github.com/mblasi/home-agents-core) | Agent logic: FastAPI :8765, LLM dispatch, HAOS client |
+| [`home-agents-ear`](https://github.com/mblasi/home-agents-ear) | Audio: mic, wake word, STT, TTS, dashboard |
+| [`home-agents-core`](https://github.com/mblasi/home-agents-core) | Agent logic: FastAPI :8765, LLM dispatch, all agents |
 
 ```
 home-agents/
 ├── ear/          → submodule: home-agents-ear
 ├── core/         → submodule: home-agents-core
-├── masterplan/   → estado.md (full task list + decisions)
-├── scripts/      → sync_issues.py
+├── backoffice/   → web admin UI at :8080
+├── masterplan/   → estado.md (task list + decisions + functional docs)
+├── scripts/      → sync_issues.py, lint_estado.py
 └── interagent/   → product concept (Interagent network)
 ```
 
@@ -130,22 +109,20 @@ home-agents/
 git clone --recurse-submodules git@github.com:mblasi/home-agents.git ~/workspace/home-agents
 
 # Configure credentials
-cp ~/workspace/home-agents/core/.env.example ~/workspace/home-agents/core/.env   # add HAOS_URL + HAOS_TOKEN
-cp ~/workspace/home-agents/ear/.env.example  ~/workspace/home-agents/ear/.env    # set CORE_URL=http://localhost:8765
+cp ~/workspace/home-agents/core/.env.example ~/workspace/home-agents/core/.env
+# Fill in: HAOS_URL, HAOS_TOKEN, OLLAMA_URL, CORE_PORT=8765
 
 # Activate Python environment
 source ~/home-agents-env/bin/activate
 
 # Start core, then ear
-systemctl --user start capitan-core
-systemctl --user start capitan
+systemctl --user start capitan-core   # FastAPI :8765
+systemctl --user start capitan        # audio pipeline
 
 # Or interactively with dashboard
 cd ~/workspace/home-agents/core && uvicorn server:app --host 127.0.0.1 --port 8765
 bash ~/workspace/home-agents/ear/dashboard.sh
 ```
-
-See [`ear/`](ear/) and [`core/`](core/) for detailed setup of each component.
 
 ---
 
@@ -153,60 +130,38 @@ See [`ear/`](ear/) and [`core/`](core/) for detailed setup of each component.
 
 | Layer | Tool | Notes |
 |-------|------|-------|
-| Wake word | openWakeWord (custom trained) | "Capitán", ONNX model, threshold 0.8 |
+| Wake word | openWakeWord (custom trained) | "Capitán", ONNX, threshold 0.8 |
 | STT | faster-whisper `small` int8 | Spanish, CPU, ~4.6s |
 | LLM | qwen2.5:7b via Ollama | 3.5s warm, correct ACTION format |
 | TTS | Piper v1.2.0 | `es_AR-daniela-high` voice, offline |
 | Home automation | Home Assistant OS | REST API only, LAN |
 | Audio capture | PyAudio + scipy resample | ALC256 → 44100→16000Hz |
 | Agent API | FastAPI + uvicorn | :8765, POST /process |
-
----
-
-## Roadmap
-
-### Phase 1 — Voice agent for home automation `complete`
-End-to-end pipeline: wake word → STT → HTTP → LLM → Home Assistant action → TTS.
-Modular architecture: `ear` and `core` as independent repos communicating via REST.
-
-### Phase 2 — Smarter home agent
-RAG over live HA state, ambiguity handling, conversation history, satellite mics in rooms.
-
-### Phase 3 — Multi-agent orchestrator
-Intent routing across agents, shared memory, unified API, observability dashboard.
-
-### Phase 3.5 — WhatsApp channel
-Text and voice notes to the orchestrator from WhatsApp. Authorized numbers only.
-
-### Phase 4 — Weather agent
-Open-Meteo integration (no API key). Proactive alerts: rain → close blinds, cold → adjust heating.
-
-### Phase 5 — Calendar agent
-Local CalDAV (Radicale). Voice queries and reminders.
-
-### Phase 6 — Investment agent
-Local portfolio. Argentine and international markets. All financial data stays on LAN.
-
-### Phase 7 — Travel agent
-RAG over travel documents. Destination weather, itinerary planning, expiry alerts.
-
-### Phase 8 — Dedicated server
-Always-on hardware, discrete GPU, larger models (qwen2.5:32b in 64GB RAM).
+| Backoffice | Flask | :8080, conversation explorer + agent admin |
+| Coordinator | qwen2.5:7b (multi-step) | generates ExecutionPlan for parallel agent dispatch |
+| Proactive | per-agent scheduler | detects patterns from history, generates intents |
+| Goals | goal_store.py | discovered→planning→in_progress→completed lifecycle |
+| Intents | intent_state.py | advise / request / goal, per-user state machine |
 
 ---
 
 ## Design decisions
 
-- **Everything local.** No API keys, no external services, no telemetry. The only network boundary is the LAN between the laptop and Home Assistant.
-- **CPU-only inference.** The integrated Radeon Vega 8 shares RAM and is not useful for ML. All models run on CPU with int8 quantization.
+- **Everything local.** No API keys, no external services (except Open-Meteo, geocoding, and ML OAuth), no telemetry.
+- **CPU-only inference.** Radeon Vega 8 shares RAM and is not useful for ML. All models run on CPU with int8 quantization.
 - **ear ↔ core over HTTP.** Separating audio I/O from agent logic via a REST boundary allows multiple `ear` instances (rooms, WhatsApp) to share one `core`.
-- **Audio resampling.** The ALC256 doesn't support 16kHz. Audio is captured at 44100Hz and resampled with `scipy.signal.resample_poly` (up=160, down=441).
-- **qwen2.5:7b over phi3.** phi3:mini was too slow (24.8s) and invented entity IDs. qwen2.5:7b gives consistent ACTION format in 3.5s.
-- **Piper over cloud TTS.** Four Spanish/Argentine voice models run fully offline.
+- **Audio resampling.** ALC256 doesn't support 16kHz. Captured at 44100Hz, resampled with `scipy.signal.resample_poly` (up=160, down=441).
+- **qwen2.5:7b.** phi3:mini too slow (24.8s), phi3-ha invented entity IDs. qwen2.5:7b gives consistent ACTION format in 3.5s.
+- **Piper offline TTS.** Four Spanish/Argentine voice models, fully offline.
 - **ffplay over aplay.** aplay requires explicit format parameters with this soundcard.
+- **Multi-agent coordinator.** Single-agent dispatch replaced by LLM-planned ExecutionPlan, supporting parallel and sequential steps across agents.
+- **Proactive intents.** Agents autonomously scan their own history to detect patterns (forgetting to water plants, frequent price checks, upcoming events), generating advise/request/goal intents without being asked.
 
 ---
 
 ## Status
 
-Phase 1 complete. See [`masterplan/estado.md`](masterplan/estado.md) for the full task list, latency numbers, and open decisions.
+See [`masterplan/estado.md`](masterplan/estado.md) for the full task list and decisions.
+See [`masterplan/arquitectura_funcional.md`](masterplan/arquitectura_funcional.md) for the detailed functional documentation.
+
+Phases 1–25 complete. Active development on Phase 26+.

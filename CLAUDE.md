@@ -77,6 +77,29 @@ de la sesión como mínimo. Hacer siempre `--dry-run` primero para verificar.
 
 ---
 
+## Documentación obligatoria
+
+Cada vez que se agregue o corrija funcionalidad, **antes de cerrar la sesión**:
+
+1. **`masterplan/estado.md`** — reflejar la tarea completa con `[x]` y actualizar el estado de fase.
+
+2. **`README.md` (raíz y submodules afectados)** — mantener consistente con el estado real del sistema:
+   - Agentes activos vs. planificados
+   - Endpoints disponibles
+   - Arquitectura actualizada
+
+3. **`masterplan/arquitectura_funcional.md`** — documento funcional detallado del sistema. Actualizar la sección correspondiente cuando cambie:
+   - Un agente (nuevo, modificado, activado)
+   - El ciclo de vida de intents o goals
+   - El sistema proactivo
+   - Endpoints de la API
+   - El backoffice
+
+**Regla:** si se modificó código, se debe actualizar documentación. No es opcional.
+Un hook de Stop en `.claude/settings.local.json` recuerda esto automáticamente.
+
+---
+
 ## Plan y estado
 
 El plan vive en `masterplan/estado.md`. Al iniciar sesión, leerlo para saber en qué fase

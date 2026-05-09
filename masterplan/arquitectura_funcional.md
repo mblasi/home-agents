@@ -1,0 +1,402 @@
+# Arquitectura Funcional — home-agents
+
+Documento de referencia funcional del sistema. Se actualiza con cada cambio de funcionalidad.
+
+_Última actualización: 2026-05-09_
+
+---
+
+## Visión general
+
+home-agents es una red de agentes de IA que corre completamente en una laptop (Gentoo Linux, Ryzen 9 5900HX, 64GB RAM). No hay dependencias de servicios externos de pago ni telemetría. El único perímetro de red es la LAN local con Home Assistant OS.
+
+El sistema combina tres capacidades:
+
+1. **Reactiva** — responde a comandos de voz o WhatsApp en tiempo real
+2. **Proactiva** — cada agente monitorea su historial y detecta patrones autónomamente
+3. **Orientada a objetivos** — los goals de largo plazo se revisan periódicamente y se avanza sobre ellos
+
+---
+
+## Componentes del sistema
+
+### ear (home-agents-ear) — capa de audio
+
+| Archivo | Función |
+|---------|---------|
+| `listen.py` | Loop principal: captura mic → wake word → STT → POST /process → TTS |
+| `tts.py` | Piper TTS + ffplay (voz `es_AR-daniela-high`) |
+| `panel_score.py` | Dashboard: wake word score animado + estado |
+| `panel_history.py` | Dashboard: historial de comandos |
+| `panel_latency.py` | Dashboard: latencias STT/LLM/HAOS |
+| `panel_agents.py` | Dashboard: agente activo y fuente |
+| `wakeword/` | Training data + openWakeWord modelo "Capitán" (ONNX, 848KB) |
+
+**Pipeline de audio:**
+```
+Mic hw:1,0 → pyaudio (44100Hz) → scipy.resample_poly(up=160, down=441) → 16000Hz
+→ openWakeWord (threshold 0.8) → faster-whisper small int8 (~4.6s)
+→ POST /process → respuesta texto → Piper TTS → ffplay
+```
+
+**Latencia warm:** ~8s | **Latencia cold:** ~15.7s
+
+---
+
+### core (home-agents-core) — capa de orquestación
+
+FastAPI en `:8765`. Recibe texto de cualquier cliente y lo pasa por el pipeline de agentes.
+
+#### Ciclo de vida de un request
+
+```
+POST /process {text, source, conversation_id?}
+    ↓
+1. Identificar usuario (desde source.wa_phone o usuario por defecto)
+2. Resolver/crear conversación
+3. Coordinator.plan(text, user, conversation)
+   a. fast_classifier: keyword matching sin LLM (< 10ms)
+   b. Si no hay match claro: qwen2.5:7b genera ExecutionPlan
+      ExecutionPlan = [Step(agent_id, query, depends_on?), ...]
+4. _run_plan():
+   - Para cada step en orden (respetando depends_on):
+     agent.process(query, conversation, source, user)
+     → (response, action?, updates?)
+     - updates.intent_updates → intent_state
+     - updates.goal_updates → goal_store
+     - updates.context_updates → user_context
+     - Registrar en agent_history
+5. Sintetizar respuesta final
+6. Actualizar conversación y trazas
+```
+
+---
+
+## Agentes
+
+### haos — Domótica
+
+- **Archivo:** `agent.py`
+- **LLM prompt:** genera `ACTION: domain.service | entity_id: X [| param: value]`
+- **Entidades mapeadas:** 13 entity IDs (luces WiZ, aire Midea, persiana, zonas de riego Rachio, TV Samsung, Echo, llaves de agua/patio/garaje)
+- **Proactivo:** detecta patrones de uso (olvidó apagar, horario habitual, etc.)
+
+### clima — Clima
+
+- **Archivo:** `clima_agent.py`
+- **Fuente:** Open-Meteo API (sin API key)
+- **Funciones:** temperatura, lluvia, viento, forecast, alertas meteorológicas
+- **Proactivo:** detecta si va a llover y recomienda cerrar persianas o llevar paraguas
+- **Contexto de usuario:** `preferred_location` → resuelve coordenadas vía `geocoding.py`
+
+### calendar — Agenda
+
+- **Archivo:** `calendar_agent.py`
+- **Fuente:** CalDAV local (Radicale)
+- **Funciones:** consultar eventos, crear recordatorios, alerta de eventos próximos
+- **Proactivo:** detecta eventos del día siguiente, feriados (sync desde FERIADOS_COUNTRY=UY)
+
+### finance — Inversiones
+
+- **Archivo:** `finance_agent.py`
+- **Fuentes:** BCRA (dólar oficial, blue, MEP), Yahoo Finance, MercadoLibre cotizaciones
+- **Funciones:** dólar actual, portfolio de inversiones, alertas de precio
+- **Proactivo:** detecta preguntas frecuentes sobre el mismo activo, sugiere alerta de precio
+- **Companion:** `finance_alerts.py` para precio objetivo, `portfolio.py` para portfolio
+
+### travel — Viajes
+
+- **Archivo:** `travel_agent.py`
+- **Fuentes:** documentos del usuario (pasaporte, DNI, visas), weather del destino
+- **Funciones:** vencimiento de documentos, itinerario, clima en destino
+- **Proactivo:** alerta de documentos próximos a vencer, clima en destinos de viajes próximos
+- **Companion:** `travel_alerts.py`, `media_store.py` para documentos
+
+### maps — Mapas
+
+- **Archivo:** `maps_agent.py`
+- **Fuente:** Open-Meteo Geocoding API
+- **Funciones:** geocoding de ciudades, distancias, direcciones
+
+### ml — MercadoLibre
+
+- **Archivo:** `ml_agent.py`
+- **Fuente:** MercadoLibre API (OAuth 2.0)
+- **Funciones:** búsqueda de productos, tracking de precio, comparación
+- **Auth:** `ml_auth.py` + `marketplace_oauth.py` — OAuth flow completo
+
+### profile — Perfil
+
+- **Archivo:** `profile_agent.py`
+- **Función:** onboarding de usuario nuevo, consulta/actualización de preferencias, contexto
+- **Proactivo:** detecta preferencias no configuradas, sugiere completar perfil
+
+### system — Sistema
+
+- **Archivo:** `system_agent.py`
+- **Función:** health check, estado de agentes, latencias, diagnósticos
+
+### user_mgmt — Gestión de usuarios
+
+- **Archivo:** `user_mgmt_agent.py`
+- **Función:** CRUD de usuarios, asignación de roles, enrollment de voz
+
+---
+
+## Sistema proactivo
+
+### ProactiveMixin
+
+Mixin que todos los agentes heredan. Agrega:
+
+- `proactive_schedule` — intervalo en segundos (default 86400s = 24h)
+- `proactive_check(user, user_context)` — LLM analiza `agent_history` del usuario, detecta patrones, retorna lista de intents a crear/actualizar
+
+`proactive_check()` retorna vacío si no hay historial Y no hay intents activos.
+
+### ProactiveScheduler
+
+Thread en background (`proactive.py`). Loop:
+
+```
+loop cada 60s:
+    para cada agente registrado:
+        si (ahora - last_run) >= proactive_schedule:
+            para cada usuario activo:
+                agent.proactive_check(user, user_ctx)
+                → aplicar intent_updates
+    
+    _review_goals():
+        para cada goal pendiente de revisión:
+            _plan_goal_steps(goal) → [{"agent_id": "...", "query": "..."}]
+            para cada step:
+                agent.process(query, _ReviewConv(goal_id), source_goal_review, user)
+                → _apply_review_updates(updates)
+            _finalize_goal_review(user, goal, results)
+            → actualizar estado del goal (LLM decide si avanzar)
+```
+
+### Alert queue
+
+`alert_queue.py` — cola de alertas proactivas pendientes de entrega. Las alertas se acumulan durante `proactive_check()` y se entregan en el próximo request del usuario (o vía WhatsApp si tiene `wa_phone` configurado).
+
+---
+
+## Sistema de intents
+
+### Tipos
+
+| Tipo | Descripción | Ciclo de vida |
+|------|-------------|---------------|
+| `advise` | Sugerencia para el usuario | `detected → active → delivered → dismissed` |
+| `request` | Pregunta proactiva que espera respuesta | `detected → pending_capture → captured \| abandoned` |
+| `goal` | Objetivo de largo plazo | Ver ciclo de goals |
+
+### Flujo de creación
+
+Un intent se crea de tres maneras:
+
+1. **Desde `proactive_check()`** — agente analiza historial y detecta patrón
+2. **Desde `process()`** — agente retorna `intent_updates` en el tercer elemento del tuple
+3. **Vía API** — `POST /users/{id}/intents`
+
+### Persistencia
+
+`intent_state.py` — almacena en `~/.local/share/capitan/intents_{user_id}.json`.
+
+---
+
+## Sistema de goals
+
+### Estados
+
+```
+discovered → planning → in_progress → completed
+                    ↘                ↘
+                  abandoned         blocked
+```
+
+### Campos
+
+| Campo | Descripción |
+|-------|-------------|
+| `id` | UUID |
+| `title` | Descripción corta |
+| `description` | Detalle del objetivo |
+| `status` | Estado actual |
+| `owner_agent_id` | Agente que lo creó |
+| `collaborating_agents` | Lista de agentes que participan |
+| `review_interval_hours` | Cada cuántas horas revisarlo (default 6) |
+| `last_reviewed_at` | Timestamp de última revisión |
+| `notes` | Lista append-only de entradas de progreso |
+| `children` | Sub-goals relacionados |
+
+### Identificación de goals
+
+Cualquier agente puede identificar un goal en dos momentos:
+
+1. Durante `process()`: retornar `goal_updates` con `{"action": "create", "title": "...", ...}`
+2. Durante `proactive_check()`: retornar intent de tipo `goal`
+
+El **Goal Engine** (en `ProactiveScheduler._review_goals()`) revisa goals pendientes y orquesta los agentes para avanzarlos. Los nuevos intents emergentes se aplican naturalmente — no se fuerzan.
+
+### Persistencia
+
+`goal_store.py` — almacena en `~/.local/share/capitan/goals_{user_id}.json`.
+
+---
+
+## Historial de agentes
+
+`agent_history.py` — almacena los últimos 40 turnos por par (agent_id, user_id) en `~/.local/share/capitan/history_{agent_id}_{user_id}.json`.
+
+El historial se escribe desde `server.py` (`_record_history()`) después de cada `agent.process()` exitoso, tanto en path single-step como multi-step. Las revisiones de goals (source `goal_review`) no se registran.
+
+---
+
+## Contexto de usuario por agente
+
+`user_context.py` — cada agente puede almacenar y leer un dict arbitrario por usuario. Persiste en `~/.local/share/capitan/context_{user_id}.json`.
+
+Ejemplo: `clima_agent` almacena `preferred_location: "Montevideo"`. En cada `proactive_check()` y `process()` recibe este contexto y resuelve coordenadas vía `geocoding.py`.
+
+---
+
+## Shared state
+
+`shared_state.py` — memoria compartida entre agentes con TTL. Clave-valor en memoria (no persiste entre reinicios).
+
+Ejemplo: `clima_agent` escribe `weather.is_raining: True` (TTL 1h), y `haos_agent` puede leerlo para decidir si cerrar persianas automáticamente.
+
+---
+
+## Coordinator
+
+`coordinator.py` — planificador multi-agente.
+
+### fast_classifier
+
+Clasificador de keywords entrenado en los ejemplos de cada agente. Si la confianza supera el umbral, despacha sin llamar al LLM (< 10ms).
+
+Entrenado con `POST /coordinator/train`. El modelo se guarda en `~/.local/share/capitan/fast_classifier.pkl`.
+
+### LLM planner (qwen2.5:7b)
+
+Para requests ambiguos o multi-agente, genera:
+
+```json
+{
+  "steps": [
+    {"step_id": "s1", "agent_id": "clima", "query": "¿va a llover mañana?"},
+    {"step_id": "s2", "agent_id": "haos", "query": "cierra las persianas", "depends_on": ["s1"]}
+  ]
+}
+```
+
+Los steps con `depends_on` se ejecutan en secuencia. Los independientes pueden ejecutarse en paralelo.
+
+---
+
+## Canal WhatsApp
+
+`wa_audio.py` — descarga OGG de WhatsApp Business, convierte a WAV 16kHz vía ffmpeg, corre faster-whisper STT.
+
+`wa_notifier.py` — envía mensajes de texto o notas de voz al WhatsApp del usuario (usando `wa_phone` del perfil). Usado para alertas proactivas y respuestas.
+
+`wa_formatter.py` — formatea respuestas para WhatsApp (Markdown simplificado, sin HTML).
+
+Números autorizados: definidos en `users.json` por `wa_phone`. Solo usuarios registrados pueden interactuar.
+
+---
+
+## RBAC
+
+`rbac.py` — roles: `admin`, `familiar`, `adolescente`, `niño`, `invitado`.
+
+Cada rol tiene permisos sobre endpoints (lectura, escritura, administración). El rol se resuelve desde el usuario identificado via `wa_phone` o speaker ID.
+
+---
+
+## OAuth (MercadoLibre)
+
+`marketplace_oauth.py` + `ml_auth.py` — flujo completo OAuth 2.0.
+
+1. `GET /auth/ml/url` → genera URL de autorización
+2. Usuario completa el flow en el navegador
+3. `POST /auth/ml/callback` → intercambia code por access_token + refresh_token
+4. Tokens almacenados en `core/.env` o en el perfil del usuario
+
+---
+
+## Backoffice
+
+Flask en `:8080`. Interfaz web de administración.
+
+Funcionalidades:
+- Explorador de conversaciones (historial completo, filtros por usuario/agente/fecha)
+- Vista de trazas de ejecución por conversación
+- Gestión de agentes (activar/desactivar, editar metadatos)
+- Intents y goals por usuario
+
+---
+
+## Persistencia en disco
+
+Todos los datos del usuario se almacenan en `~/.local/share/capitan/`:
+
+| Archivo | Contenido |
+|---------|-----------|
+| `users.json` | Registro de usuarios |
+| `history_{agent_id}_{user_id}.json` | Historial conversacional (últimos 40 turnos) |
+| `context_{user_id}.json` | Contexto por agente por usuario |
+| `intents_{user_id}.json` | Intents por usuario |
+| `goals_{user_id}.json` | Goals por usuario |
+| `conversations/*.json` | Conversaciones con todos sus turnos |
+| `traces/*.json` | Trazas de ejecución |
+| `fast_classifier.pkl` | Modelo del fast-classifier del coordinator |
+| `portfolio_{user_id}.json` | Portfolio de inversiones |
+| `documents_{user_id}.json` | Documentos de viaje/identidad |
+
+---
+
+## Dashboard zellij (ear)
+
+Paneles Rich en terminal, lanzados con `bash ear/dashboard.sh`. Leen de `/tmp/capitan/*.json` escritos por `listen.py`.
+
+| Panel | Archivo | Contenido |
+|-------|---------|-----------|
+| Score | `panel_score.py` | Wake word score animado + estado del pipeline |
+| Historial | `panel_history.py` | Últimos comandos con acción, respuesta y latencias |
+| Latencias | `panel_latency.py` | STT/LLM/HAOS promedio y por sesión |
+| Agentes | `panel_agents.py` | Agentes disponibles, agente activo, fuente del request |
+
+---
+
+## Hardware y modelos
+
+| Componente | Modelo/Config |
+|------------|---------------|
+| CPU | AMD Ryzen 9 5900HX (znver3, 8c/16t) |
+| RAM | 64GB DDR4 |
+| LLM | qwen2.5:7b via Ollama (int8, CPU, ~3.5s warm) |
+| STT | faster-whisper `small` (int8, CPU, ~4.6s para 5s audio) |
+| TTS | Piper v1.2.0, `es_AR-daniela-high.onnx`, 22050Hz |
+| Wake word | openWakeWord custom, `capitan.onnx` (848KB), threshold 0.8 |
+| Audio capture | PyAudio device_index=4 (ALC256 hw:1,0), 44100Hz |
+| Resampling | scipy.signal.resample_poly up=160 down=441 |
+
+---
+
+## Decisiones arquitectónicas clave
+
+| Decisión | Razón |
+|----------|-------|
+| CPU-only | Radeon Vega 8 comparte RAM, no útil para ML |
+| ear ↔ core via HTTP | Permite múltiples ears (mic, WhatsApp) en un solo core |
+| qwen2.5:7b | phi3:mini demasiado lento (24.8s), phi3-ha inventa entity_ids |
+| faster-whisper sobre openai-whisper | Más rápido, mismo modelo |
+| ffplay sobre aplay | aplay requiere parámetros explícitos en ALC256 |
+| scipy.resample_poly sobre librosa | Más rápido, sin overhead |
+| openWakeWord propio | Porcupine descartado (cloud dependency) |
+| Datos en ~/.local/share/capitan/ | Fuera del repo, privados, persistentes entre reinicios |
+| goal_review source type | Excluido de agent_history para no contaminar el historial de conversación |

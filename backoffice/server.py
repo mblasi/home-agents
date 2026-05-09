@@ -132,10 +132,6 @@ _OAUTH_SERVICES = {
         "me_url": "https://api.mercadolibre.com/users/me",
         "label": "MercadoLibre",
     },
-    "mp": {
-        "me_url": "https://api.mercadopago.com/users/me",
-        "label": "MercadoPago",
-    },
 }
 
 
@@ -850,12 +846,20 @@ def delete_state_key(key: str):
 
 
 @app.get("/conversations", response_class=HTMLResponse)
-def conversations_page(request: Request, status: str = "all"):
+def conversations_page(request: Request, status: str = "all", page: int = 1):
     data = _core("/conversations") or []
     if status != "all":
         data = [c for c in data if c.get("state") == status]
+    data.sort(key=lambda c: c.get("created_at", 0), reverse=True)
+    page_size  = 20
+    total      = len(data)
+    total_pages = max(1, (total + page_size - 1) // page_size)
+    page       = max(1, min(page, total_pages))
+    offset     = (page - 1) * page_size
     return _render(request, "conversations.html", "conversations",
-                   convs=data, status_filter=status)
+                   convs=data[offset:offset + page_size],
+                   status_filter=status,
+                   page=page, total_pages=total_pages, total=total)
 
 
 @app.delete("/conversations/{conv_id}", response_class=HTMLResponse)
@@ -1024,6 +1028,11 @@ def user_detail_page(request: Request, uid: str):
     user_context     = _core(f"/users/{uid}/context/raw") or {}
     user_intents     = _core(f"/users/{uid}/intents", params={"active_only": True}) or []
     proactive_status = _core("/proactive/status", timeout=3) or {}
+    # Solo agentes con proactividad habilitada globalmente
+    proactive_status = {
+        aid: info for aid, info in proactive_status.items()
+        if agents.get(aid, {}).get("proactive_enabled", True)
+    }
     # proactive_enabled per agent from plain context (not raw)
     user_ctx_plain   = _core(f"/users/{uid}/context") or {}
     return _render(request, "user_detail.html", "users",
