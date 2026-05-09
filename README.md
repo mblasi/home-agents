@@ -51,6 +51,7 @@ Beyond reactive commands, the system also runs **proactively**: each agent perio
 │                                                                          │
 │  ProactiveScheduler ─→ runs each agent's proactive_check() on schedule  │
 │  GoalEngine ─→ reviews pending goals, invokes agents to advance them    │
+│  RoutineDetector ─→ infers behavioral patterns from interaction history  │
 │  IntentState ─→ tracks advise/request/goal lifecycle per user           │
 └──────────────────────────────────────────┬───────────────────────────────┘
                                            │
@@ -141,6 +142,7 @@ bash ~/workspace/home-agents/ear/dashboard.sh
 | Coordinator | qwen2.5:7b (multi-step) | generates ExecutionPlan for parallel agent dispatch |
 | Proactive | per-agent scheduler | detects patterns from history, generates intents |
 | Goals | goal_store.py | discovered→planning→in_progress→completed lifecycle |
+| Routines | routine_store.py | inferred behavioral patterns, candidate→active→paused lifecycle |
 | Intents | intent_state.py | advise / request / goal, per-user state machine |
 
 ---
@@ -164,4 +166,4 @@ bash ~/workspace/home-agents/ear/dashboard.sh
 See [`masterplan/estado.md`](masterplan/estado.md) for the full task list and decisions.
 See [`masterplan/arquitectura_funcional.md`](masterplan/arquitectura_funcional.md) for the detailed functional documentation.
 
-Phases 1–25 complete. Active development on Phase 26+.
+Phases 1–26 complete. Active development on Phase 27+.

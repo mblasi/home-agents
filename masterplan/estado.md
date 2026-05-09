@@ -1859,3 +1859,48 @@ API key:  GOOGLE_MAPS_API_KEY en core/.env — habilitadas: Geocoding, Places, D
             `description` orientada al coordinador LLM. Agregar `GOOGLE_MAPS_API_KEY` y
             `HOME_LOCATION` como vars opcionales al bloque `.env` en el backoffice y en `CLAUDE.md`.
             Tests manuales: ruta casa→trabajo, "farmacia cerca", "horario del McDonalds de 18 de julio".
+
+---
+
+### FASE 26 - Sistema de Rutinas
+
+Estado: COMPLETA
+Deps:   FASE 9 (coordinador + agent_history), FASE 22 (goal engine — modelo de referencia).
+
+Las rutinas son patrones de comportamiento inferidos dinámicamente a partir del historial
+de interacciones del usuario. A diferencia de los goals (intenciones explícitas), las rutinas
+se detectan por observación y se construyen iterativamente.
+
+- [x] 26.1  **`routine_store.py`** — persistencia en `~/.local/share/capitan/routines/{user_id}.json`.
+            Máquina de estados: `candidate → active → paused | dismissed`.
+            Promoción automática a `active` cuando `confidence ≥ 0.6` y `occurrence_count ≥ 3`.
+            Deduplicación por similitud Jaccard antes de crear duplicados.
+            API: `create_routine`, `record_occurrence` (EMA 30/70), `transition`, `find_similar`,
+            `get_active_routines`, `mark_triggered`, `get_all_active_across_users`.
+
+- [x] 26.2  **`routine_detector.py`** — detección LLM periódica.
+            Carga mensajes del usuario de todos los agentes (solo role=user).
+            Llama a qwen2.5:7b con prompt estructurado que pide JSON array de rutinas candidatas.
+            Si detecta una rutina similar a una existente (Jaccard): incrementa ocurrencias.
+            Si es nueva: crea `candidate`. Intervalo mínimo configurable (default 6h por usuario).
+            `detect_for_user(user_id)` + `run_all_users()` para el poller de background.
+
+- [x] 26.3  **Integración en `server.py`**:
+            - Background thread `routine-detector` que llama `run_all_users()` cada 6h
+              (configurable con `ROUTINE_DETECT_INTERVAL`).
+            - `_build_agent_prefix()`: rutinas `active` inyectadas en el contexto de cada agente
+              como `[RUTINA] Título (confianza: X%): descripción`.
+            - `_apply_agent_updates()`: maneja `routine_updates` en el dict de retorno de agentes.
+              Con `routine_id` → transiciona rutina existente.
+              Sin `routine_id` + `title` → crea rutina candidata nueva.
+
+- [x] 26.4  **Endpoints REST**:
+            `GET /routines` — vista admin de rutinas activas de todos los usuarios.
+            `GET /users/{uid}/routines[?status=...]` — rutinas de un usuario con filtro opcional.
+            `POST /users/{uid}/routines` — crear rutina manualmente.
+            `GET /users/{uid}/routines/{rid}` — detalle de una rutina.
+            `POST /users/{uid}/routines/{rid}/transition` — transicionar estado.
+            `DELETE /users/{uid}/routines/{rid}` — eliminar rutina.
+            `POST /users/{uid}/routines/detect` — forzar detección inmediata (bloquea 60s máx).
+
+- [x] 26.5  **`base_agent.py`**: documenta `routine_updates` en el contrato de retorno del protocolo.

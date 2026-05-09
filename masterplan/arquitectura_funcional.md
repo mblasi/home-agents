@@ -60,11 +60,14 @@ POST /process {text, source, conversation_id?}
       ExecutionPlan = [Step(agent_id, query, depends_on?), ...]
 4. _run_plan():
    - Para cada step en orden (respetando depends_on):
+     _build_agent_prefix(user, agent_id)
+       → contexto de usuario + intents activos + goals activos + rutinas activas
      agent.process(query, conversation, source, user)
      → (response, action?, updates?)
-     - updates.intent_updates → intent_state
-     - updates.goal_updates → goal_store
+     - updates.intent_updates  → intent_state
+     - updates.goal_updates    → goal_store
      - updates.context_updates → user_context
+     - updates.routine_updates → routine_store  ← nuevo
      - Registrar en agent_history
 5. Sintetizar respuesta final
 6. Actualizar conversación y trazas
@@ -242,7 +245,69 @@ El **Goal Engine** (en `ProactiveScheduler._review_goals()`) revisa goals pendie
 
 ### Persistencia
 
-`goal_store.py` — almacena en `~/.local/share/capitan/goals_{user_id}.json`.
+`goal_store.py` — almacena en `~/.local/share/capitan/goals/{user_id}.json`.
+
+---
+
+## Sistema de rutinas
+
+Las rutinas son patrones de comportamiento **inferidos** del historial de interacciones. A diferencia de los goals (intenciones explícitas declaradas por el usuario), las rutinas son detectadas por observación repetida y se construyen iterativamente.
+
+### Estados
+
+```
+candidate → active → paused
+         ↘        ↘       ↘
+          dismissed  dismissed  dismissed
+```
+
+Promoción automática `candidate → active` cuando `confidence ≥ 0.6` y `occurrence_count ≥ 3`.
+
+### Campos principales
+
+| Campo | Descripción |
+|-------|-------------|
+| `routine_id` | UUID |
+| `title` | Descripción corta del patrón |
+| `trigger_type` | `time` / `periodic` / `context` / `mixed` |
+| `trigger_time` | Rango horario (`HH:MM-HH:MM`) o null |
+| `trigger_days` | Días de la semana o [] |
+| `trigger_context` | Descripción de contexto situacional o null |
+| `agent_id` | Agente principal que ejecuta la acción |
+| `action_template` | Descripción de la acción típica |
+| `confidence` | 0.0–1.0, actualizado con EMA (30% nuevo / 70% acumulado) |
+| `occurrence_count` | Número de veces observada |
+| `status` | Estado actual |
+| `discovered_by` | `"routine_detector"` o `agent_id` |
+
+### Detección
+
+`routine_detector.py` — corre en background cada 6h (configurable con `ROUTINE_DETECT_INTERVAL`).
+
+1. Carga los mensajes del usuario (role=`user`) del historial de todos los agentes
+2. Si hay menos de 6 mensajes, no intenta detectar
+3. Llama a qwen2.5:7b con los últimos 40 mensajes y un prompt que pide JSON array de rutinas
+4. Por cada rutina identificada:
+   - Si existe una rutina con título similar (Jaccard ≥ 0.5): `record_occurrence()` → actualiza confianza y puede promover a `active`
+   - Si no existe: `create_routine()` → nueva `candidate`
+
+### Integración con agentes
+
+Cada agente recibe las rutinas `active` del usuario en su prefijo de contexto:
+
+```
+Rutinas del usuario:
+- [RUTINA] Encender luces al despertar (confianza: 85%): Lunes a viernes antes de las 8am
+- [RUTINA] Consultar clima los domingos (confianza: 91%): Los domingos a la mañana
+```
+
+Los agentes pueden devolver `routine_updates` en su tuple de retorno para:
+- Crear una rutina candidata nueva: `{title, description?, trigger_type?, confidence?, ...}`
+- Transicionar una rutina existente: `{routine_id, status?, note?}`
+
+### Persistencia
+
+`routine_store.py` — almacena en `~/.local/share/capitan/routines/{user_id}.json`.
 
 ---
 
@@ -350,7 +415,9 @@ Todos los datos del usuario se almacenan en `~/.local/share/capitan/`:
 | `history_{agent_id}_{user_id}.json` | Historial conversacional (últimos 40 turnos) |
 | `context_{user_id}.json` | Contexto por agente por usuario |
 | `intents_{user_id}.json` | Intents por usuario |
-| `goals_{user_id}.json` | Goals por usuario |
+| `goals/{user_id}.json` | Goals por usuario |
+| `routines/{user_id}.json` | Rutinas inferidas por usuario |
+| `routine_last_detect.json` | Timestamp de última detección por usuario |
 | `conversations/*.json` | Conversaciones con todos sus turnos |
 | `traces/*.json` | Trazas de ejecución |
 | `fast_classifier.pkl` | Modelo del fast-classifier del coordinator |
