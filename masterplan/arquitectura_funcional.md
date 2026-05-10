@@ -146,6 +146,33 @@ POST /process {text, source, conversation_id?}
 
 ---
 
+## BackendCard — scoring y ejemplos por acción
+
+`backend_router.py` registra dos tipos de estadísticas por agente:
+
+- **AgentCard** (`record_agent_outcome`): estadísticas a nivel agente — `total_calls`, `successes`, `failures`, `learned_examples` (frases que llegaron al agente y tuvieron éxito, usadas por el coordinator).
+- **BackendCard** (`record_action_outcome`): estadísticas por acción discreta dentro del agente — `action_stats[action_id]` con contadores y `action_examples` (frases que dispararon esa acción con éxito).
+
+Los `learned_examples` de cada AgentCard se incorporan al catálogo del coordinator (vía `get_registry()`) y al `fast_classifier`, mejorando el ruteo con el uso real del sistema.
+
+### Patrones de implementación
+
+Los agentes se dividen en tres patrones según cómo seleccionan acciones internas:
+
+**Patrón A — BackendCard completo** (`select_action()` + `record_action_outcome()`):
+El agente llama a `select_action(text, _ACTIONS, model)` que usa el LLM para elegir entre sus `BackendCard`s. Luego registra el outcome de la acción elegida.
+- **Agentes:** `calendar_agent`, `ml_agent`, `maps_agent`
+
+**Patrón B — BackendCard híbrido** (clasificación nativa LLM + `record_action_outcome()`):
+El LLM resuelve la acción junto con los parámetros en una sola llamada (prompt de clasificación directo). El agente registra `record_action_outcome(agent_id, act, text, success)` en cada rama de su `process()`.
+- **Agentes:** `profile_agent`, `system_agent`, `user_mgmt_agent`
+
+**Patrón C — Sin BackendCard** (espacio LLM continuo):
+El agente no tiene acciones discretas seleccionables — la respuesta emerge directamente del LLM con contexto de dominio. Solo se registra `record_agent_outcome()` a nivel agente (desde `server.py`).
+- **Agentes:** `haos` (agent.py), `clima_agent`, `finance_agent`, `travel_agent`, `generic_agent`
+
+---
+
 ## Sistema proactivo
 
 ### ProactiveMixin
