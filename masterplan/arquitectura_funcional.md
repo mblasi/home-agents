@@ -2,7 +2,7 @@
 
 Documento de referencia funcional del sistema. Se actualiza con cada cambio de funcionalidad.
 
-_Última actualización: 2026-05-09_
+_Última actualización: 2026-05-10_
 
 ---
 
@@ -203,6 +203,31 @@ Un intent se crea de tres maneras:
 2. **Desde `process()`** — agente retorna `intent_updates` en el tercer elemento del tuple
 3. **Vía API** — `POST /users/{id}/intents`
 
+### Captura asincrónica de información (request intent + context_key)
+
+Un request intent puede incluir un campo `context_key` dentro de su `context`:
+
+```python
+intent_updates=[{
+    "title":       "¿En qué ciudad estás?",
+    "intent_type": "request",
+    "question":    "¿En qué ciudad preferís que consulte el clima?",
+    "context": {
+        "context_key": "preferred_location",
+        "ttl_days":    180,
+    }
+}]
+```
+
+Cuando el usuario responde (voz o WhatsApp), `server.py` llama `capture_reply()` y,
+si el intent tiene `context_key`, **persiste automáticamente la respuesta en `user_context`**
+del agente correspondiente (`_maybe_persist_context_from_reply()`). A partir de ese momento,
+el valor estará disponible en `build_agent_prefix()` en todas las interacciones siguientes —
+sin que el agente tenga que implementar ningún hook.
+
+El hook `handle_captured_reply()` sigue disponible para casos más complejos donde el agente
+necesita ejecutar una acción (no solo almacenar) en respuesta al reply.
+
 ### Persistencia
 
 `intent_state.py` — almacena en `~/.local/share/capitan/intents_{user_id}.json`.
@@ -305,6 +330,31 @@ Los agentes pueden devolver `routine_updates` en su tuple de retorno para:
 - Crear una rutina candidata nueva: `{title, description?, trigger_type?, confidence?, ...}`
 - Transicionar una rutina existente: `{routine_id, status?, note?}`
 
+#### Detección orgánica durante process()
+
+`proactive_mixin.suggest_routine_candidate(agent_id, user_id, text, *, title, ...)` es una
+función standalone que cualquier agente puede importar y llamar al final de su `process()`.
+Analiza `agent_history` del par (agent_id, user_id) y retorna un dict de rutina candidata
+si el texto actual tiene ≥ `min_occurrences` turnos similares previos (similitud por palabras
+de contenido con longitud ≥ 4 para ignorar stopwords del español).
+
+```python
+# Ejemplo en ClimaAgent.process():
+from proactive_mixin import suggest_routine_candidate
+
+routine = suggest_routine_candidate(
+    self.agent_id, user_id, text,
+    title="Consulta de clima frecuente",
+    description="El usuario consulta el tiempo regularmente",
+)
+if routine:
+    return resp, action, {"routine_updates": [routine]}
+return resp, action
+```
+
+Esto complementa la detección periódica de `routine_detector.py` (cada 6h, LLM completo)
+con detección inmediata y liviana durante la conversación.
+
 ### Persistencia
 
 `routine_store.py` — almacena en `~/.local/share/capitan/routines/{user_id}.json`.
@@ -324,6 +374,11 @@ El historial se escribe desde `server.py` (`_record_history()`) después de cada
 `user_context.py` — cada agente puede almacenar y leer un dict arbitrario por usuario. Persiste en `~/.local/share/capitan/context_{user_id}.json`.
 
 Ejemplo: `clima_agent` almacena `preferred_location: "Montevideo"`. En cada `proactive_check()` y `process()` recibe este contexto y resuelve coordenadas vía `geocoding.py`.
+
+**Fuentes de escritura:**
+- `agent.process()` vía `context_updates` en el dict de updates
+- Automática desde la captura de un request intent con `context_key` (`_maybe_persist_context_from_reply()`)
+- Directa vía `POST /users/{id}/context` (API)
 
 ---
 
