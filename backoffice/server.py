@@ -484,8 +484,6 @@ def agent_new_page(request: Request):
 async def agent_new_submit(request: Request):
     form = await request.form()
     default_roles = [r for r in _ROLES_AGENTS if r != "admin" and form.get(f"role_{r}")]
-    kw_raw = str(form.get("keywords", ""))
-    keywords = [k.strip() for k in kw_raw.splitlines() if k.strip()]
     payload = {
         "id":            str(form.get("id", "")).strip().lower().replace(" ", "_"),
         "name":          str(form.get("name", "")).strip(),
@@ -493,7 +491,6 @@ async def agent_new_submit(request: Request):
         "icon":          str(form.get("icon", "")).strip(),
         "desc":          str(form.get("desc", "")).strip(),
         "status":        str(form.get("status", "planned")),
-        "keywords":      keywords,
         "default_roles": default_roles,
         "system_prompt": str(form.get("system_prompt", "")).strip(),
         "backend":       str(form.get("backend", "ollama")),
@@ -552,11 +549,6 @@ async def agent_edit_submit(request: Request, agent_id: str):
     status = str(form.get("status", "")).strip()
     if status:
         _core(f"/agents/{agent_id}/status", method="PATCH", json={"status": status})
-
-    # Keywords: una por línea
-    kw_raw = str(form.get("keywords", ""))
-    keywords = [k.strip() for k in kw_raw.splitlines() if k.strip()]
-    _core(f"/agents/{agent_id}/keywords", method="PATCH", json={"keywords": keywords})
 
     # Ejemplos de la agent card: uno por línea
     ex_raw = str(form.get("examples", ""))
@@ -833,6 +825,39 @@ async def respond_intent_proxy(uid: str, intent_id: str, request: Request):
     )
 
 
+# ── Routines ──────────────────────────────────────────────────────────────────
+
+@app.get("/routines", response_class=HTMLResponse)
+def routines_page(request: Request):
+    users_data  = _core("/users") or {}
+    agents_data = _core("/agents", timeout=10) or {}
+    all_routines = []
+    for uid in users_data:
+        user_routines = _core(f"/users/{uid}/routines") or []
+        all_routines.extend(user_routines)
+    all_routines.sort(key=lambda r: r.get("updated_at", 0), reverse=True)
+    return _render(request, "routines.html", "routines",
+                   routines=all_routines, users=users_data, agents=agents_data)
+
+
+@app.post("/routines/{uid}/{routine_id}/transition", response_class=HTMLResponse)
+async def transition_routine_proxy(uid: str, routine_id: str, request: Request):
+    ct = request.headers.get("content-type", "")
+    if "application/json" in ct:
+        body = await request.json()
+    else:
+        form = await request.form()
+        body = dict(form)
+    _core(f"/users/{uid}/routines/{routine_id}/transition", method="POST", json=body)
+    return HTMLResponse("")
+
+
+@app.delete("/routines/{uid}/{routine_id}", response_class=HTMLResponse)
+def delete_routine_proxy(uid: str, routine_id: str):
+    _core(f"/users/{uid}/routines/{routine_id}", method="DELETE")
+    return HTMLResponse("")
+
+
 @app.get("/shared-state", response_class=HTMLResponse)
 def shared_state_page(request: Request):
     data = _core("/shared-state") or {}
@@ -907,6 +932,106 @@ def trace_detail(request: Request, conv_id: str, trace_id: str):
             return len(self._d)
 
     return _render(request, "trace_detail.html", "conversations",
+                   t=_Obj(t))
+
+
+# ── Proactive traces ───────────────────────────────────────────────────────────
+
+@app.get("/proactive/traces", response_class=HTMLResponse)
+def proactive_traces_page(request: Request):
+    _require_auth(request)
+    agent_ids   = _core("/proactive/traces") or []
+    proactive_status = _core("/proactive/status", timeout=3) or {}
+    agents_data = _core("/agents", timeout=10) or {}
+    return _render(request, "proactive_traces.html", "proactive-traces",
+                   agent_ids=agent_ids, proactive_status=proactive_status, agents=agents_data)
+
+
+@app.get("/proactive/traces/{agent_id}", response_class=HTMLResponse)
+def proactive_trace_list_page(request: Request, agent_id: str):
+    _require_auth(request)
+    traces = _core(f"/proactive/traces/{agent_id}") or []
+    agents_data = _core("/agents", timeout=10) or {}
+    agent = agents_data.get(agent_id, {})
+    return _render(request, "proactive_trace_list.html", "proactive-traces",
+                   traces=traces, agent_id=agent_id, agent=agent)
+
+
+@app.get("/proactive/traces/{agent_id}/{trace_id}", response_class=HTMLResponse)
+def proactive_trace_detail_page(request: Request, agent_id: str, trace_id: str):
+    _require_auth(request)
+    t = _core(f"/proactive/traces/{agent_id}/{trace_id}")
+    if not t:
+        return HTMLResponse("<p>Trace no encontrado</p>", status_code=404)
+
+    class _Obj:
+        def __init__(self, d):
+            if not isinstance(d, dict):
+                return
+            self._d = d
+            for k, v in d.items():
+                if isinstance(v, dict):
+                    setattr(self, k, _Obj(v))
+                elif isinstance(v, list):
+                    setattr(self, k, [_Obj(i) if isinstance(i, dict) else i for i in v])
+                else:
+                    setattr(self, k, v)
+        def get(self, k, default=None): return getattr(self, k, default)
+        def items(self): return self._d.items()
+        def __iter__(self): return iter(self._d)
+        def __len__(self): return len(self._d)
+
+    return _render(request, "proactive_trace_detail.html", "proactive-traces",
+                   t=_Obj(t))
+
+
+# ── Goal review traces ─────────────────────────────────────────────────────────
+
+@app.get("/goals/traces", response_class=HTMLResponse)
+def goal_traces_page(request: Request):
+    _require_auth(request)
+    goal_ids  = _core("/goals/traces") or []
+    all_goals = _core("/goals") or []
+    goals_by_short = {g.get("intent_id", "")[:8]: g for g in all_goals}
+    return _render(request, "goal_traces.html", "goals",
+                   goal_ids=goal_ids, goals_by_short=goals_by_short)
+
+
+@app.get("/goals/traces/{goal_id}", response_class=HTMLResponse)
+def goal_trace_list_page(request: Request, goal_id: str):
+    _require_auth(request)
+    traces    = _core(f"/goals/traces/{goal_id}") or []
+    all_goals = _core("/goals") or []
+    goal = next((g for g in all_goals if g.get("intent_id", "")[:8] == goal_id[:8]), {})
+    return _render(request, "goal_trace_list.html", "goals",
+                   traces=traces, goal_id=goal_id, goal=goal)
+
+
+@app.get("/goals/traces/{goal_id}/{trace_id}", response_class=HTMLResponse)
+def goal_trace_detail_page(request: Request, goal_id: str, trace_id: str):
+    _require_auth(request)
+    t = _core(f"/goals/traces/{goal_id}/{trace_id}")
+    if not t:
+        return HTMLResponse("<p>Trace no encontrado</p>", status_code=404)
+
+    class _Obj:
+        def __init__(self, d):
+            if not isinstance(d, dict):
+                return
+            self._d = d
+            for k, v in d.items():
+                if isinstance(v, dict):
+                    setattr(self, k, _Obj(v))
+                elif isinstance(v, list):
+                    setattr(self, k, [_Obj(i) if isinstance(i, dict) else i for i in v])
+                else:
+                    setattr(self, k, v)
+        def get(self, k, default=None): return getattr(self, k, default)
+        def items(self): return self._d.items()
+        def __iter__(self): return iter(self._d)
+        def __len__(self): return len(self._d)
+
+    return _render(request, "goal_trace_detail.html", "goals",
                    t=_Obj(t))
 
 

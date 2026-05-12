@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Traces — {{ goal_id }}{% endblock %}
+
+{% block content %}
+<div class="flex items-center gap-3 mb-6">
+  <a href="/goals/traces" class="text-gray-500 hover:text-gray-300 text-sm">← Traces de goals</a>
+  <span class="text-gray-700">/</span>
+  <span class="font-mono text-xs text-gray-400">{{ goal_id }}</span>
+  {% if goal %}
+  <span class="text-gray-600 text-xs">— {{ goal.get("title") or goal.get("description") or "" }}</span>
+  {% endif %}
+</div>
+
+{% if not traces %}
+<div class="bg-gray-900 border border-gray-800 rounded-xl p-12 text-center">
+  <p class="text-gray-600 text-sm">No hay traces para este goal.</p>
+</div>
+{% else %}
+<div class="space-y-2">
+  {% for tr in traces %}
+  <a href="/goals/traces/{{ goal_id }}/{{ tr.trace_id }}"
+     class="bg-gray-900 border border-gray-800 hover:border-gray-700 rounded-xl px-5 py-3.5 flex items-center gap-4 transition-colors">
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center gap-2 mb-1">
+        <span class="font-mono text-xs text-gray-500">{{ tr.trace_id }}</span>
+        {% if tr.get("error") %}
+        <span class="px-1.5 py-0.5 bg-red-900/30 text-red-400 rounded border border-red-800/50 text-xs">error</span>
+        {% elif tr.get("status_after") and tr.get("status_after") != tr.get("status_before") %}
+        <span class="px-1.5 py-0.5 bg-indigo-900/30 text-indigo-400 rounded border border-indigo-800/50 text-xs">
+          {{ tr.get("status_before") or "?" }} → {{ tr.status_after }}
+        </span>
+        {% endif %}
+      </div>
+      <div class="flex items-center gap-4 text-xs text-gray-500">
+        <span>{{ tr.get("ts") | datetimefmt }}</span>
+        <span>{{ tr.get("total_latency_ms", 0) }}ms</span>
+        {% set nsteps = tr.get("agent_steps") | length if tr.get("agent_steps") else 0 %}
+        <span>{{ nsteps }} paso{% if nsteps != 1 %}s{% endif %}</span>
+        {% if tr.get("user_id") %}
+        <span>{{ tr.user_id }}</span>
+        {% endif %}
+      </div>
+    </div>
+    {% if tr.get("note_added") %}
+    <p class="text-xs text-gray-500 italic max-w-xs truncate shrink">"{{ tr.note_added }}"</p>
+    {% endif %}
+    <span class="text-gray-600 text-sm shrink-0">›</span>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

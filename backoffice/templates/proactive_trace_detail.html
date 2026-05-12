@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+{% block title %}Trace proactivo {{ t.trace_id }}{% endblock %}
+
+{% block content %}
+<!-- Breadcrumb -->
+<div class="flex items-center gap-3 mb-6">
+  <a href="/proactive/traces" class="text-gray-500 hover:text-gray-300 text-sm">← Traces proactivos</a>
+  <span class="text-gray-700">/</span>
+  <a href="/proactive/traces/{{ t.agent_id }}" class="text-gray-500 hover:text-gray-300 text-sm">{{ t.agent_id }}</a>
+  <span class="text-gray-700">/</span>
+  <span class="font-mono text-xs text-gray-400">{{ t.trace_id }}</span>
+  <div class="ml-auto flex items-center gap-4">
+    <span class="font-mono text-sm text-gray-400">{{ (t.total_latency_ms / 1000) | round(1) }}s</span>
+    <span class="text-xs text-gray-600">{{ t.ts | datetimefmt }}</span>
+    {% set tb = t.get("triggered_by") or "scheduler" %}
+    {% if tb == "manual" %}
+    <span class="px-2 py-1 bg-blue-900/30 text-blue-400 rounded border border-blue-800/50 text-xs">manual</span>
+    {% elif tb == "run_for_user" %}
+    <span class="px-2 py-1 bg-indigo-900/30 text-indigo-400 rounded border border-indigo-800/50 text-xs">run-for-user</span>
+    {% else %}
+    <span class="px-2 py-1 bg-gray-800 text-gray-500 rounded border border-gray-700 text-xs">scheduler</span>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Summary bar -->
+<div class="grid grid-cols-4 gap-3 mb-6">
+  <div class="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 text-center">
+    <p class="text-2xl font-bold text-gray-100">{{ t.users | length }}</p>
+    <p class="text-xs text-gray-500 mt-0.5">usuarios</p>
+  </div>
+  <div class="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 text-center">
+    <p class="text-2xl font-bold text-teal-400">{{ t.total_created }}</p>
+    <p class="text-xs text-gray-500 mt-0.5">items creados</p>
+  </div>
+  <div class="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 text-center">
+    <p class="text-2xl font-bold text-yellow-600">{{ t.total_skipped }}</p>
+    <p class="text-xs text-gray-500 mt-0.5">omitidos</p>
+  </div>
+  <div class="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 text-center">
+    <p class="text-2xl font-bold text-gray-300">{{ t.total_latency_ms }}ms</p>
+    <p class="text-xs text-gray-500 mt-0.5">latencia total</p>
+  </div>
+</div>
+
+<!-- Per-user timeline -->
+{% for ur in t.users %}
+<div class="flex gap-3 mb-1">
+  <div class="flex flex-col items-center shrink-0">
+    <div class="w-8 h-8 rounded-full {% if ur.get('error') %}bg-red-950 border-2 border-red-700{% else %}bg-teal-950 border-2 border-teal-700{% endif %} flex items-center justify-center z-10 text-xs font-bold {% if ur.get('error') %}text-red-400{% else %}text-teal-400{% endif %}">
+      {{ loop.index }}
+    </div>
+    {% if not loop.last %}
+    <div class="w-px flex-1 bg-gray-800 mt-1 min-h-6"></div>
+    {% endif %}
+  </div>
+  <div class="flex-1 pb-4">
+    <button onclick="toggleSection('user{{ loop.index0 }}')"
+            class="w-full flex items-center gap-2 rounded-t-xl px-4 py-2.5 hover:border-gray-700 transition-colors text-left border
+                   {% if ur.get('error') %}bg-red-950/20 border-red-900/50{% else %}bg-gray-900 border-gray-800{% endif %}">
+      <span class="text-xs font-mono text-gray-500 uppercase">Usuario</span>
+      <span class="text-gray-700">→</span>
+      <span class="px-1.5 py-0.5 bg-teal-900/40 text-teal-300 rounded border border-teal-800/50 text-xs font-medium">{{ ur.user_id }}</span>
+      <span class="text-xs text-gray-600">{{ ur.get("duration_ms", 0) }}ms</span>
+      {% if ur.get("error") %}
+      <span class="px-1.5 py-0.5 bg-red-900/30 text-red-400 rounded border border-red-800/50 text-xs">error</span>
+      {% else %}
+      {% if ur.get("items_created", 0) > 0 %}
+      <span class="px-1.5 py-0.5 bg-teal-900/30 text-teal-400 rounded border border-teal-800/50 text-xs">+{{ ur.items_created }}</span>
+      {% endif %}
+      {% if ur.get("items_skipped", 0) > 0 %}
+      <span class="px-1.5 py-0.5 bg-yellow-900/20 text-yellow-600 rounded border border-yellow-900/40 text-xs">{{ ur.items_skipped }} omitidos</span>
+      {% endif %}
+      {% if ur.get("active_intents_count", 0) == 0 and ur.get("items_created", 0) == 0 %}
+      <span class="px-1.5 py-0.5 bg-gray-800 text-gray-500 rounded border border-gray-700 text-xs">sin resultado</span>
+      {% endif %}
+      {% endif %}
+      <span class="ml-auto text-gray-600 text-xs" id="user{{ loop.index0 }}-toggle-icon">▾</span>
+    </button>
+
+    <div id="section-user{{ loop.index0 }}" class="bg-gray-900/50 border border-t-0 border-gray-800 rounded-b-xl px-4 py-4">
+      <div class="space-y-3 pl-2 border-l border-gray-800">
+
+        <!-- Error -->
+        {% if ur.get("error") %}
+        <div class="relative pl-5">
+          <div class="absolute left-[-1px] top-2 w-3 h-px bg-gray-700"></div>
+          <div class="absolute left-[-4px] top-1.5 w-2 h-2 rounded-full bg-red-900 border border-red-700"></div>
+          <p class="text-xs text-red-400 font-medium mb-1">Error</p>
+          <pre class="text-xs text-red-300 bg-red-950/30 rounded p-3 overflow-x-auto whitespace-pre-wrap font-mono">{{ ur.error }}</pre>
+        </div>
+        {% endif %}
+
+        <!-- Active intents context -->
+        <div class="relative pl-5">
+          <div class="absolute left-[-1px] top-2 w-3 h-px bg-gray-700"></div>
+          <div class="absolute left-[-4px] top-1.5 w-2 h-2 rounded-full bg-gray-700 border border-gray-600"></div>
+          <p class="text-xs text-gray-500 mb-0.5">Contexto: {{ ur.get("active_intents_count", 0) }} intents activos</p>
+          {% if ur.get("active_intents") and ur.active_intents | length > 0 %}
+          <details class="group">
+            <summary class="text-xs text-gray-700 cursor-pointer hover:text-gray-500 select-none">Ver intents ▸</summary>
+            <div class="mt-2 space-y-1">
+              {% for intent in ur.active_intents %}
+              <div class="text-xs bg-gray-950 rounded px-3 py-1.5 flex items-center gap-2">
+                <span class="text-gray-400">{{ intent.get("title") or intent.get("type") or "intent" }}</span>
+                {% if intent.get("status") %}
+                <span class="text-gray-600">{{ intent.status }}</span>
+                {% endif %}
+              </div>
+              {% endfor %}
+            </div>
+          </details>
+          {% endif %}
+        </div>
+
+        <!-- API calls -->
+        {% if ur.get("api_calls") and ur.api_calls | length > 0 %}
+        {% for api in ur.api_calls %}
+        {% set is_error = api.get("response_status") == 0 or (api.get("response_status") and api.response_status >= 400) %}
+        <div class="relative pl-5">
+          <div class="absolute left-[-1px] top-2 w-3 h-px bg-gray-700"></div>
+          <div class="absolute left-[-4px] top-1.5 w-2 h-2 rounded-full {% if is_error %}bg-red-900 border-red-700{% else %}bg-cyan-900 border-cyan-700{% endif %} border"></div>
+          <div class="bg-gray-950 rounded-lg px-4 py-3 border {% if is_error %}border-red-900/40{% else %}border-gray-800/50{% endif %}">
+            <div class="flex items-center gap-2 text-xs mb-2">
+              <span class="text-cyan-400 font-mono">{{ api.get("service") }}</span>
+              <span class="text-gray-600">{{ api.get("method") }}</span>
+              <span class="text-gray-600">{{ api.get("latency_ms") }}ms</span>
+              {% set rs = api.get("response_status") %}
+              {% if rs == 0 %}
+              <span class="px-1.5 py-0.5 bg-red-900/30 text-red-400 rounded border border-red-800/50">excepción</span>
+              {% elif rs == -1 %}
+              <span class="px-1.5 py-0.5 bg-yellow-900/20 text-yellow-600 rounded border border-yellow-900/40">caché</span>
+              {% elif rs and rs >= 400 %}
+              <span class="px-1.5 py-0.5 bg-red-900/30 text-red-400 rounded border border-red-800/50">HTTP {{ rs }}</span>
+              {% elif rs %}
+              <span class="px-1.5 py-0.5 bg-emerald-900/30 text-emerald-400 rounded border border-emerald-800/50">HTTP {{ rs }}</span>
+              {% endif %}
+            </div>
+            {% if api.get("response_summary") %}
+            <div class="flex flex-wrap gap-3 text-xs mb-2">
+              {% for k, v in api.response_summary.items() if k != 'error' and k != 'cause' %}
+              <span><span class="text-gray-600">{{ k }}:</span><span class="text-gray-300 ml-1">{{ v }}</span></span>
+              {% endfor %}
+            </div>
+            {% endif %}
+            {% if api.get("request_params") %}
+            <details class="group">
+              <summary class="text-xs text-gray-700 cursor-pointer hover:text-gray-500 select-none">Request params ▸</summary>
+              <pre class="mt-2 text-xs text-gray-500 bg-gray-900 rounded p-3 overflow-x-auto">{{ api.request_params | tojson(indent=2) }}</pre>
+            </details>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        <!-- LLM calls -->
+        {% if ur.get("agent_llm_calls") and ur.agent_llm_calls | length > 0 %}
+        {% for llm in ur.agent_llm_calls %}
+        <div class="relative pl-5">
+          <div class="absolute left-[-1px] top-2 w-3 h-px bg-gray-700"></div>
+          <div class="absolute left-[-4px] top-1.5 w-2 h-2 rounded-full bg-orange-900 border border-orange-700"></div>
+          <p class="text-xs text-orange-400 font-medium mb-2">LLM del agente</p>
+          <div class="bg-gray-950 rounded-lg px-4 py-3 text-xs">
+            <div class="flex items-center gap-2 text-gray-500 mb-2">
+              <span class="text-orange-400">{{ llm.get("source") }}</span>
+              <span>{{ llm.get("model") }}</span>
+              <span>{{ llm.get("latency_ms") }}ms</span>
+            </div>
+            <details class="group">
+              <summary class="text-gray-600 cursor-pointer hover:text-gray-400 select-none">System prompt ▸</summary>
+              <pre class="mt-2 text-gray-500 bg-gray-900 rounded p-3 overflow-x-auto whitespace-pre-wrap max-h-48">{{ (llm.get("system") or "")[:2000] }}</pre>
+            </details>
+            <details class="group mt-1">
+              <summary class="text-gray-600 cursor-pointer hover:text-gray-400 select-none">Prompt ▸</summary>
+              <pre class="mt-2 text-gray-500 bg-gray-900 rounded p-3 overflow-x-auto whitespace-pre-wrap">{{ llm.get("prompt") }}</pre>
+            </details>
+            <details class="group mt-1">
+              <summary class="text-gray-600 cursor-pointer hover:text-gray-400 select-none">Respuesta raw ▸</summary>
+              <pre class="mt-2 text-gray-300 bg-gray-900 rounded p-3 overflow-x-auto whitespace-pre-wrap">{{ llm.get("raw_response") }}</pre>
+            </details>
+          </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        <!-- Raw result -->
+        {% if ur.get("raw_result") %}
+        <div class="relative pl-5">
+          <div class="absolute left-[-1px] top-2 w-3 h-px bg-gray-700"></div>
+          <div class="absolute left-[-4px] top-1.5 w-2 h-2 rounded-full {% if ur.get('items_created', 0) > 0 %}bg-emerald-900 border-emerald-700{% else %}bg-gray-700 border-gray-600{% endif %} border"></div>
+          <p class="text-xs text-gray-500 mb-1">Resultado del agente ({{ ur.raw_result | length }} items)</p>
+          {% if ur.raw_result | length > 0 %}
+          <div class="space-y-1">
+            {% for item in ur.raw_result %}
+            <div class="text-xs bg-gray-950 rounded px-3 py-2 border border-gray-800/50">
+              <div class="flex items-center gap-2 flex-wrap">
+                {% if item.get("title") %}
+                <span class="text-gray-200 font-medium">{{ item.title }}</span>
+                {% endif %}
+                {% if item.get("type") %}
+                <span class="px-1.5 py-0.5 bg-gray-800 text-gray-400 rounded border border-gray-700">{{ item.type }}</span>
+                {% endif %}
+                {% if item.get("priority") %}
+                <span class="text-gray-500">prioridad: {{ item.priority }}</span>
+                {% endif %}
+              </div>
+              {% if item.get("description") %}
+              <p class="text-gray-500 mt-1 text-xs">{{ item.description[:200] }}{% if item.description | length > 200 %}...{% endif %}</p>
+              {% endif %}
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <p class="text-xs text-gray-700 italic">Sin items retornados</p>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Skipped details -->
+        {% if ur.get("skipped_details") and ur.skipped_details | length > 0 %}
+        <div class="relative pl-5">
+          <div class="absolute left-[-1px] top-2 w-3 h-px bg-gray-700"></div>
+          <div class="absolute left-[-4px] top-1.5 w-2 h-2 rounded-full bg-yellow-900 border border-yellow-700"></div>
+          <p class="text-xs text-yellow-600 font-medium mb-1">Items omitidos ({{ ur.skipped_details | length }})</p>
+          <div class="space-y-1">
+            {% for detail in ur.skipped_details %}
+            <p class="text-xs text-gray-500 bg-gray-950 rounded px-3 py-1.5">{{ detail }}</p>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
+      </div>
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+<script>
+function toggleSection(id) {
+  const el = document.getElementById('section-' + id);
+  if (!el) return;
+  el.classList.toggle('hidden');
+}
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('[id^="section-"]').forEach(el => el.classList.remove('hidden'));
+});
+</script>
+{% endblock %}

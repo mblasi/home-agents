@@ -1,0 +1,344 @@
+{% extends "base.html" %}
+{% block title %}Revisión goal {{ t.trace_id }}{% endblock %}
+
+{% block content %}
+<!-- Breadcrumb -->
+<div class="flex items-center gap-3 mb-6">
+  <a href="/goals/traces" class="text-gray-500 hover:text-gray-300 text-sm">← Traces de goals</a>
+  <span class="text-gray-700">/</span>
+  <a href="/goals/traces/{{ t.goal_id[:8] }}" class="text-gray-500 hover:text-gray-300 text-sm">{{ t.goal_id[:8] }}</a>
+  <span class="text-gray-700">/</span>
+  <span class="font-mono text-xs text-gray-400">{{ t.trace_id }}</span>
+  <div class="ml-auto flex items-center gap-4">
+    <span class="font-mono text-sm text-gray-400">{{ (t.total_latency_ms / 1000) | round(1) }}s</span>
+    <span class="text-xs text-gray-600">{{ t.ts | datetimefmt }}</span>
+  </div>
+</div>
+
+<!-- Goal header -->
+<div class="bg-gray-900 border border-gray-800 rounded-xl px-5 py-4 mb-6">
+  <div class="flex items-start justify-between gap-4">
+    <div>
+      <p class="text-sm font-medium text-gray-100">{{ t.goal_title or "Goal" }}</p>
+      <div class="flex items-center gap-3 mt-1 text-xs text-gray-500">
+        <span class="font-mono">{{ t.goal_id }}</span>
+        <span>{{ t.user_id }}</span>
+      </div>
+    </div>
+    {% if t.get("status_before") or t.get("status_after") %}
+    <div class="text-xs text-right shrink-0">
+      {% if t.get("status_before") %}
+      <span class="px-2 py-1 bg-gray-800 text-gray-400 rounded border border-gray-700">{{ t.status_before }}</span>
+      {% endif %}
+      {% if t.get("status_after") and t.get("status_after") != t.get("status_before") %}
+      <span class="text-gray-600 mx-1">→</span>
+      <span class="px-2 py-1 bg-indigo-900/30 text-indigo-400 rounded border border-indigo-800/50">{{ t.status_after }}</span>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+  {% if t.get("note_added") %}
+  <p class="mt-3 pt-3 border-t border-gray-800 text-xs text-gray-400 italic">"{{ t.note_added }}"</p>
+  {% endif %}
+  {% if t.get("error") %}
+  <div class="mt-3 pt-3 border-t border-gray-800">
+    <p class="text-xs text-red-400 font-medium mb-1">Error en la revisión</p>
+    <pre class="text-xs text-red-300 bg-red-950/30 rounded p-2 overflow-x-auto whitespace-pre-wrap font-mono">{{ t.error }}</pre>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Timeline -->
+<div class="relative">
+
+  {# ── 1. Planning LLM ────────────────────────────────────────────────────── #}
+  {% if t.get("planning_llm_call") %}
+  {% set llm = t.planning_llm_call %}
+  <div class="flex gap-3 mb-1">
+    <div class="flex flex-col items-center shrink-0">
+      <div class="w-8 h-8 rounded-full bg-indigo-950 border-2 border-indigo-600 flex items-center justify-center z-10">
+        <svg class="w-3.5 h-3.5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+        </svg>
+      </div>
+      <div class="w-px flex-1 bg-gray-800 mt-1 min-h-6"></div>
+    </div>
+    <div class="flex-1 pb-4">
+      <button onclick="toggleSection('planning')"
+              class="w-full flex items-center gap-2 bg-gray-900 border border-gray-800 rounded-t-xl px-4 py-2.5 hover:border-gray-700 transition-colors text-left">
+        <span class="text-indigo-400 font-mono text-xs font-bold">PLANNING</span>
+        <span class="text-xs text-gray-600">{{ llm.get("latency_ms") }}ms</span>
+        <span class="text-xs text-gray-600">{{ llm.get("model") }}</span>
+        <span class="ml-auto text-gray-600 text-xs" id="planning-toggle-icon">▾</span>
+      </button>
+      <div id="section-planning" class="bg-gray-900/50 border border-t-0 border-gray-800 rounded-b-xl px-4 py-4">
+        <div class="space-y-3 pl-2 border-l border-gray-800">
+          <div class="relative pl-5">
+            <div class="absolute left-[-1px] top-2 w-3 h-px bg-gray-700"></div>
+            <div class="absolute left-[-4px] top-1.5 w-2 h-2 rounded-full bg-indigo-900 border border-indigo-700"></div>
+            <div class="bg-gray-950 rounded-lg px-4 py-3 text-xs">
+              <div class="flex items-center gap-2 text-gray-500 mb-2">
+                <span class="text-indigo-400">{{ llm.get("source") }}</span>
+                <span>{{ llm.get("model") }}</span>
+                <span>{{ llm.get("latency_ms") }}ms</span>
+              </div>
+              <details class="group">
+                <summary class="text-gray-600 cursor-pointer hover:text-gray-400 select-none">System prompt ▸</summary>
+                <pre class="mt-2 text-gray-500 bg-gray-900 rounded p-3 overflow-x-auto whitespace-pre-wrap max-h-48">{{ (llm.get("system") or "")[:2000] }}</pre>
+              </details>
+              <details class="group mt-1">
+                <summary class="text-gray-600 cursor-pointer hover:text-gray-400 select-none">Prompt ▸</summary>
+                <pre class="mt-2 text-gray-500 bg-gray-900 rounded p-3 overflow-x-auto whitespace-pre-wrap">{{ llm.get("prompt") }}</pre>
+              </details>
+              <details class="group mt-1">
+                <summary class="text-gray-600 cursor-pointer hover:text-gray-400 select-none">Respuesta raw ▸</summary>
+                <pre class="mt-2 text-gray-300 bg-gray-900 rounded p-3 overflow-x-auto whitespace-pre-wrap">{{ llm.get("raw_response") }}</pre>
+              </details>
+            </div>
+          </div>
+          {% if t.get("plan_steps") and t.plan_steps | length > 0 %}
+          <div class="relative pl-5">
+            <div class="absolute left-[-1px] top-2 w-3 h-px bg-gray-700"></div>
+            <div class="absolute left-[-4px] top-1.5 w-2 h-2 rounded-full bg-indigo-900 border border-indigo-700"></div>
+            <p class="text-xs text-indigo-300 font-medium mb-2">Plan generado ({{ t.plan_steps | length }} pasos)</p>
+            <div class="space-y-1">
+              {% for step in t.plan_steps %}
+              <div class="flex items-center gap-2 text-xs bg-gray-950 rounded px-3 py-1.5">
+                <span class="text-gray-600 font-mono w-4 text-right">{{ loop.index0 }}</span>
+                <span class="text-gray-700">→</span>
+                <span class="px-1.5 py-0.5 bg-indigo-900/40 text-indigo-300 rounded border border-indigo-800/50">{{ step.get("agent") }}</span>
+                {% if step.get("query") %}<span class="text-gray-400 italic">"{{ step.query }}"</span>{% endif %}
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {# ── 2..N. Agent steps ────────────────────────────────────────────────── #}
+  {% for step in t.agent_steps %}
+  <div class="flex gap-3 mb-1">
+    <div class="flex flex-col items-center shrink-0">
+      <div class="w-8 h-8 rounded-full {% if step.get('error') %}bg-red-950 border-2 border-red-700{% else %}bg-teal-950 border-2 border-teal-700{% endif %} flex items-center justify-center z-10 text-xs font-bold {% if step.get('error') %}text-red-400{% else %}text-teal-400{% endif %}">
+        {{ loop.index }}
+      </div>
+      {% if not loop.last or t.get("synthesis_llm_call") or t.get("note_added") %}
+      <div class="w-px flex-1 bg-gray-800 mt-1 min-h-6"></div>
+      {% endif %}
+    </div>
+    <div class="flex-1 pb-4">
+      <button onclick="toggleSection('step{{ loop.index0 }}')"
+              class="w-full flex items-center gap-2 rounded-t-xl px-4 py-2.5 hover:border-gray-700 transition-colors text-left border
+                     {% if step.get('error') %}bg-red-950/20 border-red-900/50{% else %}bg-gray-900 border-gray-800{% endif %}">
+        <span class="text-xs font-mono text-gray-500 uppercase">Paso {{ loop.index }}</span>
+        <span class="text-gray-700">→</span>
+        <span class="px-1.5 py-0.5 bg-teal-900/40 text-teal-300 rounded border border-teal-800/50 text-xs font-medium">{{ step.agent_id }}</span>
+        <span class="text-xs text-gray-600">{{ step.get("duration_ms") }}ms</span>
+        {% if step.get("error") %}
+        <span class="px-1.5 py-0.5 bg-red-900/30 text-red-400 rounded border border-red-800/50 text-xs">error</span>
+        {% endif %}
+        <span class="ml-auto text-gray-600 text-xs" id="step{{ loop.index0 }}-toggle-icon">▾</span>
+      </button>
+
+      <div id="section-step{{ loop.index0 }}" class="bg-gray-900/50 border border-t-0 border-gray-800 rounded-b-xl px-4 py-4">
+        <div class="space-y-3 pl-2 border-l border-gray-800">
+
+          <!-- Query -->
+          <div class="relative pl-5">
+            <div class="absolute left-[-1px] top-2 w-3 h-px bg-gray-700"></div>
+            <div class="absolute left-[-4px] top-1.5 w-2 h-2 rounded-full bg-gray-700 border border-gray-600"></div>
+            <p class="text-xs text-gray-500 mb-0.5">Query enviada al agente</p>
+            <p class="text-sm text-gray-300 italic">"{{ step.query }}"</p>
+          </div>
+
+          <!-- Error -->
+          {% if step.get("error") %}
+          <div class="relative pl-5">
+            <div class="absolute left-[-1px] top-2 w-3 h-px bg-gray-700"></div>
+            <div class="absolute left-[-4px] top-1.5 w-2 h-2 rounded-full bg-red-900 border border-red-700"></div>
+            <p class="text-xs text-red-400 font-medium mb-1">Error</p>
+            <pre class="text-xs text-red-300 bg-red-950/30 rounded p-3 overflow-x-auto whitespace-pre-wrap font-mono">{{ step.error }}</pre>
+          </div>
+          {% endif %}
+
+          <!-- API calls -->
+          {% if step.get("api_calls") and step.api_calls | length > 0 %}
+          {% for api in step.api_calls %}
+          {% set is_error = api.get("response_status") == 0 or (api.get("response_status") and api.response_status >= 400) %}
+          <div class="relative pl-5">
+            <div class="absolute left-[-1px] top-2 w-3 h-px bg-gray-700"></div>
+            <div class="absolute left-[-4px] top-1.5 w-2 h-2 rounded-full {% if is_error %}bg-red-900 border-red-700{% else %}bg-cyan-900 border-cyan-700{% endif %} border"></div>
+            <div class="bg-gray-950 rounded-lg px-4 py-3 border {% if is_error %}border-red-900/40{% else %}border-gray-800/50{% endif %}">
+              <div class="flex items-center gap-2 text-xs mb-2">
+                <span class="text-cyan-400 font-mono">{{ api.get("service") }}</span>
+                <span class="text-gray-600">{{ api.get("method") }}</span>
+                <span class="text-gray-600">{{ api.get("latency_ms") }}ms</span>
+                {% set rs = api.get("response_status") %}
+                {% if rs == 0 %}
+                <span class="px-1.5 py-0.5 bg-red-900/30 text-red-400 rounded border border-red-800/50">excepción</span>
+                {% elif rs == -1 %}
+                <span class="px-1.5 py-0.5 bg-yellow-900/20 text-yellow-600 rounded border border-yellow-900/40">caché</span>
+                {% elif rs and rs >= 400 %}
+                <span class="px-1.5 py-0.5 bg-red-900/30 text-red-400 rounded border border-red-800/50">HTTP {{ rs }}</span>
+                {% elif rs %}
+                <span class="px-1.5 py-0.5 bg-emerald-900/30 text-emerald-400 rounded border border-emerald-800/50">HTTP {{ rs }}</span>
+                {% endif %}
+              </div>
+              {% if api.get("response_summary") %}
+              <div class="flex flex-wrap gap-3 text-xs mb-2">
+                {% for k, v in api.response_summary.items() if k != 'error' and k != 'cause' %}
+                <span><span class="text-gray-600">{{ k }}:</span><span class="text-gray-300 ml-1">{{ v }}</span></span>
+                {% endfor %}
+              </div>
+              {% endif %}
+              {% if api.get("request_params") %}
+              <details class="group">
+                <summary class="text-xs text-gray-700 cursor-pointer hover:text-gray-500 select-none">Request params ▸</summary>
+                <pre class="mt-2 text-xs text-gray-500 bg-gray-900 rounded p-3 overflow-x-auto">{{ api.request_params | tojson(indent=2) }}</pre>
+              </details>
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+          {% endif %}
+
+          <!-- LLM calls -->
+          {% if step.get("agent_llm_calls") and step.agent_llm_calls | length > 0 %}
+          {% for llm in step.agent_llm_calls %}
+          <div class="relative pl-5">
+            <div class="absolute left-[-1px] top-2 w-3 h-px bg-gray-700"></div>
+            <div class="absolute left-[-4px] top-1.5 w-2 h-2 rounded-full bg-orange-900 border border-orange-700"></div>
+            <p class="text-xs text-orange-400 font-medium mb-2">LLM del agente</p>
+            <div class="bg-gray-950 rounded-lg px-4 py-3 text-xs">
+              <div class="flex items-center gap-2 text-gray-500 mb-2">
+                <span class="text-orange-400">{{ llm.get("source") }}</span>
+                <span>{{ llm.get("model") }}</span>
+                <span>{{ llm.get("latency_ms") }}ms</span>
+              </div>
+              <details class="group">
+                <summary class="text-gray-600 cursor-pointer hover:text-gray-400 select-none">System prompt ▸</summary>
+                <pre class="mt-2 text-gray-500 bg-gray-900 rounded p-3 overflow-x-auto whitespace-pre-wrap max-h-48">{{ (llm.get("system") or "")[:2000] }}</pre>
+              </details>
+              <details class="group mt-1">
+                <summary class="text-gray-600 cursor-pointer hover:text-gray-400 select-none">Prompt ▸</summary>
+                <pre class="mt-2 text-gray-500 bg-gray-900 rounded p-3 overflow-x-auto whitespace-pre-wrap">{{ llm.get("prompt") }}</pre>
+              </details>
+              <details class="group mt-1">
+                <summary class="text-gray-600 cursor-pointer hover:text-gray-400 select-none">Respuesta raw ▸</summary>
+                <pre class="mt-2 text-gray-300 bg-gray-900 rounded p-3 overflow-x-auto whitespace-pre-wrap">{{ llm.get("raw_response") }}</pre>
+              </details>
+            </div>
+          </div>
+          {% endfor %}
+          {% endif %}
+
+          <!-- Response -->
+          <div class="relative pl-5">
+            <div class="absolute left-[-1px] top-2 w-3 h-px bg-gray-700"></div>
+            <div class="absolute left-[-4px] top-1.5 w-2 h-2 rounded-full {% if step.get('error') %}bg-red-900 border-red-700{% else %}bg-emerald-900 border-emerald-700{% endif %} border"></div>
+            <p class="text-xs text-gray-500 mb-0.5">Respuesta del agente</p>
+            {% if step.get("response") %}
+            <p class="text-sm text-gray-200">{{ step.response }}</p>
+            {% else %}
+            <p class="text-xs text-gray-700 italic">Sin respuesta</p>
+            {% endif %}
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+
+  {# ── Synthesis LLM ────────────────────────────────────────────────────── #}
+  {% if t.get("synthesis_llm_call") %}
+  {% set llm = t.synthesis_llm_call %}
+  <div class="flex gap-3 mb-1">
+    <div class="flex flex-col items-center shrink-0">
+      <div class="w-8 h-8 rounded-full bg-purple-950 border-2 border-purple-700 flex items-center justify-center z-10">
+        <svg class="w-3.5 h-3.5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h8m-8 6h16"/>
+        </svg>
+      </div>
+      {% if t.get("note_added") %}
+      <div class="w-px flex-1 bg-gray-800 mt-1 min-h-6"></div>
+      {% endif %}
+    </div>
+    <div class="flex-1 pb-4">
+      <button onclick="toggleSection('synthesis')"
+              class="w-full flex items-center gap-2 bg-gray-900 border border-gray-800 rounded-t-xl px-4 py-2.5 hover:border-gray-700 transition-colors text-left">
+        <span class="text-purple-400 font-mono text-xs font-bold">SÍNTESIS</span>
+        <span class="text-xs text-gray-600">{{ llm.get("latency_ms") }}ms</span>
+        <span class="text-xs text-gray-600">{{ llm.get("model") }}</span>
+        <span class="ml-auto text-gray-600 text-xs">▾</span>
+      </button>
+      <div id="section-synthesis" class="bg-gray-900/50 border border-t-0 border-gray-800 rounded-b-xl px-4 py-4 space-y-3">
+        <div class="pl-2 border-l border-gray-800 space-y-3">
+          <div class="relative pl-5">
+            <div class="absolute left-[-1px] top-2 w-3 h-px bg-gray-700"></div>
+            <div class="absolute left-[-4px] top-1.5 w-2 h-2 rounded-full bg-purple-900 border border-purple-700"></div>
+            <div class="bg-gray-950 rounded-lg px-4 py-3 text-xs">
+              <div class="flex items-center gap-2 text-gray-500 mb-2">
+                <span class="text-purple-400">{{ llm.get("source") }}</span>
+                <span>{{ llm.get("model") }}</span>
+                <span>{{ llm.get("latency_ms") }}ms</span>
+              </div>
+              <details class="group">
+                <summary class="text-gray-600 cursor-pointer hover:text-gray-400 select-none">System prompt ▸</summary>
+                <pre class="mt-2 text-gray-500 bg-gray-900 rounded p-3 overflow-x-auto whitespace-pre-wrap max-h-48">{{ (llm.get("system") or "")[:2000] }}</pre>
+              </details>
+              <details class="group mt-1">
+                <summary class="text-gray-600 cursor-pointer hover:text-gray-400 select-none">Prompt ▸</summary>
+                <pre class="mt-2 text-gray-500 bg-gray-900 rounded p-3 overflow-x-auto whitespace-pre-wrap">{{ llm.get("prompt") }}</pre>
+              </details>
+              <details class="group mt-1">
+                <summary class="text-gray-600 cursor-pointer hover:text-gray-400 select-none">Respuesta raw ▸</summary>
+                <pre class="mt-2 text-gray-300 bg-gray-900 rounded p-3 overflow-x-auto whitespace-pre-wrap">{{ llm.get("raw_response") }}</pre>
+              </details>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {# ── Note / outcome ───────────────────────────────────────────────────── #}
+  {% if t.get("note_added") %}
+  <div class="flex gap-3">
+    <div class="flex flex-col items-center shrink-0">
+      <div class="w-8 h-8 rounded-full bg-emerald-950 border-2 border-emerald-600 flex items-center justify-center z-10">
+        <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+      </div>
+    </div>
+    <div class="flex-1">
+      <div class="bg-emerald-950/20 border border-emerald-900/40 rounded-xl p-4">
+        <p class="text-xs text-emerald-400 uppercase tracking-wider mb-2 font-medium">Nota agregada al goal</p>
+        <p class="text-sm text-gray-200">{{ t.note_added }}</p>
+        {% if t.get("status_after") and t.get("status_after") != t.get("status_before") %}
+        <p class="text-xs text-gray-500 mt-2">Estado: <span class="text-indigo-400">{{ t.status_after }}</span></p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+<script>
+function toggleSection(id) {
+  const el = document.getElementById('section-' + id);
+  if (!el) return;
+  el.classList.toggle('hidden');
+}
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('[id^="section-"]').forEach(el => el.classList.remove('hidden'));
+});
+</script>
+{% endblock %}

@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Traces proactivos{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <div>
+    <h1 class="text-xl font-bold text-gray-100">Traces proactivos</h1>
+    <p class="text-xs text-gray-500 mt-0.5">Historial de ejecuciones periódicas por agente</p>
+  </div>
+</div>
+
+{% if not agent_ids %}
+<div class="bg-gray-900 border border-gray-800 rounded-xl p-12 text-center">
+  <p class="text-gray-600 text-sm">No hay traces generados todavía.</p>
+  <p class="text-gray-700 text-xs mt-1">Los traces se generan automáticamente cuando los agentes ejecutan su ciclo proactivo.</p>
+</div>
+{% else %}
+<div class="grid gap-3">
+  {% for aid in agent_ids %}
+  {% set ag = agents.get(aid, {}) %}
+  {% set status = proactive_status.get(aid, {}) %}
+  <a href="/proactive/traces/{{ aid }}"
+     class="bg-gray-900 border border-gray-800 hover:border-gray-700 rounded-xl px-5 py-4 flex items-center gap-4 transition-colors">
+    <div class="w-10 h-10 rounded-full bg-teal-950 border-2 border-teal-700 flex items-center justify-center shrink-0 text-teal-400 font-mono text-sm font-bold">
+      {{ aid[0] | upper }}
+    </div>
+    <div class="flex-1 min-w-0">
+      <p class="font-medium text-gray-100">{{ ag.get("display_name") or aid }}</p>
+      <p class="text-xs text-gray-500 font-mono">{{ aid }}</p>
+    </div>
+    {% if status %}
+    <div class="text-right text-xs text-gray-500 shrink-0">
+      {% if status.get("last_run") %}
+      <p>Última ejecución</p>
+      <p class="text-gray-400">{{ status.last_run }}</p>
+      {% endif %}
+      {% if status.get("total_created") is not none %}
+      <p class="mt-0.5 text-teal-500">{{ status.total_created }} items creados</p>
+      {% endif %}
+    </div>
+    {% endif %}
+    <span class="text-gray-600 text-sm shrink-0">›</span>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}
