@@ -522,13 +522,15 @@ def agent_edit_page(request: Request, agent_id: str, connected: str = "", oauth_
                 uid: _oauth_status(svc, uid) for uid in users
             }
 
+    all_agents = _core("/agents", timeout=10) or {}
     return _render(request, "agent_edit.html", "agents",
                    agent=agent, agent_id=agent_id, error="",
                    role_perms=role_perms, roles=_ROLES_AGENTS,
                    llm_models=_get_llm_models(),
                    users=users, oauth_statuses=oauth_statuses,
                    just_connected=connected, oauth_error=oauth_error,
-                   just_saved=saved, oauth_app_url=OAUTH_APP_URL)
+                   just_saved=saved, oauth_app_url=OAUTH_APP_URL,
+                   all_agents=all_agents)
 
 
 @app.post("/agents/{agent_id}/edit")
@@ -587,6 +589,19 @@ async def agent_edit_submit(request: Request, agent_id: str):
                       json={"schema": schema})
         except Exception:
             pass
+
+    # Shared state prefix de este agente
+    ssp = str(form.get("shared_state_prefix", "")).strip() or None
+    _core(f"/agents/{agent_id}/shared-state-prefix", method="PATCH",
+          json={"shared_state_prefix": ssp})
+
+    # Afinidades: reconstruir la lista desde los checkboxes afinity_*
+    all_agents_data = _core("/agents", timeout=10) or {}
+    affinities = [
+        aid for aid in all_agents_data
+        if aid != agent_id and form.get(f"affinity_{aid}")
+    ]
+    _core(f"/agents/{agent_id}/affinities", method="PUT", json={"affinities": affinities})
 
     # RBAC: actualizar roles según checkboxes
     role_perms_current = _core("/rbac/roles") or {}

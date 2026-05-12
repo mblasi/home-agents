@@ -122,26 +122,7 @@
     </div>
   </div>
 
-  <!-- Sección 3: Keywords -->
-  <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-5">
-    <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-1">Keywords del dispatcher</h2>
-    <p class="text-xs text-gray-600 mb-3">
-      Una keyword por línea. El dispatcher de reglas usa estas palabras como fallback rápido
-      cuando el coordinador LLM no está disponible.
-    </p>
-    <textarea
-      name="keywords"
-      rows="10"
-      class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 font-mono
-             focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 resize-y"
-      placeholder="una keyword por línea">{{ (agent.keywords or []) | join('\n') }}</textarea>
-    <p class="mt-1 text-xs text-gray-600">
-      {{ (agent.keywords or []) | length }} keywords actuales.
-      Los cambios de keywords aplican al reiniciar el core.
-    </p>
-  </div>
-
-  <!-- Sección 4: Backends -->
+  <!-- Sección 3: Backends -->
   {% if agent.backends %}
   <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-5">
     <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Backends</h2>
@@ -393,7 +374,56 @@
   </div>
   {% endif %}
 
-  <!-- Sección 7: Acceso por rol -->
+  <!-- Sección 7: Afinidades entre agentes -->
+  <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-5">
+    <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-1">Afinidades entre agentes</h2>
+    <p class="text-xs text-gray-600 mb-4">
+      Los agentes afines comparten contexto durante el chequeo proactivo: si el agente afín publica
+      datos en su <code class="text-gray-500">shared_state_prefix</code>, el LLM de este agente
+      los recibe automáticamente al hacer su revisión periódica.
+    </p>
+
+    <!-- Shared state prefix de este agente -->
+    <div class="mb-4">
+      <label class="block text-xs font-medium text-gray-400 mb-1">
+        Namespace de SharedState que este agente publica
+        <span class="text-gray-600 font-normal ml-1">(shared_state_prefix)</span>
+      </label>
+      <input type="text" name="shared_state_prefix"
+             value="{{ agent.get('shared_state_prefix') or '' }}"
+             placeholder="ej: weather, calendar, maps — vacío si no publica nada"
+             class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 font-mono
+                    focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500">
+      <p class="mt-0.5 text-xs text-gray-600">
+        Los agentes que tengan afinidad con este usarán este prefix para leer sus datos de SharedState.
+      </p>
+    </div>
+
+    <!-- Agentes afines (multi-select checkboxes) -->
+    <div>
+      <label class="block text-xs font-medium text-gray-400 mb-2">Agentes con los que tiene afinidad</label>
+      {% set current_affinities = agent.get('affinities') or [] %}
+      {% if all_agents %}
+      <div class="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-1">
+        {% for aid, ainfo in all_agents.items() if aid != agent_id %}
+        <label class="flex items-center gap-2 px-3 py-2 bg-gray-800/50 rounded-lg cursor-pointer hover:bg-gray-800 transition-colors">
+          <input type="checkbox" name="affinity_{{ aid }}" value="1"
+                 {% if aid in current_affinities %}checked{% endif %}
+                 class="rounded border-gray-700 bg-gray-800 text-indigo-500 focus:ring-indigo-500">
+          <span class="text-xs text-gray-300">{{ ainfo.get('icon', '') }} {{ ainfo.get('name', aid) }}</span>
+          {% if ainfo.get('shared_state_prefix') %}
+          <span class="ml-auto text-xs text-gray-600 font-mono">{{ ainfo.shared_state_prefix }}.*</span>
+          {% endif %}
+        </label>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-xs text-gray-600">No hay otros agentes disponibles.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Sección 8: Acceso por rol -->
   <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-5">
     <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-1">Acceso por rol</h2>
     <p class="text-xs text-gray-600 mb-3">Qué roles tienen acceso a este agente por defecto.</p>
