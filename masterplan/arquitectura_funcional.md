@@ -180,9 +180,39 @@ El agente no tiene acciones discretas seleccionables — la respuesta emerge dir
 Mixin que todos los agentes heredan. Agrega:
 
 - `proactive_schedule` — intervalo en segundos (default 86400s = 24h)
-- `proactive_check(user, user_context)` — LLM analiza `agent_history` del usuario, detecta patrones, retorna lista de intents a crear/actualizar
+- `proactive_check(user, user_context, active_intents)` — LLM analiza `agent_history` del usuario + contexto de agentes afines, detecta patrones, retorna lista de intents a crear/actualizar
+- `proactive_system_prompt` (class attr opcional) — system prompt propio para el check proactivo; si no se define, se usa el genérico del mixin
 
-`proactive_check()` retorna vacío si no hay historial Y no hay intents activos.
+`proactive_check()` retorna vacío si no hay historial Y no hay intents activos Y no hay contexto de afines relevante.
+
+### Afinidades entre agentes
+
+Cada agente puede declarar relaciones de **afinidad** con otros. Durante `proactive_check`, el mixin llama a `_build_affinity_context(agent_id)` que:
+
+1. Lee `affinities` del agente desde `agent_config` (configurable por el usuario en el backoffice)
+2. Para cada agente afín, obtiene su `shared_state_prefix` (el namespace que ese agente publica en `SharedState`)
+3. Llama a `SharedState.get_by_prefix(prefix)` para obtener los datos vigentes
+4. Construye un bloque de texto: `"- clima (weather.*): temp=22.5, is_raining=False, conditions=Soleado"`
+5. Lo inyecta al prompt del LLM entre el contexto de intents activos y el historial
+
+Esto permite que el LLM del agente reciba datos de otros dominios sin que el agente tenga acoplamiento directo con ellos. La colaboración emerge de la configuración de afinidades y de los datos publicados en `SharedState`.
+
+**Atributos declarables en la clase del agente:**
+
+| Atributo | Descripción |
+|---|---|
+| `shared_state_prefix` | Namespace que este agente publica en SharedState (ej: `"weather"`) |
+| `default_affinities` | Lista de agent_ids con afinidad por defecto (sobrescribible desde backoffice) |
+| `proactive_system_prompt` | System prompt para el check proactivo (si es None, usa el genérico) |
+
+**Agents con proactividad declarada (FASE 27):**
+
+| Agente | prefix | default_affinities | schedule |
+|---|---|---|---|
+| `HaosAgent` | — | — | 86400s |
+| `ClimaAgent` | `weather` | — | — (override propio) |
+| `MapsAgent` | — | `["weather"]` | 3600s |
+| `GenericAgent` | configurable | configurable | — |
 
 ### ProactiveScheduler
 

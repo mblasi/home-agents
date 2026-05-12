@@ -1904,3 +1904,54 @@ se detectan por observación y se construyen iterativamente.
             `POST /users/{uid}/routines/detect` — forzar detección inmediata (bloquea 60s máx).
 
 - [x] 26.5  **`base_agent.py`**: documenta `routine_updates` en el contrato de retorno del protocolo.
+
+---
+
+### FASE 27 - Afinidades entre agentes + proactividad colaborativa
+
+Estado: COMPLETA
+Deps:   FASE 26 (SharedState), FASE 9 (proactividad base), FASE 24 (traces).
+
+Los agentes pueden tener relaciones de afinidad configuradas por el usuario. Durante el ciclo
+proactivo, cada agente construye automáticamente un contexto cross-dominio leyendo datos de
+SharedState publicados por sus agentes afines. Esto habilita sugerencias proactivas que emergen
+de la colaboración entre dominios sin hardcodear lógica inter-agente.
+
+- [x] 27.1  **`shared_state.py`** — añade `get_by_prefix(prefix)`: retorna todas las entradas
+            no expiradas cuya clave comienza con `prefix.`. Permite filtrar datos por namespace
+            de agente (ej: `weather.*`, `calendar.*`) en O(n) sobre las entradas vivas.
+
+- [x] 27.2  **`agent_config.py`** — cuatro funciones nuevas:
+            `get/set_affinities(agent_id)` — lista de agent_ids con los que hay afinidad.
+            `get/set_shared_state_prefix(agent_id)` — namespace que este agente publica en SharedState.
+            Ambos persisten en `~/.local/share/capitan/agents.json`.
+
+- [x] 27.3  **`proactive_mixin.py`** — `_build_affinity_context(agent_id)` lee affinities de
+            agent_config, obtiene el shared_state_prefix de cada afín y llama get_by_prefix para
+            construir un bloque de texto tipo "- weather (weather.*): temp=22.5, is_raining=False".
+            En `proactive_check`: el bloque se inyecta al prompt del LLM entre active_intents y
+            el historial. Hook `proactive_system_prompt`: si el agente define este atributo de clase,
+            se usa como system prompt; si no, el genérico de ProactiveMixin.
+
+- [x] 27.4  **`clima_agent.py`** — declara `shared_state_prefix = "weather"`. ClimaAgent ya
+            publicaba `weather.*` en SharedState; ahora ese namespace queda formalizado para que
+            otros agentes puedan declarar afinidad con él.
+
+- [x] 27.5  **`maps_agent.py`** — hereda `ProactiveMixin` (primer agente no-genérico en hacerlo).
+            `proactive_schedule = 3600` (horario). `default_affinities = ["weather"]` — por defecto
+            tiene afinidad con el agente de clima. `proactive_system_prompt` orienta al LLM hacia
+            sugerencias de movilidad emergentes del contexto (clima + rutinas + historial).
+
+- [x] 27.6  **`core/server.py`** — `GET /agents` incluye `affinities` y `shared_state_prefix`
+            por agente (con fallback a atributos de clase). Endpoints nuevos:
+            `GET/PUT /agents/{id}/affinities` — leer/escribir lista de afines.
+            `GET/PATCH /agents/{id}/shared-state-prefix` — leer/escribir namespace.
+
+- [x] 27.7  **Backoffice** — `agent_edit.html` sección "Afinidades entre agentes":
+            campo `shared_state_prefix` (qué namespace publica este agente) y multi-select
+            de agentes afines con checkboxes, mostrando el namespace de cada uno.
+            `backoffice/server.py` proxea los nuevos endpoints al core.
+
+- [x] 27.8  **Tests** — `tests/test_agent_affinities.py`: 13 tests cubren get/set de affinities
+            y shared_state_prefix, SharedState.get_by_prefix (incluye expiración y aislamiento
+            de prefijos), y _build_affinity_context (sin affinities, con datos, sin prefix, sin datos).
