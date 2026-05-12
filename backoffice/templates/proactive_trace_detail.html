@@ -91,11 +91,23 @@
         </div>
         {% endif %}
 
+        <!-- User context -->
+        {% if ur.get("user_ctx") %}
+        <div class="relative pl-5">
+          <div class="absolute left-[-1px] top-2 w-3 h-px bg-gray-700"></div>
+          <div class="absolute left-[-4px] top-1.5 w-2 h-2 rounded-full bg-gray-700 border border-gray-600"></div>
+          <details class="group">
+            <summary class="text-xs text-gray-600 cursor-pointer hover:text-gray-400 select-none">Contexto de usuario (user_ctx) ▸</summary>
+            <pre class="mt-2 text-xs text-gray-500 bg-gray-950 rounded p-3 overflow-x-auto whitespace-pre-wrap">{{ ur.user_ctx | tojson(indent=2) }}</pre>
+          </details>
+        </div>
+        {% endif %}
+
         <!-- Active intents context -->
         <div class="relative pl-5">
           <div class="absolute left-[-1px] top-2 w-3 h-px bg-gray-700"></div>
           <div class="absolute left-[-4px] top-1.5 w-2 h-2 rounded-full bg-gray-700 border border-gray-600"></div>
-          <p class="text-xs text-gray-500 mb-0.5">Contexto: {{ ur.get("active_intents_count", 0) }} intents activos</p>
+          <p class="text-xs text-gray-500 mb-0.5">Intents activos pasados al agente: {{ ur.get("active_intents_count", 0) }}</p>
           {% if ur.get("active_intents") and ur.active_intents | length > 0 %}
           <details class="group">
             <summary class="text-xs text-gray-700 cursor-pointer hover:text-gray-500 select-none">Ver intents ▸</summary>
