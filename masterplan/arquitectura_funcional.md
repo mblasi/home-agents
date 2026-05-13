@@ -507,13 +507,30 @@ Cada rol tiene permisos sobre endpoints (lectura, escritura, administración). E
 
 ## Backoffice
 
-Flask en `:8080`. Interfaz web de administración.
+FastAPI + Jinja2 en `:8080`. Interfaz web de administración.
 
-Funcionalidades:
-- Explorador de conversaciones (historial completo, filtros por usuario/agente/fecha)
-- Vista de trazas de ejecución por conversación
-- Gestión de agentes (activar/desactivar, editar metadatos)
-- Intents y goals por usuario
+### Funcionalidades
+
+- **Conversaciones** — historial completo, filtros por usuario/agente/fecha
+- **Traces de conversación** — árbol visual por request: coordinador, pasos LLM, llamadas HAOS/API
+- **Traces proactivos** — página unificada `/traces` con dos solapas:
+  - `proactive_check` — runs periódicos por agente, ordenados por fecha, paginados. Cada row incluye badges por `intent_type` detectado (advise/request/goal con conteo)
+  - `goal_review` — ciclos de revisión de goals abiertos, ordenados por fecha, paginados
+- **Gestión de agentes** — activar/desactivar, editar metadatos, toggle proactivo por agente
+- **Intents y goals** — por usuario, con estados y ciclo de vida
+- **Rutinas** — rutinas inferidas por usuario
+- **Shared State** — estado compartido entre agentes con TTL
+- **Plan** — visualización de `estado.md` con progreso de fases
+
+### Tipos de trace
+
+| Tipo | `trace_kind` | Archivo JSONL | Clave |
+|------|-------------|---------------|-------|
+| Conversación | `request` | `traces/{conv_id}.jsonl` | `RequestTrace` |
+| Proactive check | `proactive_check` | `traces/proactive-{agent_id}.jsonl` | `ProactiveRunTrace` |
+| Goal review | `goal_review` | `traces/goal-review-{goal_id[:8]}.jsonl` | `GoalReviewTrace` |
+
+Un `ProactiveRunTrace` agrega resultados por usuario: cada `ProactiveUserResult` tiene `raw_result` (items devueltos por el LLM) con `intent_type` por item (`advise`, `request`, `goal`). El endpoint `/proactive/traces/{agent_id}` incluye `intent_type_counts` agregado para mostrar en el listado sin leer el detalle.
 
 ---
 
@@ -531,7 +548,9 @@ Todos los datos del usuario se almacenan en `~/.local/share/capitan/`:
 | `routines/{user_id}.json` | Rutinas inferidas por usuario |
 | `routine_last_detect.json` | Timestamp de última detección por usuario |
 | `conversations/*.json` | Conversaciones con todos sus turnos |
-| `traces/*.json` | Trazas de ejecución |
+| `traces/{conv_id}.jsonl` | Trazas de conversación (max 100 por conv) |
+| `traces/proactive-{agent_id}.jsonl` | Trazas de proactive_check por agente (max 50) |
+| `traces/goal-review-{goal_id[:8]}.jsonl` | Trazas de revisión de goal (max 50) |
 | `fast_classifier.pkl` | Modelo del fast-classifier del coordinator |
 | `portfolio_{user_id}.json` | Portfolio de inversiones |
 | `documents_{user_id}.json` | Documentos de viaje/identidad |

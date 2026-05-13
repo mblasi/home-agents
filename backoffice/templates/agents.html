@@ -6,7 +6,7 @@
   <h1 class="text-2xl font-bold">Agentes</h1>
   <div class="flex items-center gap-3">
     <div id="restart-banner" class="hidden bg-yellow-900/30 border border-yellow-700 text-yellow-300 text-xs px-3 py-2 rounded-lg">
-      ⚠️ Hay cambios de config/keywords pendientes — reiniciar el core para aplicar.
+      ⚠️ Hay cambios de config pendientes — reiniciar el core para aplicar.
     </div>
     <a href="/agents/new"
        class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors">
@@ -29,7 +29,6 @@
       <tr class="border-b border-gray-800 text-gray-400 text-xs uppercase tracking-wider">
         <th class="px-4 py-3 text-left">Agente</th>
         <th class="px-4 py-3 text-left">Descripción</th>
-        <th class="px-4 py-3 text-left">Keywords</th>
         <th class="px-4 py-3 text-center">Estado</th>
         <th class="px-4 py-3 text-center">Proactivo</th>
         <th class="px-4 py-3 text-center">Accesible</th>
@@ -52,16 +51,6 @@
           </div>
         </td>
         <td class="px-4 py-3 text-gray-300">{{ info.desc }}</td>
-        <td class="px-4 py-3">
-          <div class="flex flex-wrap gap-1">
-            {% for kw in (info.keywords or [])[:6] %}
-            <span class="px-1.5 py-0.5 bg-gray-800 rounded text-xs text-gray-400">{{ kw }}</span>
-            {% endfor %}
-            {% if (info.keywords or [])|length > 6 %}
-            <span class="px-1.5 py-0.5 text-xs text-gray-600">+{{ (info.keywords|length) - 6 }}</span>
-            {% endif %}
-          </div>
-        </td>
         <td class="px-4 py-3 text-center" id="status-cell-{{ aid }}">
           {% set st = info.status %}
           <button

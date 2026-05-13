@@ -503,7 +503,12 @@ async def agent_new_submit(request: Request):
                        error="No se pudo crear el agente (¿ID ya existe?)",
                        role_perms=role_perms, roles=_ROLES_AGENTS,
                        llm_models=_get_llm_models())
-    return RedirectResponse("/agents", status_code=303)
+    examples_raw = str(form.get("examples", "")).strip()
+    if examples_raw:
+        examples = [l.strip() for l in examples_raw.splitlines() if l.strip()]
+        if examples:
+            _core(f"/agents/{payload['id']}/examples", method="PATCH", json={"examples": examples})
+    return RedirectResponse(f"/agents/{payload['id']}", status_code=303)
 
 
 @app.get("/agents/{agent_id}/edit", response_class=HTMLResponse)
@@ -950,6 +955,45 @@ def trace_detail(request: Request, conv_id: str, trace_id: str):
                    t=_Obj(t))
 
 
+# ── Traces combinados (proactive + goal review) ────────────────────────────────
+
+_TRACES_PAGE_SIZE = 25
+
+
+@app.get("/traces", response_class=HTMLResponse)
+def traces_page(request: Request, tab: str = "proactive", page: int = 1):
+    _require_auth(request)
+    agents_data = _core("/agents", timeout=10) or {}
+    tab = tab if tab in ("proactive", "goals") else "proactive"
+
+    if tab == "goals":
+        goal_ids   = _core("/goals/traces") or []
+        all_goals  = _core("/goals") or []
+        gmap       = {g.get("intent_id", "")[:8]: g for g in all_goals}
+        all_traces = []
+        for gid in goal_ids:
+            for t in (_core(f"/goals/traces/{gid}") or []):
+                t["_goal"] = gmap.get(gid, {})
+                all_traces.append(t)
+    else:
+        agent_ids  = _core("/proactive/traces") or []
+        all_traces = []
+        for aid in agent_ids:
+            for t in (_core(f"/proactive/traces/{aid}") or []):
+                t["_agent"] = agents_data.get(aid, {})
+                all_traces.append(t)
+
+    all_traces.sort(key=lambda t: t.get("ts", 0), reverse=True)
+    total       = len(all_traces)
+    total_pages = max(1, (total + _TRACES_PAGE_SIZE - 1) // _TRACES_PAGE_SIZE)
+    page        = max(1, min(page, total_pages))
+    traces      = all_traces[(page - 1) * _TRACES_PAGE_SIZE : page * _TRACES_PAGE_SIZE]
+
+    return _render(request, "traces.html", "traces",
+                   tab=tab, page=page, total_pages=total_pages, total=total,
+                   traces=traces, agents=agents_data)
+
+
 # ── Proactive traces ───────────────────────────────────────────────────────────
 
 @app.get("/proactive/traces", response_class=HTMLResponse)
@@ -958,7 +1002,7 @@ def proactive_traces_page(request: Request):
     agent_ids   = _core("/proactive/traces") or []
     proactive_status = _core("/proactive/status", timeout=3) or {}
     agents_data = _core("/agents", timeout=10) or {}
-    return _render(request, "proactive_traces.html", "proactive-traces",
+    return _render(request, "proactive_traces.html", "traces",
                    agent_ids=agent_ids, proactive_status=proactive_status, agents=agents_data)
 
 
@@ -968,7 +1012,7 @@ def proactive_trace_list_page(request: Request, agent_id: str):
     traces = _core(f"/proactive/traces/{agent_id}") or []
     agents_data = _core("/agents", timeout=10) or {}
     agent = agents_data.get(agent_id, {})
-    return _render(request, "proactive_trace_list.html", "proactive-traces",
+    return _render(request, "proactive_trace_list.html", "traces",
                    traces=traces, agent_id=agent_id, agent=agent)
 
 
@@ -996,7 +1040,7 @@ def proactive_trace_detail_page(request: Request, agent_id: str, trace_id: str):
         def __iter__(self): return iter(self._d)
         def __len__(self): return len(self._d)
 
-    return _render(request, "proactive_trace_detail.html", "proactive-traces",
+    return _render(request, "proactive_trace_detail.html", "traces",
                    t=_Obj(t))
 
 
@@ -1008,7 +1052,7 @@ def goal_traces_page(request: Request):
     goal_ids  = _core("/goals/traces") or []
     all_goals = _core("/goals") or []
     goals_by_short = {g.get("intent_id", "")[:8]: g for g in all_goals}
-    return _render(request, "goal_traces.html", "goals",
+    return _render(request, "goal_traces.html", "traces",
                    goal_ids=goal_ids, goals_by_short=goals_by_short)
 
 
@@ -1018,7 +1062,7 @@ def goal_trace_list_page(request: Request, goal_id: str):
     traces    = _core(f"/goals/traces/{goal_id}") or []
     all_goals = _core("/goals") or []
     goal = next((g for g in all_goals if g.get("intent_id", "")[:8] == goal_id[:8]), {})
-    return _render(request, "goal_trace_list.html", "goals",
+    return _render(request, "goal_trace_list.html", "traces",
                    traces=traces, goal_id=goal_id, goal=goal)
 
 
@@ -1046,7 +1090,7 @@ def goal_trace_detail_page(request: Request, goal_id: str, trace_id: str):
         def __iter__(self): return iter(self._d)
         def __len__(self): return len(self._d)
 
-    return _render(request, "goal_trace_detail.html", "goals",
+    return _render(request, "goal_trace_detail.html", "traces",
                    t=_Obj(t))
 
 

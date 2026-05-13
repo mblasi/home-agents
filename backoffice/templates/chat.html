@@ -254,11 +254,16 @@ function appendBubble(role, text, meta = null, scroll = true, ts = null, userNam
            : 'rounded-tl-sm bg-gray-800 text-gray-100',
   ].join(' ');
 
-  // Nombre del remitente (usuario solamente, cuando hay uno seleccionado)
+  // Nombre del remitente
   if (isUser && userName) {
     const nameEl = document.createElement('div');
     nameEl.className  = 'text-[10px] font-semibold text-blue-200 mb-0.5 tracking-wide';
     nameEl.textContent = userName;
+    bubble.appendChild(nameEl);
+  } else if (!isUser && meta && meta.fancy_display) {
+    const nameEl = document.createElement('div');
+    nameEl.className  = 'agent-display text-[10px] font-semibold text-gray-500 mb-0.5 tracking-wide';
+    nameEl.textContent = meta.fancy_display;
     bubble.appendChild(nameEl);
   }
 
@@ -335,11 +340,22 @@ function buildChip(meta) {
       ${meta.latency_ms            != null ? `<span>total ${fmtMs(meta.latency_ms)}</span>`             : ''}
     </div>` : '';
 
+  const traceLink = meta.trace_id && meta.conversation_id
+    ? `<a href="/conversations/${escHtml(meta.conversation_id)}/traces/${escHtml(meta.trace_id)}"
+          target="_blank"
+          class="text-violet-500 hover:text-violet-300 transition-colors font-mono">🔍</a>`
+    : '';
+
   chip.innerHTML = `
-    <button class="hover:text-gray-200 transition-colors text-left"
-            onclick="this.nextElementSibling.classList.toggle('hidden')">
-      ▸ ${escHtml(agentLine)}${action} ${latency}
-    </button>
+    <div class="flex items-center gap-2">
+      <button class="text-gray-500 hover:text-gray-300 transition-colors text-left flex items-center gap-1"
+              onclick="this.closest('div').nextElementSibling.classList.toggle('hidden')">
+        <span class="text-gray-600 select-none">▸</span>
+        <span>${escHtml(agentLine)}${action}</span>
+        <span class="text-gray-600">${latency}</span>
+      </button>
+      ${traceLink}
+    </div>
     <div class="hidden mt-1.5 pl-2 border-l border-gray-700">
       <div class="text-gray-500 font-medium mb-1">${planLabel}</div>
       ${stepsHtml ? `<div class="space-y-0.5 mb-0.5">${stepsHtml}</div>` : `
@@ -413,6 +429,12 @@ form.addEventListener('submit', async (e) => {
           } else if (currentEvent === 'done') {
             fullText = data.response;
             agentTextEl.textContent = fullText;
+            if (data.fancy_display && !agentBubble.querySelector('.agent-display')) {
+              const nameEl = document.createElement('div');
+              nameEl.className  = 'agent-display text-[10px] font-semibold text-gray-500 mb-0.5 tracking-wide';
+              nameEl.textContent = data.fancy_display;
+              agentBubble.insertBefore(nameEl, agentTextEl);
+            }
             const isNewConv = !activeConvId && data.conversation_id;
             activeConvId = data.conversation_id;
             convBadge.textContent = activeConvId;

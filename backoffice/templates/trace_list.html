@@ -3,10 +3,13 @@
 
 {% block content %}
 <div class="flex items-center gap-3 mb-6">
-  <a href="/conversations" class="text-gray-500 hover:text-gray-300 text-sm">← Conversaciones</a>
+  <a href="/conversations#conv-{{ conv_id }}" class="text-gray-500 hover:text-gray-300 text-sm">← Conversaciones</a>
   <span class="text-gray-700">/</span>
   <h1 class="text-xl font-bold">Traces</h1>
   <span class="font-mono text-xs text-gray-500">{{ conv_id }}</span>
+  <a href="/chat?conv_id={{ conv_id }}"
+     class="ml-auto text-xs px-3 py-1.5 rounded-lg border border-blue-800 bg-blue-950 text-blue-300 hover:text-white hover:border-blue-600 transition-colors"
+     title="Retomar conversación en el chat">↗ Chat</a>
 </div>
 
 {% if traces %}

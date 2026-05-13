@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% block title %}Traces{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-5">
+  <div>
+    <h1 class="text-xl font-bold text-gray-100">Traces</h1>
+    <p class="text-xs text-gray-500 mt-0.5">{{ total }} ejecución{{ "es" if total != 1 else "" }}</p>
+  </div>
+</div>
+
+<!-- Tabs -->
+<div class="flex gap-1 mb-5 border-b border-gray-800">
+  <a href="/traces?tab=proactive&page=1"
+     class="px-4 py-2 text-sm font-medium rounded-t transition-colors
+            {% if tab == 'proactive' %}text-teal-400 border-b-2 border-teal-500 -mb-px bg-gray-900{% else %}text-gray-500 hover:text-gray-300{% endif %}">
+    <span class="inline-flex items-center gap-1.5">
+      <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+        <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+      </svg>
+      proactive_check
+    </span>
+  </a>
+  <a href="/traces?tab=goals&page=1"
+     class="px-4 py-2 text-sm font-medium rounded-t transition-colors
+            {% if tab == 'goals' %}text-indigo-400 border-b-2 border-indigo-500 -mb-px bg-gray-900{% else %}text-gray-500 hover:text-gray-300{% endif %}">
+    <span class="inline-flex items-center gap-1.5">
+      <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+      </svg>
+      goal_review
+    </span>
+  </a>
+</div>
+
+{% if not traces %}
+<div class="bg-gray-900 border border-gray-800 rounded-xl px-5 py-12 text-center">
+  <p class="text-gray-600 text-sm">No hay traces generados todavía.</p>
+</div>
+
+{% elif tab == 'proactive' %}
+<!-- ── proactive_check list ── -->
+<div class="divide-y divide-gray-800 border border-gray-800 rounded-xl overflow-hidden">
+  {% for t in traces %}
+  {% set agent = t.get("_agent", {}) %}
+  <a href="/proactive/traces/{{ t.agent_id }}/{{ t.trace_id }}"
+     class="flex items-center gap-4 px-5 py-3.5 bg-gray-900 hover:bg-gray-800/60 transition-colors group">
+    <!-- avatar -->
+    <div class="w-8 h-8 rounded-full bg-teal-950 border border-teal-800 flex items-center justify-center shrink-0 text-teal-400 font-mono text-xs font-bold">
+      {{ t.agent_id[0] | upper }}
+    </div>
+    <!-- agent + triggered_by -->
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center gap-2">
+        <span class="text-sm font-medium text-gray-100 truncate">
+          {{ agent.get("display_name") or t.agent_id }}
+        </span>
+        <span class="text-[10px] px-1.5 py-0.5 rounded font-mono
+          {% if t.get('triggered_by') == 'scheduler' %}bg-gray-800 text-gray-500
+          {% elif t.get('triggered_by') == 'manual' %}bg-amber-950 text-amber-400
+          {% else %}bg-gray-800 text-gray-500{% endif %}">
+          {{ t.get("triggered_by", "—") }}
+        </span>
+        {% if t.get("has_errors") %}
+        <span class="text-[10px] px-1.5 py-0.5 rounded bg-red-950 text-red-400 font-mono">error</span>
+        {% endif %}
+      </div>
+      <p class="text-xs text-gray-600 font-mono mt-0.5">{{ t.agent_id }}</p>
+    </div>
+    <!-- intent_type badges -->
+    <div class="flex items-center gap-1 shrink-0">
+      {% set counts = t.get("intent_type_counts") or {} %}
+      {% for itype, n in counts.items() if n > 0 %}
+        {% if itype == "goal" %}
+      <span class="px-1.5 py-0.5 bg-indigo-950 text-indigo-400 rounded border border-indigo-800 text-[10px] font-mono">goal ×{{ n }}</span>
+        {% elif itype == "request" %}
+      <span class="px-1.5 py-0.5 bg-amber-950 text-amber-400 rounded border border-amber-800 text-[10px] font-mono">request ×{{ n }}</span>
+        {% else %}
+      <span class="px-1.5 py-0.5 bg-gray-800 text-gray-400 rounded border border-gray-700 text-[10px] font-mono">advise ×{{ n }}</span>
+        {% endif %}
+      {% endfor %}
+    </div>
+    <!-- stats -->
+    <div class="text-right text-xs shrink-0 space-y-0.5">
+      {% if t.get("total_created") %}
+      <p class="text-teal-500">+{{ t.total_created }} creados</p>
+      {% endif %}
+      {% if t.get("total_latency_ms") %}
+      <p class="text-gray-600">{{ t.total_latency_ms }}ms</p>
+      {% endif %}
+    </div>
+    <!-- timestamp -->
+    <div class="text-right text-xs text-gray-500 shrink-0 w-36">
+      {{ t.get("ts") | datetimefmt if t.get("ts") else "—" }}
+    </div>
+    <span class="text-gray-700 group-hover:text-gray-400 text-sm shrink-0 transition-colors">›</span>
+  </a>
+  {% endfor %}
+</div>
+
+{% else %}
+<!-- ── goal_review list ── -->
+<div class="divide-y divide-gray-800 border border-gray-800 rounded-xl overflow-hidden">
+  {% for t in traces %}
+  {% set goal = t.get("_goal", {}) %}
+  <a href="/goals/traces/{{ t.goal_id[:8] }}/{{ t.trace_id }}"
+     class="flex items-center gap-4 px-5 py-3.5 bg-gray-900 hover:bg-gray-800/60 transition-colors group">
+    <!-- icon -->
+    <div class="w-8 h-8 rounded-full bg-indigo-950 border border-indigo-800 flex items-center justify-center shrink-0">
+      <svg class="w-3.5 h-3.5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+      </svg>
+    </div>
+    <!-- title + status -->
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center gap-2">
+        <span class="text-sm font-medium text-gray-100 truncate">
+          {{ t.get("goal_title") or goal.get("title") or t.goal_id[:8] }}
+        </span>
+        {% if t.get("status_before") or t.get("status_after") %}
+        <span class="text-[10px] text-gray-600 font-mono">
+          {{ t.get("status_before", "?") }}{% if t.get("status_after") %} → {{ t.status_after }}{% endif %}
+        </span>
+        {% endif %}
+        {% if t.get("error") %}
+        <span class="text-[10px] px-1.5 py-0.5 rounded bg-red-950 text-red-400 font-mono">error</span>
+        {% endif %}
+      </div>
+      <div class="flex items-center gap-3 mt-0.5">
+        <span class="text-xs text-gray-600 font-mono">{{ t.goal_id[:8] }}</span>
+        {% if t.get("user_id") %}<span class="text-xs text-gray-600">{{ t.user_id }}</span>{% endif %}
+      </div>
+    </div>
+    <!-- latency -->
+    <div class="text-right text-xs shrink-0">
+      {% if t.get("total_latency_ms") %}
+      <p class="text-gray-600">{{ t.total_latency_ms }}ms</p>
+      {% endif %}
+    </div>
+    <!-- timestamp -->
+    <div class="text-right text-xs text-gray-500 shrink-0 w-36">
+      {{ t.get("ts") | datetimefmt if t.get("ts") else "—" }}
+    </div>
+    <span class="text-gray-700 group-hover:text-gray-400 text-sm shrink-0 transition-colors">›</span>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Paginador -->
+{% if total_pages > 1 %}
+<div class="flex items-center justify-between mt-5">
+  <p class="text-xs text-gray-600">
+    Página {{ page }} de {{ total_pages }} &mdash; {{ total }} traces
+  </p>
+  <div class="flex gap-1">
+    {% if page > 1 %}
+    <a href="/traces?tab={{ tab }}&page={{ page - 1 }}"
+       class="px-3 py-1.5 text-xs rounded bg-gray-800 text-gray-300 hover:bg-gray-700 transition-colors">‹ Anterior</a>
+    {% endif %}
+    {% for p in range(1, total_pages + 1) %}
+      {% if p == page %}
+      <span class="px-3 py-1.5 text-xs rounded bg-gray-700 text-gray-100 font-medium">{{ p }}</span>
+      {% elif p == 1 or p == total_pages or (p >= page - 2 and p <= page + 2) %}
+      <a href="/traces?tab={{ tab }}&page={{ p }}"
+         class="px-3 py-1.5 text-xs rounded bg-gray-800 text-gray-400 hover:bg-gray-700 transition-colors">{{ p }}</a>
+      {% elif p == page - 3 or p == page + 3 %}
+      <span class="px-1 py-1.5 text-xs text-gray-600">…</span>
+      {% endif %}
+    {% endfor %}
+    {% if page < total_pages %}
+    <a href="/traces?tab={{ tab }}&page={{ page + 1 }}"
+       class="px-3 py-1.5 text-xs rounded bg-gray-800 text-gray-300 hover:bg-gray-700 transition-colors">Siguiente ›</a>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1557,6 +1557,11 @@ Estado:   COMPLETA
 - Arquitectura decidida: todo el procesamiento en laptop, HAOS solo recibe REST calls
 - acoustics parcheado para compatibilidad con scipy 1.17.1 / Python 3.13
 
+### 2026-05-13
+- Backoffice: página `/traces` unificada con solapas `proactive_check` / `goal_review`, listados flat ordenados por fecha descendente, paginados (25/página).
+- Core: endpoint `/proactive/traces/{agent_id}` agrega `intent_type_counts` (conteo de items por tipo: advise/request/goal) para mostrarlo como badges en el listado sin leer el detalle.
+- Templates `proactive_trace_list.html`, `proactive_trace_detail.html` y `traces.html` actualizados con badges de tipo.
+
 ### Pendiente decidir
 - Latencia: ¿optimizar ahora o avanzar con la integración?
 - Hardware servidor: timing y presupuesto

@@ -210,8 +210,13 @@
                 {% if item.get("title") %}
                 <span class="text-gray-200 font-medium">{{ item.title }}</span>
                 {% endif %}
-                {% if item.get("type") %}
-                <span class="px-1.5 py-0.5 bg-gray-800 text-gray-400 rounded border border-gray-700">{{ item.type }}</span>
+                {% set itype = item.get("intent_type", "advise") %}
+                {% if itype == "goal" %}
+                <span class="px-1.5 py-0.5 bg-indigo-950 text-indigo-400 rounded border border-indigo-800 text-[10px] font-mono">goal</span>
+                {% elif itype == "request" %}
+                <span class="px-1.5 py-0.5 bg-amber-950 text-amber-400 rounded border border-amber-800 text-[10px] font-mono">request</span>
+                {% else %}
+                <span class="px-1.5 py-0.5 bg-gray-800 text-gray-500 rounded border border-gray-700 text-[10px] font-mono">advise</span>
                 {% endif %}
                 {% if item.get("priority") %}
                 <span class="text-gray-500">prioridad: {{ item.priority }}</span>

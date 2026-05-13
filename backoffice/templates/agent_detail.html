@@ -89,6 +89,17 @@
   {% endif %}
 </div>
 
+{% set sys_prompt = (agent.config or {}).get('system_prompt', '') %}
+{% if sys_prompt %}
+<div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-4">
+  <div class="flex items-center justify-between mb-3">
+    <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">System Prompt</h2>
+    <a href="/agents/{{ agent_id }}/edit" class="text-xs text-indigo-400 hover:text-indigo-300">Editar →</a>
+  </div>
+  <pre class="text-xs text-gray-400 bg-gray-800/50 rounded-lg p-3 whitespace-pre-wrap font-mono border border-gray-800">{{ sys_prompt }}</pre>
+</div>
+{% endif %}
+
 <div class="grid grid-cols-2 gap-4 mb-4">
 
   <!-- Estado -->
@@ -206,20 +217,6 @@
   </div>
 </div>
 {% endif %}
-
-<!-- Keywords -->
-<div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-4">
-  <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Keywords de activación</h2>
-  {% if agent.keywords %}
-  <div class="flex flex-wrap gap-2">
-    {% for kw in agent.keywords %}
-    <span class="px-2 py-1 bg-gray-800 rounded-lg text-xs text-gray-300">{{ kw }}</span>
-    {% endfor %}
-  </div>
-  {% else %}
-  <p class="text-sm text-gray-600">Sin keywords definidas.</p>
-  {% endif %}
-</div>
 
 <!-- RBAC -->
 <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-4">

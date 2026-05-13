@@ -61,6 +61,17 @@
              class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200
                     focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500">
     </div>
+    <div>
+      <label class="block text-xs font-medium text-gray-400 mb-1">
+        Ejemplos de activación
+        <span class="text-gray-600 font-normal ml-1">(opcional — uno por línea)</span>
+      </label>
+      <textarea name="examples" rows="4"
+                class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200
+                       focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 resize-y"
+                placeholder="¿cuánto gasté este mes?&#10;mostrame el balance de la cuenta&#10;¿cuál es mi presupuesto disponible?"></textarea>
+      <p class="mt-0.5 text-xs text-gray-600">3-5 ejemplos variados mejoran la precisión del routing.</p>
+    </div>
   </div>
 
   <!-- Sección 1: Estado inicial -->
@@ -136,19 +147,7 @@
       placeholder="Sos un asistente útil y conciso que responde en español."></textarea>
   </div>
 
-  <!-- Sección 4: Keywords -->
-  <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-5">
-    <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-1">Keywords del dispatcher</h2>
-    <p class="text-xs text-gray-600 mb-3">Una keyword por línea. El dispatcher usará estas palabras para enrutar comandos a este agente.</p>
-    <textarea
-      name="keywords"
-      rows="6"
-      class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 font-mono
-             focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 resize-y"
-      placeholder="una keyword por línea"></textarea>
-  </div>
-
-  <!-- Sección 5: Acceso por rol -->
+  <!-- Sección 4: Acceso por rol -->
   <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-5">
     <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-1">Acceso por rol</h2>
     <p class="text-xs text-gray-600 mb-3">Qué roles tendrán acceso a este agente desde el inicio.</p>
