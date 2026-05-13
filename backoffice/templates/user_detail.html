@@ -58,6 +58,121 @@
   </div>
 </div>
 
+<!-- Notificaciones OAuth -->
+{% if connected %}
+<div class="mb-4 bg-emerald-900/30 border border-emerald-700 text-emerald-300 px-3 py-2 rounded-lg text-xs">
+  Cuenta conectada correctamente.
+</div>
+{% endif %}
+{% if oauth_error %}
+<div class="mb-4 bg-red-900/30 border border-red-700 text-red-300 px-3 py-2 rounded-lg text-xs">
+  Error OAuth: {{ oauth_error | replace("+", " ") }}
+</div>
+{% endif %}
+
+<!-- MercadoLibre -->
+{% set ml = ml_oauth_status or {} %}
+<div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-4">
+  <div class="flex items-center justify-between mb-4">
+    <div>
+      <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">MercadoLibre</h2>
+      <p class="text-xs text-gray-600 mt-0.5">Cuenta OAuth2 para el agente de marketplace</p>
+    </div>
+    {% if ml.online %}
+      <span class="px-2 py-0.5 text-xs rounded-full bg-emerald-900/40 text-emerald-400 border border-emerald-700/40">online</span>
+    {% elif ml.connected %}
+      <span class="px-2 py-0.5 text-xs rounded-full bg-yellow-900/40 text-yellow-400 border border-yellow-700/40">token guardado</span>
+    {% else %}
+      <span class="px-2 py-0.5 text-xs rounded-full bg-gray-800 text-gray-500 border border-gray-700">no conectado</span>
+    {% endif %}
+  </div>
+
+  {% if ml.connected %}
+  <div class="text-xs text-gray-500 mb-4 space-y-0.5">
+    {% if ml.api_user_id %}<div>ID ML: <code class="text-gray-400">{{ ml.api_user_id }}</code></div>{% endif %}
+    {% if ml.saved_at %}<div>Guardado: <span class="text-gray-400">{{ ml.saved_at[:10] }}</span></div>{% endif %}
+  </div>
+  {% endif %}
+
+  <div class="flex flex-wrap items-center gap-3">
+    {% if ml.connected %}
+      <!-- Desconectar -->
+      <form method="POST" action="/auth/ml/disconnect" class="inline">
+        <input type="hidden" name="user_id" value="{{ uid }}">
+        <input type="hidden" name="redirect_to" value="/users/{{ uid }}">
+        <button type="submit"
+          class="px-3 py-1.5 bg-gray-800 hover:bg-red-900/40 text-gray-400 hover:text-red-400
+                 text-xs font-medium rounded-lg border border-gray-700 hover:border-red-700/50 transition-colors">
+          Desconectar
+        </button>
+      </form>
+    {% else %}
+      {% if oauth_app_url %}
+      <a href="/auth/ml/connect?user_id={{ uid }}&redirect_to=/users/{{ uid }}"
+         class="px-3 py-1.5 bg-indigo-700 hover:bg-indigo-600 text-white text-xs font-medium rounded-lg transition-colors">
+        Conectar cuenta →
+      </a>
+      {% else %}
+      <span class="text-xs text-gray-600">Configurar OAUTH_APP_URL en backoffice/.env para habilitar OAuth</span>
+      {% endif %}
+    {% endif %}
+
+    <!-- Recuperar por short_code -->
+    <button type="button" id="sc-toggle-{{ uid }}"
+      onclick="document.getElementById('sc-form-{{ uid }}').classList.toggle('hidden');document.getElementById('mt-form-{{ uid }}').classList.add('hidden')"
+      class="text-xs text-indigo-400 hover:text-indigo-300 transition-colors underline">
+      Recuperar por short_code
+    </button>
+    <!-- Manual -->
+    <button type="button" id="mt-toggle-{{ uid }}"
+      onclick="document.getElementById('mt-form-{{ uid }}').classList.toggle('hidden');document.getElementById('sc-form-{{ uid }}').classList.add('hidden')"
+      class="text-xs text-gray-500 hover:text-gray-300 transition-colors underline">
+      Configurar manualmente
+    </button>
+  </div>
+
+  <!-- Short code form -->
+  <div id="sc-form-{{ uid }}" class="hidden mt-3 bg-gray-800/50 border border-gray-700 rounded-lg p-3 space-y-2">
+    <p class="text-xs text-gray-500">Pegá el <code class="text-gray-400">short_code</code> del log o pantalla ML:</p>
+    <form method="POST" action="/auth/ml/fetch-shortcode" class="space-y-2">
+      <input type="hidden" name="user_id" value="{{ uid }}">
+      <input type="hidden" name="redirect_to" value="/users/{{ uid }}">
+      <input type="text" name="short_code" required placeholder="uu9Fj..."
+        class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs font-mono text-indigo-300 focus:outline-none focus:border-indigo-600">
+      <p class="text-xs text-gray-600">El short_code expira a los 5 minutos.</p>
+      <div class="flex gap-2 pt-1">
+        <button type="submit" class="px-3 py-1 bg-indigo-700 hover:bg-indigo-600 text-white text-xs rounded transition-colors">Recuperar token</button>
+        <button type="button" onclick="document.getElementById('sc-form-{{ uid }}').classList.add('hidden')"
+          class="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs rounded transition-colors">Cancelar</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Manual token form -->
+  <div id="mt-form-{{ uid }}" class="hidden mt-3 bg-gray-800/50 border border-gray-700 rounded-lg p-3 space-y-2">
+    <p class="text-xs text-gray-500">Pegá los tokens obtenidos del flujo OAuth:</p>
+    <form method="POST" action="/auth/ml/set-token" class="space-y-2">
+      <input type="hidden" name="user_id" value="{{ uid }}">
+      <input type="hidden" name="redirect_to" value="/users/{{ uid }}">
+      <div>
+        <label class="block text-xs text-gray-400 mb-0.5">access_token</label>
+        <input type="text" name="access_token" required placeholder="eyJ..."
+          class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs font-mono text-indigo-300 focus:outline-none focus:border-indigo-600">
+      </div>
+      <div>
+        <label class="block text-xs text-gray-400 mb-0.5">refresh_token <span class="text-gray-600">(opcional)</span></label>
+        <input type="text" name="refresh_token" placeholder="TG-..."
+          class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs font-mono text-indigo-300 focus:outline-none focus:border-indigo-600">
+      </div>
+      <div class="flex gap-2 pt-1">
+        <button type="submit" class="px-3 py-1 bg-indigo-700 hover:bg-indigo-600 text-white text-xs rounded transition-colors">Guardar tokens</button>
+        <button type="button" onclick="document.getElementById('mt-form-{{ uid }}').classList.add('hidden')"
+          class="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs rounded transition-colors">Cancelar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- Google Calendar -->
 <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-4">
   <div class="flex items-center justify-between mb-4">

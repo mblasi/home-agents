@@ -165,10 +165,19 @@
                 </div>
               </div>
               <div class="text-xs text-gray-600 mt-0.5">{{ meta.name }}</div>
-              {% if b.reachable == "partial" and b.users_fail is defined %}
+              {% if b.type == "oauth2" or b.type == "caldav" %}
+                {% if b.reachable == "partial" %}
                 <div class="text-xs text-amber-600 mt-1">
-                  Sin token: {{ b.users_fail | join(", ") }}
+                  Sin configurar:
+                  {% for uid in (b.users_fail or []) %}
+                  <a href="/users/{{ uid }}" class="underline hover:text-amber-400">{{ uid }}</a>{% if not loop.last %}, {% endif %}
+                  {% endfor %}
                 </div>
+                {% elif not b.reachable %}
+                <div class="text-xs text-red-600 mt-1">
+                  Configurar credenciales en el perfil de cada usuario.
+                </div>
+                {% endif %}
               {% endif %}
               {% if b.model %}
                 <code class="text-xs bg-gray-800 text-indigo-300 px-1.5 py-0.5 rounded mt-1 inline-block">
