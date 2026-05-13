@@ -636,9 +636,11 @@ def delete_agent_htmx(agent_id: str):
 # ── OAuth2 backends ─────────────────────────────────────────────────────────────
 
 @app.get("/auth/{service}/connect")
-def oauth_connect(service: str, user_id: str, agent_id: str = ""):
+def oauth_connect(service: str, user_id: str, agent_id: str = "", redirect_to: str = ""):
     """Inicia el flujo OAuth2: pide a core la URL y redirige al usuario."""
-    result = _core(f"/auth/{service}/url", params={"user_id": user_id, "agent_id": agent_id})
+    result = _core(f"/auth/{service}/url", params={
+        "user_id": user_id, "agent_id": agent_id, "redirect_to": redirect_to,
+    })
     if not result or not result.get("url"):
         raise HTTPException(status_code=503, detail=f"Core no pudo generar la URL de autorización para {service}")
     return RedirectResponse(result["url"], status_code=302)
@@ -649,9 +651,15 @@ def oauth_callback(service: str, code: str = "", state: str = "", error: str = "
     """Recibe el callback de ML/MP con el code, lo envía a core para canjearlo."""
     if error or not code:
         return RedirectResponse("/agents", status_code=302)
-    result = _core(f"/auth/{service}/callback", method="POST", json={"code": code, "state": state})
-    agent_id = (result or {}).get("agent_id", "")
-    redirect = f"/agents/{agent_id}/edit?connected=1" if agent_id else "/agents"
+    result      = _core(f"/auth/{service}/callback", method="POST", json={"code": code, "state": state})
+    redirect_to = (result or {}).get("redirect_to", "")
+    agent_id    = (result or {}).get("agent_id", "")
+    if redirect_to:
+        redirect = f"{redirect_to}?connected=1"
+    elif agent_id:
+        redirect = f"/agents/{agent_id}/edit?connected=1"
+    else:
+        redirect = "/agents"
     return RedirectResponse(redirect, status_code=302)
 
 
@@ -659,21 +667,26 @@ def oauth_callback(service: str, code: str = "", state: str = "", error: str = "
 async def oauth_disconnect(request: Request, service: str):
     if service not in _OAUTH_SERVICES:
         raise HTTPException(status_code=404)
-    form = await request.form()
-    user_id = str(form.get("user_id", "")).strip()
-    agent_id = str(form.get("agent_id", "")).strip()
+    form        = await request.form()
+    user_id     = str(form.get("user_id",     "")).strip()
+    agent_id    = str(form.get("agent_id",    "")).strip()
+    redirect_to = str(form.get("redirect_to", "")).strip()
     _oauth_token_path(service, user_id).unlink(missing_ok=True)
-    return RedirectResponse(f"/agents/{agent_id}/edit", status_code=303)
+    dest = redirect_to or (f"/agents/{agent_id}/edit" if agent_id else "/agents")
+    return RedirectResponse(dest, status_code=303)
 
 
 @app.post("/auth/{service}/fetch-shortcode")
 async def oauth_fetch_shortcode(request: Request, service: str):
     """Recupera el token del oauth app por short_code y lo persiste localmente."""
-    form = await request.form()
-    user_id  = str(form.get("user_id", "")).strip()
-    agent_id = str(form.get("agent_id", "")).strip()
+    form        = await request.form()
+    user_id     = str(form.get("user_id",     "")).strip()
+    agent_id    = str(form.get("agent_id",    "")).strip()
+    redirect_to = str(form.get("redirect_to", "")).strip()
 
     def _err(msg: str):
+        if redirect_to:
+            return RedirectResponse(f"{redirect_to}?oauth_error={msg}", status_code=303)
         err_redirect = f"/agents/{agent_id}/edit?oauth_error={msg}" if agent_id else "/agents"
         return RedirectResponse(err_redirect, status_code=303)
 
@@ -705,20 +718,23 @@ async def oauth_fetch_shortcode(request: Request, service: str):
     }
     _CAPITAN_DIR.mkdir(parents=True, exist_ok=True)
     _oauth_token_path(service, user_id).write_text(json.dumps(token_data, indent=2))
-    redirect = f"/agents/{agent_id}/edit?connected=1" if agent_id else "/agents"
-    return RedirectResponse(redirect, status_code=303)
+    dest = redirect_to or (f"/agents/{agent_id}/edit?connected=1" if agent_id else "/agents")
+    return RedirectResponse(dest if "?" in dest else f"{dest}?connected=1", status_code=303)
 
 
 @app.post("/auth/{service}/set-token")
 async def oauth_set_token(request: Request, service: str):
     """Configura tokens OAuth manualmente, como fallback al circuito WA."""
-    form = await request.form()
-    user_id       = str(form.get("user_id", "")).strip()
-    agent_id      = str(form.get("agent_id", "")).strip()
-    access_token  = str(form.get("access_token", "")).strip()
+    form          = await request.form()
+    user_id       = str(form.get("user_id",       "")).strip()
+    agent_id      = str(form.get("agent_id",      "")).strip()
+    redirect_to   = str(form.get("redirect_to",   "")).strip()
+    access_token  = str(form.get("access_token",  "")).strip()
     refresh_token = str(form.get("refresh_token", "")).strip()
 
     def _err(msg: str):
+        if redirect_to:
+            return RedirectResponse(f"{redirect_to}?oauth_error={msg}", status_code=303)
         err_redirect = f"/agents/{agent_id}/edit?oauth_error={msg}" if agent_id else "/agents"
         return RedirectResponse(err_redirect, status_code=303)
 
@@ -736,8 +752,8 @@ async def oauth_set_token(request: Request, service: str):
     }
     _CAPITAN_DIR.mkdir(parents=True, exist_ok=True)
     _oauth_token_path(service, user_id).write_text(json.dumps(token_data, indent=2))
-    redirect = f"/agents/{agent_id}/edit?connected=1" if agent_id else "/agents"
-    return RedirectResponse(redirect, status_code=303)
+    dest = redirect_to or (f"/agents/{agent_id}/edit?connected=1" if agent_id else "/agents")
+    return RedirectResponse(dest if "?" in dest else f"{dest}?connected=1", status_code=303)
 
 
 @app.get("/intents", response_class=HTMLResponse)
@@ -1219,13 +1235,18 @@ def user_detail_page(request: Request, uid: str):
     }
     # proactive_enabled per agent from plain context (not raw)
     user_ctx_plain   = _core(f"/users/{uid}/context") or {}
+    ml_oauth_status  = _oauth_status("ml", uid)
     return _render(request, "user_detail.html", "users",
                    user=user, uid=uid, agents=agents,
                    ww_samples=ww_samples, ww_metrics=ww_metrics,
                    train_status=train_status,
                    user_context=user_context, user_intents=user_intents,
                    proactive_status=proactive_status,
-                   user_ctx_plain=user_ctx_plain)
+                   user_ctx_plain=user_ctx_plain,
+                   ml_oauth_status=ml_oauth_status,
+                   oauth_app_url=OAUTH_APP_URL,
+                   connected=request.query_params.get("connected", ""),
+                   oauth_error=request.query_params.get("oauth_error", ""))
 
 
 @app.get("/users/{uid}/edit", response_class=HTMLResponse)
