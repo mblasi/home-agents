@@ -1286,6 +1286,28 @@ def delete_user_context_field_proxy(uid: str, agent_id: str, field: str):
     return HTMLResponse("")
 
 
+@app.post("/users/{uid}/gcal", response_class=HTMLResponse)
+async def save_gcal_credentials(request: Request, uid: str):
+    form     = await request.form()
+    email    = str(form.get("gcal_email",        "")).strip()
+    password = str(form.get("gcal_app_password", "")).strip()
+    # Remover espacios del app password (Google los muestra en grupos de 4)
+    password = password.replace(" ", "")
+    payload: dict = {"gcal_email": email or None}
+    if password:
+        payload["gcal_app_password"] = password
+    result = _core(f"/users/{uid}", method="PATCH", json=payload)
+    if result is None:
+        return HTMLResponse('<span class="text-red-400">Error al guardar</span>')
+    return HTMLResponse('<span class="text-emerald-400">Guardado</span>')
+
+
+@app.delete("/users/{uid}/gcal", response_class=HTMLResponse)
+def delete_gcal_credentials(uid: str):
+    _core(f"/users/{uid}/gcal", method="DELETE")
+    return HTMLResponse('<span class="text-gray-400">Eliminado — recargá la página</span>')
+
+
 @app.post("/users/{uid}/preferences/{key}/toggle", response_class=HTMLResponse)
 def toggle_user_preference(uid: str, key: str):
     user = _core(f"/users/{uid}") or {}
