@@ -26,7 +26,7 @@ import secrets
 
 import requests
 from fastapi import Cookie, FastAPI, Form, HTTPException, Request, Response
-from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 
 # ── Configuración ──────────────────────────────────────────────────────────────
@@ -1381,6 +1381,14 @@ async def set_user_context_field(uid: str, agent_id: str, field: str, request: R
         f'<script>setTimeout(()=>document.getElementById("ctx-saved-{agent_id}-{field}")?.remove(),2000)</script>'
         f'</span>'
     )
+
+
+@app.get("/users/{uid}/finance/plans/history")
+def get_user_plans_history(request: Request, uid: str):
+    plan_names = request.query_params.getlist("plan")
+    params = [("plan", n) for n in plan_names] if plan_names else None
+    data = _core(f"/finance/plans/{uid}/history", timeout=30, params=params) or {}
+    return JSONResponse(data)
 
 
 @app.delete("/users/{uid}/finance/plans/{plan_name}", response_class=HTMLResponse)
