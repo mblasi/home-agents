@@ -1413,7 +1413,9 @@ async def set_user_context_field(uid: str, agent_id: str, field: str, request: R
 @app.get("/users/{uid}/finance/plans/history")
 def get_user_plans_history(request: Request, uid: str):
     plan_names = request.query_params.getlist("plan")
-    params = [("plan", n) for n in plan_names] if plan_names else None
+    interval   = request.query_params.get("interval", "1h")
+    params: list = [("plan", n) for n in plan_names]
+    params.append(("interval", interval))
     data = _core(f"/finance/plans/{uid}/history", timeout=30, params=params) or {}
     return JSONResponse(data)
 
