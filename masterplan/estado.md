@@ -529,6 +529,11 @@ Nota:     Modo dummy (recomendaciones + P&L hipotética). Portfolio por usuario 
            con fallback a defaults globales (.env). Globales: FINANCE_PLAN_PNL_UP_PCT=5.0,
            FINANCE_PLAN_PNL_DOWN_PCT=-5.0, FINANCE_PLAN_PNL_HOURS=1. Clamp mínimo de 1h.
            Valores inválidos hacen fallback silencioso al global.
+- [x] 6.15 Todas las alertas de finanzas configurables por usuario:
+           _get_user_pnl_config reemplazado por _get_user_alert_config que cubre los 7 umbrales:
+           dollar_gap_pct, btc_move_pct, stock_move_pct, briefing_hour, plan_pnl_up_pct,
+           plan_pnl_down_pct, plan_pnl_hours. check() itera por usuario en todas las reglas,
+           cooldown keys incluyen uid. user_context_schema extendido con 4 campos nuevos.
 
 ---
 
