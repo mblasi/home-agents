@@ -1141,20 +1141,21 @@ def alerts_page(request: Request):
                    alerts=data, alert_state=alert_keys)
 
 
-@app.get("/finance/templates", response_class=HTMLResponse)
-def finance_templates_page(request: Request):
-    core_ok   = _core("/health", timeout=3) is not None
-    templates = _core("/finance/templates") or [] if core_ok else []
-    return _render(request, "finance_templates.html", "finance-templates",
-                   templates=templates, core_ok=core_ok)
+@app.get("/users/{uid}/finance/templates", response_class=HTMLResponse)
+def get_user_finance_templates_fragment(uid: str):
+    templates = _core(f"/finance/plans/{uid}/templates") or []
+    return HTMLResponse(_render_templates_rows(uid, templates))
 
 
-@app.post("/finance/templates", response_class=HTMLResponse)
-async def create_finance_template_proxy(request: Request):
-    form     = await request.form()
-    name     = str(form.get("name", "")).strip()
-    raw_pos  = str(form.get("positions_raw", "")).strip()
-    threshold = float(form.get("review_threshold", -10))
+@app.post("/users/{uid}/finance/templates", response_class=HTMLResponse)
+async def create_user_finance_template(request: Request, uid: str):
+    form      = await request.form()
+    name      = str(form.get("name", "")).strip()
+    raw_pos   = str(form.get("positions_raw", "")).strip()
+    try:
+        threshold = float(form.get("review_threshold") or -10)
+    except ValueError:
+        threshold = -10.0
 
     positions: list[dict] = []
     for part in raw_pos.split(","):
@@ -1167,20 +1168,46 @@ async def create_finance_template_proxy(request: Request):
                 pass
 
     if not name or not positions:
-        return HTMLResponse('<p class="text-red-400 text-xs">Nombre y posiciones requeridos.</p>', status_code=422)
+        return HTMLResponse('<p class="text-red-400 text-xs mt-1">Nombre y posiciones requeridos.</p>')
 
-    _core("/finance/templates", method="POST",
+    _core(f"/finance/plans/{uid}/templates", method="POST",
           json={"name": name, "positions": positions, "review_threshold": threshold})
 
-    templates = _core("/finance/templates") or []
-    return _render(request, "finance_templates.html", "finance-templates",
-                   templates=templates, core_ok=True)
+    templates = _core(f"/finance/plans/{uid}/templates") or []
+    return HTMLResponse(_render_templates_rows(uid, templates))
 
 
-@app.delete("/finance/templates/{name}", response_class=HTMLResponse)
-def delete_finance_template_proxy(name: str):
-    _core(f"/finance/templates/{name}", method="DELETE")
+@app.delete("/users/{uid}/finance/templates/{name}", response_class=HTMLResponse)
+def delete_user_finance_template(uid: str, name: str):
+    _core(f"/finance/plans/{uid}/templates/{name}", method="DELETE")
     return HTMLResponse("")
+
+
+def _render_templates_rows(uid: str, templates: list[dict]) -> str:
+    if not templates:
+        return '<p class="text-xs text-gray-600 italic">Sin templates definidos.</p>'
+    rows = []
+    for t in templates:
+        positions_str = ", ".join(
+            f'{p["ticker"]} {p["pct"]:.0f}%' for p in t.get("positions", [])
+        )
+        threshold = t.get("review_threshold", -10.0)
+        name_safe = t["name"].replace('"', "&quot;")
+        rows.append(
+            f'<div class="flex items-center gap-2 py-1.5 border-b border-gray-800 last:border-0">'
+            f'  <span class="text-sm font-medium text-gray-200 w-28 shrink-0">{t["name"]}</span>'
+            f'  <span class="text-xs text-gray-500 flex-1 font-mono">{positions_str}</span>'
+            f'  <span class="text-xs font-mono shrink-0 '
+            f'{"text-amber-400" if threshold >= -5 else "text-yellow-400" if threshold >= -10 else "text-red-400"}">'
+            f'  {threshold:+.0f}%</span>'
+            f'  <button hx-delete="/users/{uid}/finance/templates/{name_safe}"'
+            f'    hx-target="closest div" hx-swap="outerHTML"'
+            f'    hx-confirm="¿Eliminar template \'{name_safe}\'?"'
+            f'    class="shrink-0 px-1.5 py-0.5 text-[10px] text-gray-600 hover:text-red-400'
+            f'           hover:bg-red-900/20 rounded transition-colors">✕</button>'
+            f'</div>'
+        )
+    return "".join(rows)
 
 
 @app.get("/config", response_class=HTMLResponse)
