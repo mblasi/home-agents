@@ -534,6 +534,14 @@ Nota:     Modo dummy (recomendaciones + P&L hipotética). Portfolio por usuario 
            dollar_gap_pct, btc_move_pct, stock_move_pct, briefing_hour, plan_pnl_up_pct,
            plan_pnl_down_pct, plan_pnl_hours. check() itera por usuario en todas las reglas,
            cooldown keys incluyen uid. user_context_schema extendido con 4 campos nuevos.
+- [x] 6.17 Templates de inversión per-user:
+           Eliminados los templates globales (/finance/templates). Cada usuario tiene
+           su propio archivo finance_templates_{uid}.json con defaults hardcodeados
+           (conservador/moderado/agresivo) si nunca personalizó. Nuevos endpoints
+           GET/POST/DELETE /finance/plans/{uid}/templates en core. Backoffice: sección
+           "Templates de inversión" bajo el agente finance en user_detail, separada
+           visualmente de los campos del LLM context. Formulario inline con HTMX.
+           Sidebar pierde ítem global "Templates inv."
 - [x] 6.16 Histograma de P&L de planes a lo largo del tiempo (backoffice):
            Vista en backoffice que muestra evolución histórica del P&L de cada plan.
            FUENTE DE DATOS: precios históricos vía fc.get_price_at_date() / yfinance.history()
