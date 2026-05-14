@@ -624,7 +624,7 @@ async function runAllProactive(uid) {
 
   <!-- Campos aprendidos en agentes sin schema declarado (read-only + delete) -->
   {% for agent_id, fields in user_context.items() %}
-  {% if not agents.get(agent_id, {}).user_context_schema and agent_id != 'proactive_enabled' %}
+  {% if not agents_meta.get(agent_id, {}).get('user_context_schema') and agent_id != 'proactive_enabled' %}
   {% set agent_info = agents.get(agent_id, {}) %}
   <details class="mb-2 group">
     <summary class="flex items-center gap-2 cursor-pointer py-2 border-b border-gray-800 hover:border-gray-700 list-none select-none">
