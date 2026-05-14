@@ -661,4 +661,61 @@ async function runAllProactive(uid) {
 
 </div>
 
+<!-- Planes de inversión -->
+<div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-4">
+  <div class="flex items-center justify-between mb-3">
+    <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Planes de inversión</h2>
+    <span class="text-xs text-gray-600">{{ finance_plans | length }} plan{{ 'es' if finance_plans | length != 1 }}</span>
+  </div>
+
+  {% if finance_plans %}
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="text-xs text-gray-500 uppercase border-b border-gray-800">
+          <th class="pb-2 text-left">Plan</th>
+          <th class="pb-2 text-left">Posiciones</th>
+          <th class="pb-2 text-center">Desde</th>
+          <th class="pb-2 text-center">P&amp;L</th>
+          <th class="pb-2"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-800">
+        {% for plan in finance_plans %}
+        <tr id="plan-row-{{ plan.id }}" class="hover:bg-gray-800/30">
+          <td class="py-2 pr-4 font-medium text-gray-200">{{ plan.name }}</td>
+          <td class="py-2 pr-4 text-gray-400 text-xs">
+            {% for pos in plan.positions %}
+            <span class="inline-block mr-2">{{ pos.ticker }} {{ pos.pct | int }}%</span>
+            {% endfor %}
+          </td>
+          <td class="py-2 text-center text-gray-500 text-xs">{{ plan.created_at[:10] }}</td>
+          <td class="py-2 text-center text-xs font-mono font-medium
+            {% if plan.weighted_pnl is not none %}
+              {% if plan.weighted_pnl >= 0 %}text-emerald-400{% else %}text-red-400{% endif %}
+            {% else %}text-gray-600{% endif %}">
+            {% if plan.weighted_pnl is not none %}
+              {{ '%+.1f' | format(plan.weighted_pnl) }}%
+            {% else %}—{% endif %}
+          </td>
+          <td class="py-2 text-right">
+            <button
+              hx-delete="/users/{{ uid }}/finance/plans/{{ plan.name }}"
+              hx-target="#plan-row-{{ plan.id }}"
+              hx-swap="outerHTML"
+              hx-confirm="¿Eliminar el plan '{{ plan.name }}'?"
+              class="px-2 py-0.5 text-[10px] text-gray-600 hover:text-red-400 hover:bg-red-900/20 rounded transition-colors">
+              Eliminar
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="text-sm text-gray-600">Sin planes de inversión. Se crearán automáticamente en el próximo ciclo proactivo.</p>
+  {% endif %}
+</div>
+
 {% endblock %}

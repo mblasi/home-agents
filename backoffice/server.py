@@ -1141,6 +1141,48 @@ def alerts_page(request: Request):
                    alerts=data, alert_state=alert_keys)
 
 
+@app.get("/finance/templates", response_class=HTMLResponse)
+def finance_templates_page(request: Request):
+    core_ok   = _core("/health", timeout=3) is not None
+    templates = _core("/finance/templates") or [] if core_ok else []
+    return _render(request, "finance_templates.html", "finance-templates",
+                   templates=templates, core_ok=core_ok)
+
+
+@app.post("/finance/templates", response_class=HTMLResponse)
+async def create_finance_template_proxy(request: Request):
+    form     = await request.form()
+    name     = str(form.get("name", "")).strip()
+    raw_pos  = str(form.get("positions_raw", "")).strip()
+    threshold = float(form.get("review_threshold", -10))
+
+    positions: list[dict] = []
+    for part in raw_pos.split(","):
+        part = part.strip()
+        if ":" in part:
+            ticker, pct_s = part.split(":", 1)
+            try:
+                positions.append({"ticker": ticker.strip().upper(), "pct": float(pct_s.strip())})
+            except ValueError:
+                pass
+
+    if not name or not positions:
+        return HTMLResponse('<p class="text-red-400 text-xs">Nombre y posiciones requeridos.</p>', status_code=422)
+
+    _core("/finance/templates", method="POST",
+          json={"name": name, "positions": positions, "review_threshold": threshold})
+
+    templates = _core("/finance/templates") or []
+    return _render(request, "finance_templates.html", "finance-templates",
+                   templates=templates, core_ok=True)
+
+
+@app.delete("/finance/templates/{name}", response_class=HTMLResponse)
+def delete_finance_template_proxy(name: str):
+    _core(f"/finance/templates/{name}", method="DELETE")
+    return HTMLResponse("")
+
+
 @app.get("/config", response_class=HTMLResponse)
 def config_page(request: Request):
     env_path = Path.home() / "workspace/home-agents/core/.env"
@@ -1254,6 +1296,7 @@ def user_detail_page(request: Request, uid: str):
     # proactive_enabled per agent from plain context (not raw)
     user_ctx_plain   = _core(f"/users/{uid}/context") or {}
     ml_oauth_status  = _oauth_status("ml", uid)
+    finance_plans    = _core(f"/finance/plans/{uid}") or []
     return _render(request, "user_detail.html", "users",
                    user=user, uid=uid, agents=agents, agents_meta=agents_meta,
                    ww_samples=ww_samples, ww_metrics=ww_metrics,
@@ -1262,6 +1305,7 @@ def user_detail_page(request: Request, uid: str):
                    proactive_status=proactive_status,
                    user_ctx_plain=user_ctx_plain,
                    ml_oauth_status=ml_oauth_status,
+                   finance_plans=finance_plans,
                    oauth_app_url=OAUTH_APP_URL,
                    connected=request.query_params.get("connected", ""),
                    oauth_error=request.query_params.get("oauth_error", ""))
@@ -1337,6 +1381,12 @@ async def set_user_context_field(uid: str, agent_id: str, field: str, request: R
         f'<script>setTimeout(()=>document.getElementById("ctx-saved-{agent_id}-{field}")?.remove(),2000)</script>'
         f'</span>'
     )
+
+
+@app.delete("/users/{uid}/finance/plans/{plan_name}", response_class=HTMLResponse)
+def delete_user_finance_plan(uid: str, plan_name: str):
+    _core(f"/finance/plans/{uid}/{plan_name}", method="DELETE")
+    return HTMLResponse("")
 
 
 @app.post("/users/{uid}/gcal", response_class=HTMLResponse)

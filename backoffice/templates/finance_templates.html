@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Templates de inversión{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-bold">Templates de inversión</h1>
+  <p class="text-sm text-gray-500">Se usan para crear planes automáticamente por usuario en el ciclo proactivo</p>
+</div>
+
+{% if not core_ok %}
+<div class="mb-4 bg-red-900/30 border border-red-700 text-red-300 text-sm px-4 py-3 rounded-xl">
+  No se pudo conectar al core. Los templates no están disponibles.
+</div>
+{% endif %}
+
+<!-- Lista de templates existentes -->
+<div id="templates-list" class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden mb-6">
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="border-b border-gray-800 text-gray-400 text-xs uppercase tracking-wider">
+        <th class="px-4 py-3 text-left">Nombre</th>
+        <th class="px-4 py-3 text-left">Posiciones</th>
+        <th class="px-4 py-3 text-center">Umbral revisión</th>
+        <th class="px-4 py-3 text-center">Acciones</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-800">
+      {% for tmpl in templates %}
+      <tr id="tmpl-row-{{ loop.index }}" class="hover:bg-gray-800/30">
+        <td class="px-4 py-3 font-medium text-gray-200">{{ tmpl.name }}</td>
+        <td class="px-4 py-3 text-gray-400 text-xs">
+          {% for pos in tmpl.positions %}
+          <span class="inline-block mr-3">
+            <span class="font-mono text-gray-300">{{ pos.ticker }}</span>
+            <span class="text-gray-500">{{ pos.pct | int }}%</span>
+          </span>
+          {% endfor %}
+        </td>
+        <td class="px-4 py-3 text-center text-xs font-mono
+          {% if tmpl.review_threshold >= -5 %}text-amber-400
+          {% elif tmpl.review_threshold >= -10 %}text-yellow-400
+          {% else %}text-red-400{% endif %}">
+          {{ '%+.0f' | format(tmpl.review_threshold) }}%
+        </td>
+        <td class="px-4 py-3 text-center">
+          <button
+            hx-delete="/finance/templates/{{ tmpl.name }}"
+            hx-target="#tmpl-row-{{ loop.index }}"
+            hx-swap="outerHTML"
+            hx-confirm="¿Eliminar el template '{{ tmpl.name }}'? Los planes de usuarios existentes no se eliminan."
+            class="px-2 py-1 bg-red-900/40 hover:bg-red-900/70 text-red-400 hover:text-red-300 rounded text-xs transition-colors">
+            Eliminar
+          </button>
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="4" class="px-4 py-6 text-center text-gray-600 text-sm">
+          No hay templates definidos. El agente no podrá crear planes automáticamente.
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Formulario nuevo template -->
+<div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+  <h2 class="text-sm font-semibold text-gray-300 mb-4">Nuevo template</h2>
+  <form id="new-tmpl-form" hx-post="/finance/templates" hx-target="#templates-list" hx-swap="outerHTML" hx-select="#templates-list" hx-on::after-request="this.reset()">
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">Nombre</label>
+        <input type="text" name="name" required placeholder="ej: conservador"
+               class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500">
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">Posiciones (TICKER:pct, separadas por coma)</label>
+        <input type="text" name="positions_raw" required placeholder="ej: GGAL:30,MELI:40,BTC-USD:30"
+               class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 font-mono focus:outline-none focus:border-indigo-500">
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">Umbral de revisión (%)</label>
+        <input type="number" name="review_threshold" value="-10" step="0.5" min="-50" max="0"
+               class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500">
+      </div>
+    </div>
+    <div id="tmpl-form-error" class="mt-2 text-xs text-red-400 hidden"></div>
+    <div class="mt-4 flex items-center gap-3">
+      <button type="submit"
+              class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors">
+        Crear template
+      </button>
+      <span id="tmpl-saved" class="text-xs text-emerald-400 hidden">✓ Guardado</span>
+    </div>
+  </form>
+</div>
+{% endblock %}
