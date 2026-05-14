@@ -693,7 +693,7 @@ async function runAllProactive(uid) {
 
         <!-- Filas de posiciones dinámicas -->
         <div id="tmpl-positions" class="space-y-1.5"></div>
-        <button type="button" onclick="tmplAddRow()"
+        <button type="button" onclick="const _inp = tmplAddRow(); setTimeout(() => _inp?.focus(), 0)"
                 class="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">
           + Agregar ticker
         </button>
@@ -726,8 +726,10 @@ async function runAllProactive(uid) {
   const dropdown = document.getElementById('ticker-dropdown');
   let activeInput = null;
   let debounceTimer = null;
+  let hideTimer = null;
 
   function showDropdown(input, items, grouped) {
+    clearTimeout(hideTimer);
     activeInput = input;
     dropdown.innerHTML = '';
 
@@ -769,7 +771,7 @@ async function runAllProactive(uid) {
 
   function positionDropdown(input) {
     const rect = input.getBoundingClientRect();
-    dropdown.style.top  = (rect.bottom + window.scrollY + 2) + 'px';
+    dropdown.style.top  = (rect.bottom + 2) + 'px';   // fixed: viewport coords, no scrollY
     dropdown.style.left = rect.left + 'px';
     dropdown.style.width = Math.max(256, rect.width) + 'px';
   }
@@ -837,9 +839,9 @@ async function runAllProactive(uid) {
 
     tickerInput.addEventListener('focus',  () => onTickerFocus(tickerInput));
     tickerInput.addEventListener('input',  () => { onTickerInput(tickerInput); tickerInput.value = tickerInput.value.toUpperCase(); });
-    tickerInput.addEventListener('blur',   () => setTimeout(hideDropdown, 150));
+    tickerInput.addEventListener('blur',   () => { hideTimer = setTimeout(hideDropdown, 150); });
     pctInput.addEventListener('input',    updateTotal);
-    tickerInput.focus();
+    return tickerInput;
   };
 
   function updateTotal() {

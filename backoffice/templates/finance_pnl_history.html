@@ -15,8 +15,12 @@
 
 {% else %}
 
+{% set min_date = finance_plans | map(attribute='created_at') | list | sort | first %}
+
 <!-- Controles -->
-<div class="bg-gray-900 border border-gray-800 rounded-xl p-4 mb-4">
+<div class="bg-gray-900 border border-gray-800 rounded-xl p-4 mb-4 space-y-3">
+
+  <!-- Fila 1: planes + toggles + intervalo -->
   <div class="flex items-center gap-4 flex-wrap">
     <span class="text-xs text-gray-400 uppercase tracking-wider font-semibold">Planes</span>
     {% for plan in finance_plans %}
@@ -26,17 +30,21 @@
       <span class="text-sm text-gray-300">{{ plan.name }}</span>
     </label>
     {% endfor %}
-    <span class="mx-2 text-gray-700">|</span>
+    <span class="mx-1 text-gray-700">|</span>
     <label class="flex items-center gap-2 cursor-pointer select-none">
       <input type="checkbox" id="toggle-trend" class="accent-emerald-500 w-4 h-4" checked>
       <span class="text-sm text-gray-400">Tendencia</span>
     </label>
-    <span class="mx-2 text-gray-700">|</span>
+    <label class="flex items-center gap-2 cursor-pointer select-none">
+      <input type="checkbox" id="toggle-breakdown" class="accent-indigo-500 w-4 h-4">
+      <span class="text-sm text-gray-400">Desglose tickers</span>
+    </label>
+    <span class="mx-1 text-gray-700">|</span>
     <span class="text-xs text-gray-400 uppercase tracking-wider font-semibold">Intervalo</span>
     <select id="interval-select"
             class="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200
                    focus:outline-none focus:ring-1 focus:ring-indigo-500">
-      <option value="1h"  selected>1 hora</option>
+      <option value="1h" selected>1 hora</option>
       <option value="1d">1 día</option>
       <option value="1wk">1 semana</option>
     </select>
@@ -45,6 +53,34 @@
       Actualizar
     </button>
   </div>
+
+  <!-- Fila 2: ventana de tiempo -->
+  <div class="flex items-center gap-3 flex-wrap">
+    <span class="text-xs text-gray-400 uppercase tracking-wider font-semibold">Ventana</span>
+    <div class="flex items-center gap-1.5">
+      <span class="text-xs text-gray-500">Desde</span>
+      <input type="date" id="date-start" value="{{ min_date[:10] }}"
+             min="{{ min_date[:10] }}"
+             class="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200
+                    focus:outline-none focus:ring-1 focus:ring-indigo-500">
+    </div>
+    <div class="flex items-center gap-1.5">
+      <span class="text-xs text-gray-500">Hasta</span>
+      <input type="date" id="date-end"
+             class="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200
+                    focus:outline-none focus:ring-1 focus:ring-indigo-500">
+    </div>
+    <button id="btn-apply-range"
+            class="px-3 py-1 text-xs bg-indigo-700 hover:bg-indigo-600 text-white rounded transition-colors">
+      Aplicar
+    </button>
+    <button id="btn-reset-range"
+            class="px-3 py-1 text-xs bg-gray-800 hover:bg-gray-700 text-gray-400 rounded transition-colors">
+      Restablecer
+    </button>
+    <span class="text-xs text-gray-600 ml-1">— o arrastrá en el gráfico para seleccionar</span>
+  </div>
+
 </div>
 
 <!-- Chart -->
@@ -63,51 +99,64 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2"></script>
 <script>
 (function () {
-  const UID = {{ uid | tojson | safe }};
-  const PLAN_NAMES = {{ finance_plans | map(attribute='name') | list | tojson | safe }};
+  const UID        = {{ uid | tojson | safe }};
+  const MIN_DATE   = {{ min_date[:10] | tojson | safe }};
+  const TODAY      = new Date().toISOString().slice(0, 10);
 
-  let chart = null;
+  let chart      = null;
+  let lastData   = null;  // raw API response, for re-renders without fetch
 
   const COLORS = [
-    { border: '#10b981', bg: 'rgba(16,185,129,0.08)', trend: '#059669' },
-    { border: '#3b82f6', bg: 'rgba(59,130,246,0.08)', trend: '#2563eb' },
+    { border: '#10b981', bg: 'rgba(16,185,129,0.08)',  trend: '#059669' },
+    { border: '#3b82f6', bg: 'rgba(59,130,246,0.08)',  trend: '#2563eb' },
     { border: '#f59e0b', bg: 'rgba(245,158,11,0.08)',  trend: '#d97706' },
     { border: '#a78bfa', bg: 'rgba(167,139,250,0.08)', trend: '#7c3aed' },
     { border: '#f472b6', bg: 'rgba(244,114,182,0.08)', trend: '#db2777' },
   ];
+  // Dash patterns for ticker sub-lines (per ticker index within a plan)
+  const TICKER_DASHES = [[4,3],[2,2],[8,3],[6,2,2,2]];
+
+  /* ── helpers ────────────────────────────────────────────────────────────── */
 
   function selectedPlans() {
     return [...document.querySelectorAll('.plan-toggle:checked')].map(el => el.value);
   }
-
   function selectedInterval() {
     return document.getElementById('interval-select').value;
   }
+  function dateStart() { return document.getElementById('date-start').value; }
+  function dateEnd()   { return document.getElementById('date-end').value; }
+  function showBreakdown() { return document.getElementById('toggle-breakdown').checked; }
 
   function buildUrl(plans) {
     const params = plans.map(p => `plan=${encodeURIComponent(p)}`);
     params.push(`interval=${selectedInterval()}`);
+    if (dateStart()) params.push(`start=${dateStart()}`);
+    if (dateEnd())   params.push(`end=${dateEnd()}`);
     return `/users/${UID}/finance/plans/history?` + params.join('&');
   }
 
+  /* ── datasets ───────────────────────────────────────────────────────────── */
+
   function buildDatasets(data, labels) {
-    const datasets = [];
-    let colorIdx = 0;
+    const datasets   = [];
+    const breakdown  = showBreakdown();
+    const showTrend  = document.getElementById('toggle-trend').checked;
+    let   colorIdx   = 0;
+
     for (const [planName, planData] of Object.entries(data)) {
-      const { series, trend } = planData;
-      if (!series || series.length < 2) continue;
+      const { series, trend, ticker_series } = planData;
+      if (!series || series.length < 2) { colorIdx++; continue; }
       const col = COLORS[colorIdx % COLORS.length];
       colorIdx++;
 
-      // Historical series — plain array aligned to labels
-      const seriesMap = Object.fromEntries(series.map(p => [p.date, p.pnl_pct]));
-      const histValues = labels.map(date => {
-        const v = seriesMap[date];
-        return (v !== undefined) ? v : null;
-      });
-
+      // Main plan line
+      const seriesMap  = Object.fromEntries(series.map(p => [p.date, p.pnl_pct]));
+      const histValues = labels.map(d => { const v = seriesMap[d]; return v !== undefined ? v : null; });
       datasets.push({
         label: planName,
         data: histValues,
@@ -118,21 +167,44 @@
         pointRadius: 2,
         pointHoverRadius: 4,
         spanGaps: false,
+        _isTrend: false,
+        _isTicker: false,
       });
 
-      // Trend line (only if available)
-      if (trend && trend.points && trend.points.length >= 2) {
-        const trendMap = Object.fromEntries(trend.points.map(p => [p.date, p.pnl_pct]));
-        const trendLabels = trend.points.map(p => p.date);
-        // extend labels with future trend dates
-        for (const d of trendLabels) {
-          if (!labels.includes(d)) labels.push(d);
+      // Ticker breakdown lines
+      if (breakdown && ticker_series) {
+        let tickerIdx = 0;
+        for (const [ticker, tseries] of Object.entries(ticker_series)) {
+          if (!tseries || !tseries.length) continue;
+          const tMap    = Object.fromEntries(tseries.map(p => [p.date, p.contribution]));
+          const tValues = labels.map(d => { const v = tMap[d]; return v !== undefined ? v : null; });
+          const dash    = TICKER_DASHES[tickerIdx % TICKER_DASHES.length];
+          datasets.push({
+            label: `${planName} / ${ticker}`,
+            data: tValues,
+            borderColor: col.border,
+            borderDash: dash,
+            borderWidth: 1.2,
+            backgroundColor: 'transparent',
+            fill: false,
+            tension: 0.2,
+            pointRadius: 0,
+            pointHoverRadius: 3,
+            spanGaps: false,
+            _isTrend: false,
+            _isTicker: true,
+            hidden: false,
+          });
+          tickerIdx++;
         }
-        // rebuild trend values after labels may have grown
-        const trendValues = labels.map(date => {
-          const v = trendMap[date];
-          return (v !== undefined) ? v : null;
-        });
+      }
+
+      // Trend line
+      if (trend && trend.points && trend.points.length >= 2) {
+        const trendMap    = Object.fromEntries(trend.points.map(p => [p.date, p.pnl_pct]));
+        const trendLabels = trend.points.map(p => p.date);
+        for (const d of trendLabels) { if (!labels.includes(d)) labels.push(d); }
+        const trendValues = labels.map(d => { const v = trendMap[d]; return v !== undefined ? v : null; });
         datasets.push({
           label: `${planName} (tendencia)`,
           data: trendValues,
@@ -143,36 +215,60 @@
           fill: false,
           spanGaps: true,
           tension: 0,
+          hidden: !showTrend,
+          _isTrend: true,
+          _isTicker: false,
         });
       }
     }
     return datasets;
   }
 
+  /* ── metrics ────────────────────────────────────────────────────────────── */
+
   function renderMetrics(data) {
     const container = document.getElementById('pnl-metrics');
     container.innerHTML = '';
-    let hasAny = false;
+    let hasAny   = false;
     let colorIdx = 0;
+
     for (const [planName, planData] of Object.entries(data)) {
-      const { series, trend } = planData;
-      if (!series || series.length < 2) continue;
+      const { series, trend, ticker_series } = planData;
+      if (!series || series.length < 2) { colorIdx++; continue; }
       hasAny = true;
-      const col = COLORS[colorIdx % COLORS.length];
+      const col  = COLORS[colorIdx % COLORS.length];
       colorIdx++;
 
-      const last = series[series.length - 1];
-      const first = series[0];
+      const last          = series[series.length - 1];
+      const first         = series[0];
       const intervalLabel = {'1h': 'hora', '1d': 'día', '1wk': 'semana'}[selectedInterval()] || 'intervalo';
-      const slopeStr = trend && trend.slope_per_interval !== undefined
+      const slopeStr      = trend?.slope_per_interval !== undefined
         ? (trend.slope_per_interval >= 0 ? '+' : '') + trend.slope_per_interval.toFixed(3) + `%/${intervalLabel}`
         : '—';
-      const proj30Str = trend && trend.projection_30d != null
+      const proj30Str     = trend?.projection_30d != null
         ? (trend.projection_30d >= 0 ? '+' : '') + trend.projection_30d.toFixed(2) + '%'
         : '—';
-      const r2Str = trend && trend.r2 !== undefined
-        ? (trend.r2 * 100).toFixed(0) + '%'
-        : '—';
+      const r2Str         = trend?.r2 !== undefined ? (trend.r2 * 100).toFixed(0) + '%' : '—';
+
+      // Per-ticker breakdown at last point
+      let tickerRows = '';
+      if (ticker_series) {
+        for (const [ticker, tseries] of Object.entries(ticker_series)) {
+          if (!tseries.length) continue;
+          const tLast = tseries[tseries.length - 1];
+          const contribColor = tLast.contribution >= 0 ? 'text-emerald-400' : 'text-red-400';
+          const pnlColor     = tLast.pnl_pct >= 0 ? 'text-emerald-300' : 'text-red-300';
+          tickerRows += `
+            <div class="flex items-center gap-3 py-0.5 border-t border-gray-800/50 mt-0.5">
+              <span class="font-mono text-gray-300 text-[11px] w-20 shrink-0">${ticker}</span>
+              <span class="text-gray-500 text-[11px]">P&L propio</span>
+              <span class="font-mono ${pnlColor} text-[11px]">${tLast.pnl_pct >= 0 ? '+' : ''}${tLast.pnl_pct.toFixed(2)}%</span>
+              <span class="text-gray-600 text-[11px] mx-1">·</span>
+              <span class="text-gray-500 text-[11px]">contribución</span>
+              <span class="font-mono ${contribColor} text-[11px]">${tLast.contribution >= 0 ? '+' : ''}${tLast.contribution.toFixed(2)}%</span>
+            </div>`;
+        }
+      }
 
       const card = document.createElement('div');
       card.className = 'bg-gray-900 border border-gray-800 rounded-xl p-4 flex items-start gap-4';
@@ -180,72 +276,43 @@
         <div class="w-2.5 h-2.5 rounded-full mt-1 shrink-0" style="background:${col.border}"></div>
         <div class="flex-1 min-w-0">
           <div class="text-sm font-semibold text-gray-200 mb-2">${planName}</div>
-          <div class="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
-            <div>
-              <span class="text-gray-500">Desde</span>
-              <span class="ml-2 font-mono text-gray-300">${first.date}</span>
-            </div>
-            <div>
-              <span class="text-gray-500">Hasta</span>
-              <span class="ml-2 font-mono text-gray-300">${last.date}</span>
-            </div>
+          <div class="grid grid-cols-2 gap-x-6 gap-y-1 text-xs mb-2">
+            <div><span class="text-gray-500">Desde</span><span class="ml-2 font-mono text-gray-300">${first.date}</span></div>
+            <div><span class="text-gray-500">Hasta</span><span class="ml-2 font-mono text-gray-300">${last.date}</span></div>
             <div>
               <span class="text-gray-500">P&L actual</span>
               <span class="ml-2 font-mono ${last.pnl_pct >= 0 ? 'text-emerald-400' : 'text-red-400'}">
                 ${last.pnl_pct >= 0 ? '+' : ''}${last.pnl_pct.toFixed(2)}%
               </span>
             </div>
-            <div>
-              <span class="text-gray-500">Tendencia</span>
-              <span class="ml-2 font-mono text-gray-400">${slopeStr}</span>
-            </div>
+            <div><span class="text-gray-500">Tendencia</span><span class="ml-2 font-mono text-gray-400">${slopeStr}</span></div>
             <div>
               <span class="text-gray-500">Proyección 30d</span>
-              <span class="ml-2 font-mono ${(!trend || trend.projection_30d === undefined) ? 'text-gray-500' : trend.projection_30d >= 0 ? 'text-emerald-400' : 'text-red-400'}">
+              <span class="ml-2 font-mono ${(!trend || trend.projection_30d == null) ? 'text-gray-500' : trend.projection_30d >= 0 ? 'text-emerald-400' : 'text-red-400'}">
                 ${proj30Str}
               </span>
             </div>
-            <div>
-              <span class="text-gray-500">Ajuste (R²)</span>
-              <span class="ml-2 font-mono text-gray-400">${r2Str}</span>
-            </div>
+            <div><span class="text-gray-500">Ajuste (R²)</span><span class="ml-2 font-mono text-gray-400">${r2Str}</span></div>
           </div>
-        </div>
-      `;
+          ${tickerRows ? `<div class="mt-1">${tickerRows}</div>` : ''}
+        </div>`;
       container.appendChild(card);
     }
     container.classList.toggle('hidden', !hasAny);
   }
 
-  async function load() {
-    const plans = selectedPlans();
-    document.getElementById('pnl-loading').classList.remove('hidden');
-    document.getElementById('pnl-chart-wrap').classList.add('hidden');
-    document.getElementById('pnl-no-data').classList.add('hidden');
-    document.getElementById('pnl-metrics').classList.add('hidden');
+  /* ── chart render ───────────────────────────────────────────────────────── */
 
-    let data;
-    try {
-      const resp = await fetch(buildUrl(plans));
-      data = await resp.json();
-    } catch (e) {
-      document.getElementById('pnl-loading').textContent = 'Error al cargar datos.';
-      return;
-    }
-
-    document.getElementById('pnl-loading').classList.add('hidden');
-
-    // Collect all historical dates (sorted) as the label axis
+  function renderChart(data) {
     const dateSet = new Set();
-    for (const planData of Object.values(data)) {
-      (planData.series || []).forEach(p => dateSet.add(p.date));
+    for (const pd of Object.values(data)) {
+      (pd.series || []).forEach(p => dateSet.add(p.date));
     }
-    const labels = [...dateSet].sort();
-
+    const labels   = [...dateSet].sort();
     const datasets = buildDatasets(data, labels);
 
     const totalPoints = datasets
-      .filter(ds => !ds.label.includes('(tendencia)'))
+      .filter(ds => !ds._isTrend && !ds._isTicker)
       .reduce((s, ds) => s + ds.data.filter(v => v !== null).length, 0);
 
     if (totalPoints === 0) {
@@ -257,8 +324,9 @@
     document.getElementById('pnl-chart-wrap').classList.remove('hidden');
 
     if (chart) {
-      chart.data.labels = labels;
+      chart.data.labels   = labels;
       chart.data.datasets = datasets;
+      chart.resetZoom();
       chart.update();
     } else {
       chart = new Chart(document.getElementById('pnl-chart'), {
@@ -269,14 +337,32 @@
           interaction: { mode: 'index', intersect: false },
           plugins: {
             legend: {
-              labels: { color: '#9ca3af', font: { size: 11 }, boxWidth: 14 }
+              labels: { color: '#9ca3af', font: { size: 11 }, boxWidth: 14,
+                        filter: item => !item.text.includes('(tendencia)') && !item.text.includes(' / ') }
             },
             tooltip: {
               callbacks: {
                 label: ctx => {
                   if (ctx.raw === null) return null;
                   const sign = ctx.raw >= 0 ? '+' : '';
+                  if (ctx.dataset._isTicker) {
+                    return `  ${ctx.dataset.label}: ${sign}${ctx.raw.toFixed(2)}% contrib`;
+                  }
                   return `${ctx.dataset.label}: ${sign}${ctx.raw.toFixed(2)}%`;
+                }
+              }
+            },
+            zoom: {
+              zoom: {
+                drag: { enabled: true, backgroundColor: 'rgba(99,102,241,0.12)', borderColor: '#6366f1', borderWidth: 1 },
+                mode: 'x',
+                onZoomComplete: ({ chart: c }) => {
+                  const xScale = c.scales.x;
+                  const labs   = c.data.labels;
+                  const iMin   = Math.max(0, Math.round(xScale.min));
+                  const iMax   = Math.min(labs.length - 1, Math.round(xScale.max));
+                  if (labs[iMin]) document.getElementById('date-start').value = labs[iMin].substring(0, 10);
+                  if (labs[iMax]) document.getElementById('date-end').value   = labs[iMax].substring(0, 10);
                 }
               }
             }
@@ -289,8 +375,7 @@
             },
             y: {
               ticks: {
-                color: '#6b7280',
-                font:  { size: 11 },
+                color: '#6b7280', font: { size: 11 },
                 callback: v => (v >= 0 ? '+' : '') + v.toFixed(1) + '%'
               },
               grid: { color: 'rgba(75,85,99,0.2)' }
@@ -299,27 +384,70 @@
         }
       });
     }
-
     renderMetrics(data);
   }
+
+  /* ── load ───────────────────────────────────────────────────────────────── */
+
+  async function load() {
+    const plans = selectedPlans();
+    document.getElementById('pnl-loading').classList.remove('hidden');
+    document.getElementById('pnl-chart-wrap').classList.add('hidden');
+    document.getElementById('pnl-no-data').classList.add('hidden');
+    document.getElementById('pnl-metrics').classList.add('hidden');
+
+    try {
+      const resp = await fetch(buildUrl(plans));
+      lastData = await resp.json();
+    } catch {
+      document.getElementById('pnl-loading').textContent = 'Error al cargar datos.';
+      return;
+    }
+    document.getElementById('pnl-loading').classList.add('hidden');
+    renderChart(lastData);
+  }
+
+  // Re-render from cache (no fetch) when toggling breakdown/trend
+  function rerender() {
+    if (!lastData) return;
+    document.getElementById('pnl-chart-wrap').classList.add('hidden');
+    document.getElementById('pnl-no-data').classList.add('hidden');
+    document.getElementById('pnl-metrics').classList.add('hidden');
+    renderChart(lastData);
+  }
+
+  /* ── visibility toggles ─────────────────────────────────────────────────── */
 
   function applyTrendVisibility() {
     if (!chart) return;
     const show = document.getElementById('toggle-trend').checked;
-    chart.data.datasets.forEach(ds => {
-      if (ds.label && ds.label.includes('(tendencia)')) {
-        ds.hidden = !show;
-      }
-    });
+    chart.data.datasets.forEach(ds => { if (ds._isTrend) ds.hidden = !show; });
     chart.update();
   }
 
-  document.querySelectorAll('.plan-toggle').forEach(el =>
-    el.addEventListener('change', load)
-  );
+  function applyBreakdownVisibility() {
+    if (!lastData) return;
+    rerender();  // full re-render since ticker datasets need to be added/removed
+  }
+
+  /* ── events ─────────────────────────────────────────────────────────────── */
+
+  document.querySelectorAll('.plan-toggle').forEach(el => el.addEventListener('change', load));
   document.getElementById('toggle-trend').addEventListener('change', applyTrendVisibility);
+  document.getElementById('toggle-breakdown').addEventListener('change', applyBreakdownVisibility);
   document.getElementById('interval-select').addEventListener('change', load);
   document.getElementById('btn-refresh').addEventListener('click', load);
+
+  document.getElementById('btn-apply-range').addEventListener('click', load);
+  document.getElementById('btn-reset-range').addEventListener('click', () => {
+    document.getElementById('date-start').value = MIN_DATE;
+    document.getElementById('date-end').value   = TODAY;
+    if (chart) chart.resetZoom();
+    load();
+  });
+
+  // Set today as default end date
+  document.getElementById('date-end').value = TODAY;
 
   load();
 })();
