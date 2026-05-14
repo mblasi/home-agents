@@ -59,14 +59,14 @@
     <span class="text-xs text-gray-400 uppercase tracking-wider font-semibold">Ventana</span>
     <div class="flex items-center gap-1.5">
       <span class="text-xs text-gray-500">Desde</span>
-      <input type="date" id="date-start" value="{{ min_date[:10] }}"
-             min="{{ min_date[:10] }}"
+      <input type="datetime-local" id="date-start" value="{{ min_date[:16] if min_date|length >= 16 else min_date[:10] + 'T00:00' }}"
+             min="{{ min_date[:10] }}T00:00"
              class="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200
                     focus:outline-none focus:ring-1 focus:ring-indigo-500">
     </div>
     <div class="flex items-center gap-1.5">
       <span class="text-xs text-gray-500">Hasta</span>
-      <input type="date" id="date-end"
+      <input type="datetime-local" id="date-end"
              class="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200
                     focus:outline-none focus:ring-1 focus:ring-indigo-500">
     </div>
@@ -101,11 +101,14 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3"></script>
 <script>
 (function () {
   const UID        = {{ uid | tojson | safe }};
-  const MIN_DATE   = {{ min_date[:10] | tojson | safe }};
-  const TODAY      = new Date().toISOString().slice(0, 10);
+  const MIN_DATE   = {{ (min_date[:16] if min_date|length >= 16 else min_date[:10] + 'T00:00') | tojson | safe }};
+  const _now       = new Date();
+  const _pad       = n => String(n).padStart(2, '0');
+  const TODAY      = `${_now.getFullYear()}-${_pad(_now.getMonth()+1)}-${_pad(_now.getDate())}T23:59`;
 
   let chart      = null;
   let lastData   = null;  // raw API response, for re-renders without fetch
@@ -361,8 +364,11 @@
                   const labs   = c.data.labels;
                   const iMin   = Math.max(0, Math.round(xScale.min));
                   const iMax   = Math.min(labs.length - 1, Math.round(xScale.max));
-                  if (labs[iMin]) document.getElementById('date-start').value = labs[iMin].substring(0, 10);
-                  if (labs[iMax]) document.getElementById('date-end').value   = labs[iMax].substring(0, 10);
+                  const toLocal = lab => lab.length >= 16
+                    ? lab.substring(0, 10) + 'T' + lab.substring(11, 16)
+                    : lab.substring(0, 10) + 'T00:00';
+                  if (labs[iMin]) document.getElementById('date-start').value = toLocal(labs[iMin]);
+                  if (labs[iMax]) document.getElementById('date-end').value   = toLocal(labs[iMax]);
                 }
               }
             }
@@ -387,6 +393,86 @@
     renderMetrics(data);
   }
 
+  /* ── milestones ─────────────────────────────────────────────────────────── */
+
+  const MILESTONE_COLORS = {
+    suggestion: '#f59e0b',
+    applied:    '#10b981',
+    rejected:   '#ef4444',
+  };
+
+  function labelToTs(label) {
+    // labels son "YYYY-MM-DD HH:MM" (intraday) o "YYYY-MM-DD" (daily)
+    const iso = label.length >= 16
+      ? label.replace(' ', 'T') + ':00-03:00'
+      : label + 'T00:00:00-03:00';
+    return new Date(iso).getTime() / 1000;
+  }
+
+  async function loadMilestones(labels) {
+    if (!chart || !labels || labels.length === 0) return;
+
+    const since = labelToTs(labels[0]);
+    let events;
+    try {
+      const resp = await fetch(`/finance/plan-events/${UID}?since=${since}`);
+      const json = await resp.json();
+      events = json.events || [];
+    } catch {
+      return;
+    }
+
+    // Limpiar anotaciones previas
+    if (!chart.options.plugins.annotation) {
+      chart.options.plugins.annotation = {};
+    }
+    if (events.length === 0) {
+      chart.options.plugins.annotation.annotations = {};
+      chart.update('none');
+      return;
+    }
+
+    // Precalcular timestamps de cada label para nearestLabel
+    const labelTsArr = labels.map(l => ({ label: l, ts: labelToTs(l) }));
+    function nearestLabel(eventTs) {
+      let best = labelTsArr[0];
+      let bestDiff = Math.abs(eventTs - best.ts);
+      for (const lt of labelTsArr) {
+        const diff = Math.abs(eventTs - lt.ts);
+        if (diff < bestDiff) { bestDiff = diff; best = lt; }
+      }
+      return best.label;
+    }
+
+    const annotations = {};
+    events.forEach((ev, idx) => {
+      const xLabel = nearestLabel(ev.ts);
+      const color  = MILESTONE_COLORS[ev.event_type] || '#6b7280';
+      const detail = (ev.detail || ev.event_type).substring(0, 45)
+                     + ((ev.detail || '').length > 45 ? '…' : '');
+      annotations[`milestone_${idx}`] = {
+        type:        'line',
+        xMin:        xLabel,
+        xMax:        xLabel,
+        borderColor: color,
+        borderWidth: 1.5,
+        borderDash:  [4, 2],
+        label: {
+          content:         detail,
+          display:         true,
+          position:        'start',
+          color:           color,
+          font:            { size: 10 },
+          backgroundColor: 'rgba(17,24,39,0.88)',
+          padding:         { x: 4, y: 2 },
+        },
+      };
+    });
+
+    chart.options.plugins.annotation.annotations = annotations;
+    chart.update('none');
+  }
+
   /* ── load ───────────────────────────────────────────────────────────────── */
 
   async function load() {
@@ -405,6 +491,9 @@
     }
     document.getElementById('pnl-loading').classList.add('hidden');
     renderChart(lastData);
+
+    const labels = chart ? chart.data.labels : [];
+    await loadMilestones(labels);
   }
 
   // Re-render from cache (no fetch) when toggling breakdown/trend
