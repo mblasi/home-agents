@@ -462,7 +462,7 @@ Estado:   COMPLETA (5.2 postergada, google-free; alarma luces → HAOS nativo)
 ### FASE 6 - Agente Inversiones
 ```
 Objetivo: Consultas financieras por voz, datos privados locales
-Estado:   EN CURSO (10/12 — quedan 6.6, 6.11, 6.12)
+Estado:   EN CURSO (12/13 — solo queda 6.6)
 Nota:     Modo dummy (recomendaciones + P&L hipotética). Portfolio por usuario (FASE 2.5).
           Fuentes: yfinance (acciones/crypto/FX) + dolarapi.com (dólar oficial/blue/MEP/CCL).
 ```
@@ -504,14 +504,17 @@ Nota:     Modo dummy (recomendaciones + P&L hipotética). Portfolio por usuario 
            — proactive_check(): llama _strategic_checks() + super().proactive_check() (LLM sobre historial);
              omite LLM si no hay perfil. proactive_system_prompt específico para finanzas.
            Las alertas reactivas de precios siguen en finance_alerts.check() sin duplicación.
-- [ ] 6.11 Templates de planes automáticos: crear planes desde templates sin necesidad de conversación.
+- [x] 6.11 Templates de planes automáticos: crear planes desde templates sin necesidad de conversación.
            Auto-crear un plan por template disponible al primer proactive_check sin planes.
-           CRUD de templates en backoffice (/finance/templates): crear, editar, eliminar templates
-           con nombre, allocations (ticker:pct) y umbral de revisión.
-           Eliminar el intent de onboarding por chat (perfil requerido → reemplazado por templates).
-- [ ] 6.12 Backoffice sección planes de inversión por usuario:
-           Ver todos los planes activos, P&L actual por plan, botón eliminar.
-           Accesible desde el perfil del usuario.
+           list_templates(), save_template(), delete_template() en portfolio.py — CRUD persistente
+           en finance_templates.json con seed desde RISK_PROFILE_TEMPLATES. Cada template tiene
+           review_threshold propio. create_plans_from_templates(user_id) crea solo los faltantes.
+           _strategic_checks() reemplaza Intent 0 + Intent 1 por auto-creación silenciosa.
+           CRUD en backoffice /finance/templates con formulario inline.
+           REST: GET/POST /finance/templates, DELETE /finance/templates/{name}.
+- [x] 6.12 Backoffice sección planes de inversión por usuario:
+           Sección "Planes de inversión" en /users/{id}: tabla con posiciones, P&L actual por plan,
+           botón eliminar por fila. REST: GET /finance/plans/{uid}, DELETE /finance/plans/{uid}/{name}.
 
 ---
 

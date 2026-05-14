@@ -109,7 +109,8 @@ POST /process {text, source, conversation_id?}
   - `_strategic_checks()` (hardcodeado): detecta si el usuario no tiene perfil → intent de configuración; tiene perfil pero no tiene planes → intent de creación; P&L ponderada de algún plan cae bajo umbral del perfil → intent + notify WA.
   - `proactive_check()` override: llama `_strategic_checks()` + `super().proactive_check()` (LLM sobre historial de conversación). Sin perfil, omite el escaneo LLM. `proactive_system_prompt` específico para finanzas.
   - Intervalo: 3600s (cada 1h). Alertas reactivas de precios van por `alerts()` (cada 15min), sin duplicación.
-- **Companion:** `finance_alerts.py` para alertas reactivas de precio, `portfolio.py` para portfolio + templates por perfil (`RISK_PROFILE_TEMPLATES`, `RISK_REVIEW_THRESHOLD`)
+- **Templates de planes:** `portfolio.py` mantiene un CRUD de templates persistentes (`finance_templates.json`). Cada template tiene `name`, `positions` (ticker:pct) y `review_threshold`. Al primer `proactive_check` sin planes, `create_plans_from_templates()` crea uno por template faltante (silencioso, sin intents). CRUD en backoffice `/finance/templates`. REST: `GET/POST /finance/templates`, `DELETE /finance/templates/{name}`.
+- **Companion:** `finance_alerts.py` para alertas reactivas de precio, `portfolio.py` para portfolio + templates
 
 ### travel — Viajes
 
