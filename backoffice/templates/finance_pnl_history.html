@@ -31,6 +31,15 @@
       <input type="checkbox" id="toggle-trend" class="accent-emerald-500 w-4 h-4" checked>
       <span class="text-sm text-gray-400">Tendencia</span>
     </label>
+    <span class="mx-2 text-gray-700">|</span>
+    <span class="text-xs text-gray-400 uppercase tracking-wider font-semibold">Intervalo</span>
+    <select id="interval-select"
+            class="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200
+                   focus:outline-none focus:ring-1 focus:ring-indigo-500">
+      <option value="1h"  selected>1 hora</option>
+      <option value="1d">1 día</option>
+      <option value="1wk">1 semana</option>
+    </select>
     <button id="btn-refresh"
             class="ml-auto px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs rounded-lg transition-colors">
       Actualizar
@@ -73,10 +82,14 @@
     return [...document.querySelectorAll('.plan-toggle:checked')].map(el => el.value);
   }
 
+  function selectedInterval() {
+    return document.getElementById('interval-select').value;
+  }
+
   function buildUrl(plans) {
-    const base = `/users/${UID}/finance/plans/history`;
-    if (!plans.length) return base;
-    return base + '?' + plans.map(p => `plan=${encodeURIComponent(p)}`).join('&');
+    const params = plans.map(p => `plan=${encodeURIComponent(p)}`);
+    params.push(`interval=${selectedInterval()}`);
+    return `/users/${UID}/finance/plans/history?` + params.join('&');
   }
 
   function buildDatasets(data, labels) {
@@ -150,10 +163,11 @@
 
       const last = series[series.length - 1];
       const first = series[0];
-      const slopeStr = trend && trend.slope_per_day !== undefined
-        ? (trend.slope_per_day >= 0 ? '+' : '') + trend.slope_per_day.toFixed(3) + '%/día'
+      const intervalLabel = {'1h': 'hora', '1d': 'día', '1wk': 'semana'}[selectedInterval()] || 'intervalo';
+      const slopeStr = trend && trend.slope_per_interval !== undefined
+        ? (trend.slope_per_interval >= 0 ? '+' : '') + trend.slope_per_interval.toFixed(3) + `%/${intervalLabel}`
         : '—';
-      const proj30Str = trend && trend.projection_30d !== undefined
+      const proj30Str = trend && trend.projection_30d != null
         ? (trend.projection_30d >= 0 ? '+' : '') + trend.projection_30d.toFixed(2) + '%'
         : '—';
       const r2Str = trend && trend.r2 !== undefined
@@ -304,6 +318,7 @@
     el.addEventListener('change', load)
   );
   document.getElementById('toggle-trend').addEventListener('change', applyTrendVisibility);
+  document.getElementById('interval-select').addEventListener('change', load);
   document.getElementById('btn-refresh').addEventListener('click', load);
 
   load();
