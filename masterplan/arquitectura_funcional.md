@@ -110,7 +110,8 @@ POST /process {text, source, conversation_id?}
   - `proactive_check()` override: llama `_strategic_checks()` + `super().proactive_check()` (LLM sobre historial de conversación). Sin perfil, omite el escaneo LLM. `proactive_system_prompt` específico para finanzas.
   - Intervalo: 3600s (cada 1h). Alertas reactivas de precios van por `alerts()` (cada 15min), sin duplicación.
 - **Templates de planes:** `portfolio.py` mantiene un CRUD de templates persistentes (`finance_templates.json`). Cada template tiene `name`, `positions` (ticker:pct) y `review_threshold`. Al primer `proactive_check` sin planes, `create_plans_from_templates()` crea uno por template faltante (silencioso, sin intents). CRUD en backoffice `/finance/templates`. REST: `GET/POST /finance/templates`, `DELETE /finance/templates/{name}`.
-- **Companion:** `finance_alerts.py` para alertas reactivas de precio, `portfolio.py` para portfolio + templates
+- **RAG de noticias:** `finance_news.py` — scraping RSS Yahoo Finance por ticker, embeddings con `nomic-embed-text` (Ollama), búsqueda semántica cosine (numpy), fallback keyword si Ollama no responde. Índice persistido en `~/.local/share/capitan/finance_news_index.json` (TTL 30min). Las noticias más relevantes a la query del usuario se inyectan al system prompt del LLM. El refresh corre en background thread tanto en `process()` como en `alerts()`, por lo que el índice se mantiene fresco independientemente de la interacción del usuario.
+- **Companion:** `finance_alerts.py` para alertas reactivas de precio, `portfolio.py` para portfolio + templates, `finance_news.py` para RAG de noticias
 
 ### travel — Viajes
 
