@@ -70,16 +70,13 @@
             <span class="px-2 py-0.5 bg-gray-800 text-gray-600 rounded text-xs">off</span>
           {% endif %}
         </td>
-        <td class="px-4 py-3 text-center">
-          {% if info.reachable is none %}
-            <span class="text-gray-600 text-xs">—</span>
-          {% elif info.reachable == "partial" %}
-            <span title="Parcialmente accesible" class="text-amber-400">●</span>
-          {% elif info.reachable %}
-            <span title="Accesible" class="text-emerald-400">●</span>
-          {% else %}
-            <span title="No accesible" class="text-red-400">●</span>
-          {% endif %}
+        <td class="px-4 py-3 text-center"
+            id="reachable-{{ aid }}"
+            hx-get="/api/agents/{{ aid }}/reachable"
+            hx-trigger="load"
+            hx-swap="innerHTML"
+            hx-target="#reachable-{{ aid }}">
+          <span class="text-gray-500 text-xs animate-pulse">…</span>
         </td>
         <td class="px-4 py-3 text-center">
           <div class="flex items-center justify-center gap-2">

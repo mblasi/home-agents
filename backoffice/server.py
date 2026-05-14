@@ -353,9 +353,25 @@ def dashboard(request: Request):
 
 @app.get("/agents", response_class=HTMLResponse)
 def agents_page(request: Request):
+    # /agents-meta es instantáneo (sin checks de conectividad)
+    # La columna "Accesible" se carga después via JS por /api/agents/{aid}/reachable
     core_ok = _core("/health", timeout=3) is not None
-    data    = _core("/agents", timeout=30) if core_ok else None
+    data    = _core("/agents-meta", timeout=5) if core_ok else None
     return _render(request, "agents.html", "agents", agents=data or {}, core_ok=core_ok)
+
+
+@app.get("/api/agents/{agent_id}/reachable", response_class=HTMLResponse)
+def api_agent_reachable(agent_id: str):
+    """Fragmento HTML de accesibilidad para el lazy-load de la columna en /agents."""
+    result   = _core(f"/agents/{agent_id}/reachable", timeout=8)
+    reachable = (result or {}).get("reachable") if result else False
+    if reachable is None:
+        return '<span class="text-gray-600 text-xs">—</span>'
+    if reachable == "partial":
+        return '<span title="Parcialmente accesible" class="text-amber-400">●</span>'
+    if reachable:
+        return '<span title="Accesible" class="text-emerald-400">●</span>'
+    return '<span title="No accesible" class="text-red-400">●</span>'
 
 
 @app.get("/agents/{agent_id}/detail", response_class=HTMLResponse)
