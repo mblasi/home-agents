@@ -103,9 +103,11 @@ POST /process {text, source, conversation_id?}
 
 - **Archivo:** `finance_agent.py`
 - **Fuentes:** BCRA (dólar oficial, blue, MEP), Yahoo Finance, MercadoLibre cotizaciones
-- **Funciones:** dólar actual, portfolio de inversiones, alertas de precio
-- **Proactivo:** detecta preguntas frecuentes sobre el mismo activo, sugiere alerta de precio
-- **Companion:** `finance_alerts.py` para precio objetivo, `portfolio.py` para portfolio
+- **Funciones:** dólar actual, portfolio de inversiones, alertas de precio, planes de inversión por perfil de riesgo
+- **Perfil de riesgo:** conservador / moderado / agresivo — guardado en `user_context` vía tag `[PROFILE:...]`. Informa al LLM en cada conversación. Configurable desde el backoffice o por voz.
+- **Proactivo (capa estratégica, cada 1h):** detecta si el usuario tiene perfil pero no tiene planes → crea intent; detecta si la P&L ponderada de algún plan cae bajo el umbral del perfil → crea intent + notify WA.
+- **Proactivo (capa reactiva, cada 15min via `alerts()`):** brecha blue/oficial, movimientos BTC/watchlist, reporte diario de planes con P&L comparativa por WA.
+- **Companion:** `finance_alerts.py` para alertas reactivas de precio, `portfolio.py` para portfolio + templates por perfil (`RISK_PROFILE_TEMPLATES`, `RISK_REVIEW_THRESHOLD`)
 
 ### travel — Viajes
 

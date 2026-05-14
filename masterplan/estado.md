@@ -462,7 +462,7 @@ Estado:   COMPLETA (5.2 postergada, google-free; alarma luces → HAOS nativo)
 ### FASE 6 - Agente Inversiones
 ```
 Objetivo: Consultas financieras por voz, datos privados locales
-Estado:   EN CURSO (8/9 — solo queda 6.6)
+Estado:   EN CURSO (9/10 — solo queda 6.6)
 Nota:     Modo dummy (recomendaciones + P&L hipotética). Portfolio por usuario (FASE 2.5).
           Fuentes: yfinance (acciones/crypto/FX) + dolarapi.com (dólar oficial/blue/MEP/CCL).
 ```
@@ -495,6 +495,14 @@ Nota:     Modo dummy (recomendaciones + P&L hipotética). Portfolio por usuario 
            2. Reporte WA rico enviado directo vía wa_notifier: tabla por plan con
               P&L por posición, ponderada total, medallas 🥇🥈🥉, mejor plan 🏆.
            Cooldown 20h por usuario. Configurable via FINANCE_BRIEFING_HOUR.
+- [x] 6.10 Perfiles de riesgo por usuario + ciclo proactivo estratégico (portfolio.py + finance_agent.py):
+           RISK_PROFILE_TEMPLATES (conservador/moderado/agresivo) con posiciones y umbrales de revisión.
+           Tag [PROFILE:...] en system prompt: el LLM detecta el perfil en conversación y lo persiste
+           via context_updates (3-tuple). _ask_llm() inyecta perfil como contexto activo.
+           proactive_check() override con capa estratégica (proactive_schedule=3600):
+           — intent si usuario tiene perfil pero no tiene planes guardados
+           — intent + notify_message si P&L de algún plan cae bajo umbral del perfil
+           Las alertas reactivas de precios siguen en finance_alerts.check() sin duplicación.
 
 ---
 
