@@ -542,6 +542,25 @@ Nota:     Modo dummy (recomendaciones + P&L hipotética). Portfolio por usuario 
            "Templates de inversión" bajo el agente finance en user_detail, separada
            visualmente de los campos del LLM context. Formulario inline con HTMX.
            Sidebar pierde ítem global "Templates inv."
+- [x] 6.18 Ticker autocomplete en formulario de templates:
+           GET /finance/tickers/popular — lista curada (22 instrumentos: CEDEARs, ETFs, cripto,
+           commodities, FX) con cache 5min. GET /finance/tickers/search?q= — proxy Yahoo Finance
+           search con debounce 280ms y cache 5min. Formulario de nuevo template rediseñado: filas
+           dinámicas ticker+%, dropdown con curada agrupada por categoría al hacer focus, búsqueda
+           en tiempo real al tipear. Validación suma=100% antes de guardar. Fix autocomplete:
+           hideTimer compartido con clearTimeout, position:fixed sin scrollY, tmplAddRow() retorna
+           input, foco con setTimeout(0).
+- [x] 6.19 Ventana temporal configurable + desglose por ticker en P&L history:
+           BACKEND: get_plan_pnl_history(plan, interval, start, end) con start/end opcionales
+           clampeados a created_at. Retorna 3-tupla (series, trend, ticker_series) donde
+           ticker_series mapea cada ticker a [{date, pnl_pct, contribution}]. Core server pasa
+           ?start=&end= al portfolio. Backoffice proxy reenvía ambos params.
+           FRONTEND: date range picker (desde/hasta, min=creación plan más antiguo). Drag-to-select
+           en el gráfico via chartjs-plugin-zoom: arrastrar actualiza inputs de fecha automáticamente.
+           Botón Restablecer vuelve al rango completo. Toggle "Desglose tickers": líneas por ticker
+           con contribución ponderada, sin fetch (re-render desde cache). Métricas incluyen tabla
+           de P&L propio + contribución por ticker. Timezone fix (forward-fill) para planes con
+           mezcla de equity/cripto/commodity.
 - [x] 6.16 Histograma de P&L de planes a lo largo del tiempo (backoffice):
            Vista en backoffice que muestra evolución histórica del P&L de cada plan.
            FUENTE DE DATOS: precios históricos vía fc.get_price_at_date() / yfinance.history()
