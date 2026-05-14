@@ -25,7 +25,7 @@ from pathlib import Path
 import secrets
 
 import requests
-from fastapi import Cookie, FastAPI, Form, HTTPException, Request, Response
+from fastapi import Cookie, FastAPI, Form, HTTPException, Query, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 
@@ -1425,6 +1425,77 @@ def user_plans_evolution(request: Request, uid: str):
     finance_plans = _core(f"/finance/plans/{uid}") or []
     return _render(request, "finance_pnl_history.html", "users",
                    uid=uid, finance_plans=finance_plans)
+
+
+_POPULAR_TICKERS = [
+    # ── CEDEARs / acciones globales ───────────────────────────────────────────
+    {"symbol": "GGAL",   "name": "Galicia",             "type": "Stock", "cat": "CEDEARs"},
+    {"symbol": "MELI",   "name": "MercadoLibre",        "type": "Stock", "cat": "CEDEARs"},
+    {"symbol": "BABA",   "name": "Alibaba",             "type": "Stock", "cat": "CEDEARs"},
+    {"symbol": "AMZN",   "name": "Amazon",              "type": "Stock", "cat": "CEDEARs"},
+    {"symbol": "AAPL",   "name": "Apple",               "type": "Stock", "cat": "CEDEARs"},
+    {"symbol": "MSFT",   "name": "Microsoft",           "type": "Stock", "cat": "CEDEARs"},
+    {"symbol": "GOOGL",  "name": "Alphabet",            "type": "Stock", "cat": "CEDEARs"},
+    {"symbol": "META",   "name": "Meta",                "type": "Stock", "cat": "CEDEARs"},
+    {"symbol": "NVDA",   "name": "NVIDIA",              "type": "Stock", "cat": "CEDEARs"},
+    {"symbol": "TSLA",   "name": "Tesla",               "type": "Stock", "cat": "CEDEARs"},
+    {"symbol": "GOLD",   "name": "Barrick Gold",        "type": "Stock", "cat": "CEDEARs"},
+    {"symbol": "GLOB",   "name": "Globant",             "type": "Stock", "cat": "CEDEARs"},
+    # ── ETFs ─────────────────────────────────────────────────────────────────
+    {"symbol": "SPY",    "name": "S&P 500 ETF",         "type": "ETF",   "cat": "ETFs"},
+    {"symbol": "QQQ",    "name": "Nasdaq 100 ETF",      "type": "ETF",   "cat": "ETFs"},
+    {"symbol": "VTI",    "name": "Total Market ETF",    "type": "ETF",   "cat": "ETFs"},
+    # ── Cripto ───────────────────────────────────────────────────────────────
+    {"symbol": "BTC-USD","name": "Bitcoin",             "type": "Crypto","cat": "Cripto"},
+    {"symbol": "ETH-USD","name": "Ethereum",            "type": "Crypto","cat": "Cripto"},
+    {"symbol": "SOL-USD","name": "Solana",              "type": "Crypto","cat": "Cripto"},
+    # ── Commodities ──────────────────────────────────────────────────────────
+    {"symbol": "GC=F",   "name": "Oro (Gold Futures)", "type": "Future","cat": "Commodities"},
+    {"symbol": "CL=F",   "name": "Petróleo WTI",       "type": "Future","cat": "Commodities"},
+    {"symbol": "SI=F",   "name": "Plata (Silver Fut)", "type": "Future","cat": "Commodities"},
+    # ── Pares de moneda ───────────────────────────────────────────────────────
+    {"symbol": "UYU=X",  "name": "USD/Peso Uruguayo",  "type": "FX",    "cat": "FX"},
+]
+
+_ticker_search_cache: dict[str, dict] = {}
+_TICKER_SEARCH_TTL = 300  # 5 min
+
+@app.get("/finance/tickers/popular")
+def get_popular_tickers():
+    return JSONResponse(_POPULAR_TICKERS)
+
+
+@app.get("/finance/tickers/search")
+def search_tickers(q: str = Query(default="")):
+    q = q.strip()
+    if not q:
+        return JSONResponse([])
+    key = q.upper()
+    cached = _ticker_search_cache.get(key)
+    if cached and (time.time() - cached["ts"]) < _TICKER_SEARCH_TTL:
+        return JSONResponse(cached["data"])
+    try:
+        r = requests.get(
+            "https://query1.finance.yahoo.com/v1/finance/search",
+            params={"q": q, "quotesCount": 8, "newsCount": 0, "enableFuzzyQuery": "false"},
+            headers={"User-Agent": "Mozilla/5.0"},
+            timeout=5,
+        )
+        quotes = r.json().get("quotes", [])
+        result = [
+            {
+                "symbol":   qt.get("symbol", ""),
+                "name":     qt.get("shortname") or qt.get("longname") or "",
+                "type":     qt.get("typeDisp", ""),
+                "exchange": qt.get("exchDisp", ""),
+            }
+            for qt in quotes
+            if qt.get("symbol")
+        ]
+        _ticker_search_cache[key] = {"data": result, "ts": time.time()}
+        return JSONResponse(result)
+    except Exception:
+        return JSONResponse([])
 
 
 @app.delete("/users/{uid}/finance/plans/{plan_name}", response_class=HTMLResponse)

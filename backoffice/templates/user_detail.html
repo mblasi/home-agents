@@ -669,7 +669,7 @@ async function runAllProactive(uid) {
   <div class="mb-5">
     <div class="flex items-center justify-between mb-2">
       <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Templates de inversión</h2>
-      <button onclick="document.getElementById('tmpl-form').classList.toggle('hidden')"
+      <button onclick="tmplOpen()"
               class="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">+ Nuevo</button>
     </div>
     <div id="finance-templates-list"
@@ -680,34 +680,221 @@ async function runAllProactive(uid) {
       <span class="text-xs text-gray-600 italic">Cargando…</span>
     </div>
     <div id="tmpl-form" class="hidden mt-2 bg-gray-800/50 rounded-lg p-3">
-      <form hx-post="/users/{{ uid }}/finance/templates"
-            hx-target="#finance-templates-list"
-            hx-swap="innerHTML"
-            hx-on::after-request="this.reset(); document.getElementById('tmpl-form').classList.add('hidden')"
-            class="space-y-2">
+      <form id="tmpl-form-inner" class="space-y-2">
         <div class="flex gap-2">
-          <input name="name" placeholder="Nombre (ej: conservador)"
+          <input id="tmpl-name" name="name" placeholder="Nombre (ej: conservador)"
                  class="flex-1 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200
                         focus:outline-none focus:ring-1 focus:ring-indigo-500" required>
-          <input name="review_threshold" type="number" step="0.5" value="-10"
+          <input id="tmpl-threshold" name="review_threshold" type="number" step="0.5" value="-10"
                  title="Umbral P&L para revisión (%)"
                  class="w-20 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200
                         focus:outline-none focus:ring-1 focus:ring-indigo-500">
         </div>
-        <input name="positions_raw" placeholder="Posiciones: GGAL:30, MELI:40, GC=F:30"
-               class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200
-                      focus:outline-none focus:ring-1 focus:ring-indigo-500" required>
-        <div class="flex gap-2 justify-end">
+
+        <!-- Filas de posiciones dinámicas -->
+        <div id="tmpl-positions" class="space-y-1.5"></div>
+        <button type="button" onclick="tmplAddRow()"
+                class="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">
+          + Agregar ticker
+        </button>
+
+        <div class="flex gap-2 justify-end pt-1">
           <button type="button"
-                  onclick="document.getElementById('tmpl-form').classList.add('hidden')"
+                  onclick="document.getElementById('tmpl-form').classList.add('hidden'); document.getElementById('tmpl-positions').innerHTML = ''; document.getElementById('tmpl-form-inner').reset();"
                   class="px-2 py-1 text-xs text-gray-500 hover:text-gray-300 transition-colors">Cancelar</button>
-          <button type="submit"
+          <button type="button" onclick="tmplSubmit()"
                   class="px-3 py-1 text-xs bg-indigo-700 hover:bg-indigo-600 text-white rounded transition-colors">
             Guardar
           </button>
         </div>
       </form>
     </div>
+
+<!-- Autocomplete dropdown (singleton, se mueve al ticker activo) -->
+<div id="ticker-dropdown"
+     class="hidden fixed z-50 bg-gray-800 border border-gray-700 rounded-lg shadow-xl
+            text-xs text-gray-200 overflow-y-auto max-h-64 w-64">
+</div>
+
+<script>
+(function () {
+  /* ── datos ──────────────────────────────────────────────────────────────── */
+  let popularTickers = [];
+  fetch('/finance/tickers/popular').then(r => r.json()).then(d => { popularTickers = d; });
+
+  /* ── autocomplete singleton ─────────────────────────────────────────────── */
+  const dropdown = document.getElementById('ticker-dropdown');
+  let activeInput = null;
+  let debounceTimer = null;
+
+  function showDropdown(input, items, grouped) {
+    activeInput = input;
+    dropdown.innerHTML = '';
+
+    if (grouped) {
+      const cats = {};
+      for (const t of items) {
+        (cats[t.cat] = cats[t.cat] || []).push(t);
+      }
+      for (const [cat, tickers] of Object.entries(cats)) {
+        const hdr = document.createElement('div');
+        hdr.className = 'px-3 pt-2 pb-0.5 text-gray-500 uppercase tracking-wider font-semibold text-[10px]';
+        hdr.textContent = cat;
+        dropdown.appendChild(hdr);
+        tickers.forEach(t => dropdown.appendChild(makeItem(t, input)));
+      }
+    } else {
+      items.forEach(t => dropdown.appendChild(makeItem(t, input)));
+    }
+
+    positionDropdown(input);
+    dropdown.classList.remove('hidden');
+  }
+
+  function makeItem(t, input) {
+    const el = document.createElement('div');
+    el.className = 'flex items-center gap-2 px-3 py-1.5 hover:bg-gray-700 cursor-pointer';
+    el.innerHTML = `
+      <span class="font-mono font-semibold text-gray-100 w-20 shrink-0">${t.symbol}</span>
+      <span class="text-gray-400 truncate">${t.name}</span>
+      <span class="ml-auto text-gray-600 text-[10px] shrink-0">${t.type || ''}</span>`;
+    el.addEventListener('mousedown', e => {
+      e.preventDefault();
+      input.value = t.symbol;
+      input.dataset.name = t.name;
+      hideDropdown();
+    });
+    return el;
+  }
+
+  function positionDropdown(input) {
+    const rect = input.getBoundingClientRect();
+    dropdown.style.top  = (rect.bottom + window.scrollY + 2) + 'px';
+    dropdown.style.left = rect.left + 'px';
+    dropdown.style.width = Math.max(256, rect.width) + 'px';
+  }
+
+  function hideDropdown() {
+    dropdown.classList.add('hidden');
+    activeInput = null;
+  }
+
+  document.addEventListener('click', e => {
+    if (!dropdown.contains(e.target) && e.target !== activeInput) hideDropdown();
+  });
+
+  function onTickerFocus(input) {
+    if (!input.value.trim()) {
+      showDropdown(input, popularTickers, true);
+    } else {
+      triggerSearch(input);
+    }
+  }
+
+  function onTickerInput(input) {
+    clearTimeout(debounceTimer);
+    const q = input.value.trim();
+    if (!q) { showDropdown(input, popularTickers, true); return; }
+    debounceTimer = setTimeout(() => triggerSearch(input), 280);
+  }
+
+  function triggerSearch(input) {
+    const q = input.value.trim();
+    if (!q) return;
+    fetch(`/finance/tickers/search?q=${encodeURIComponent(q)}`)
+      .then(r => r.json())
+      .then(items => {
+        if (items.length === 0) { hideDropdown(); return; }
+        showDropdown(input, items, false);
+      })
+      .catch(() => hideDropdown());
+  }
+
+  /* ── filas de posiciones ─────────────────────────────────────────────────── */
+  window.tmplAddRow = function (symbol = '', pct = '') {
+    const container = document.getElementById('tmpl-positions');
+    const row = document.createElement('div');
+    row.className = 'flex gap-1.5 items-center';
+    row.innerHTML = `
+      <div class="relative flex-1">
+        <input type="text" placeholder="Ticker (ej: GGAL)"
+               value="${symbol}"
+               class="ticker-input w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs
+                      text-gray-200 font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500
+                      uppercase">
+      </div>
+      <input type="number" placeholder="%" min="0" max="100" step="1" value="${pct}"
+             class="pct-input w-16 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs
+                    text-gray-200 text-right focus:outline-none focus:ring-1 focus:ring-indigo-500">
+      <button type="button"
+              class="text-gray-600 hover:text-red-400 transition-colors text-sm leading-none px-1"
+              onclick="this.closest('.flex').remove(); updateTotal()">✕</button>
+      <span class="text-gray-600 text-xs w-4 text-right pct-label">%</span>`;
+    container.appendChild(row);
+
+    const tickerInput = row.querySelector('.ticker-input');
+    const pctInput    = row.querySelector('.pct-input');
+
+    tickerInput.addEventListener('focus',  () => onTickerFocus(tickerInput));
+    tickerInput.addEventListener('input',  () => { onTickerInput(tickerInput); tickerInput.value = tickerInput.value.toUpperCase(); });
+    tickerInput.addEventListener('blur',   () => setTimeout(hideDropdown, 150));
+    pctInput.addEventListener('input',    updateTotal);
+    tickerInput.focus();
+  };
+
+  function updateTotal() {
+    const rows = document.querySelectorAll('#tmpl-positions .pct-input');
+    const total = [...rows].reduce((s, el) => s + (parseFloat(el.value) || 0), 0);
+    const btn = document.querySelector('#tmpl-form-inner button[onclick="tmplSubmit()"]');
+    if (btn) {
+      btn.classList.toggle('opacity-50', Math.abs(total - 100) > 0.5);
+      btn.title = Math.abs(total - 100) > 0.5 ? `Total: ${total}% (debe ser 100%)` : '';
+    }
+  }
+
+  window.tmplSubmit = async function () {
+    const name      = document.getElementById('tmpl-name').value.trim();
+    const threshold = parseFloat(document.getElementById('tmpl-threshold').value || '-10');
+    if (!name) { document.getElementById('tmpl-name').focus(); return; }
+
+    const rows = [...document.querySelectorAll('#tmpl-positions .flex.gap-1\\.5')];
+    const parts = [];
+    for (const row of rows) {
+      const ticker = row.querySelector('.ticker-input').value.trim().toUpperCase();
+      const pct    = row.querySelector('.pct-input').value.trim();
+      if (ticker && pct) parts.push(`${ticker}:${pct}`);
+    }
+    if (!parts.length) { return; }
+
+    const total = parts.reduce((s, p) => s + parseFloat(p.split(':')[1] || 0), 0);
+    if (Math.abs(total - 100) > 0.5) {
+      alert(`Las posiciones suman ${total.toFixed(1)}% — deben sumar 100%.`);
+      return;
+    }
+
+    const body = new FormData();
+    body.append('name', name);
+    body.append('review_threshold', threshold);
+    body.append('positions_raw', parts.join(', '));
+
+    const resp = await fetch(`/users/{{ uid }}/finance/templates`, { method: 'POST', body });
+    const html = await resp.text();
+    document.getElementById('finance-templates-list').innerHTML = html;
+    document.getElementById('tmpl-form').classList.add('hidden');
+    document.getElementById('tmpl-form-inner').reset();
+    document.getElementById('tmpl-positions').innerHTML = '';
+  };
+
+  window.tmplOpen = function () {
+    const form = document.getElementById('tmpl-form');
+    const pos  = document.getElementById('tmpl-positions');
+    form.classList.toggle('hidden');
+    if (!form.classList.contains('hidden') && !pos.children.length) {
+      tmplAddRow(); tmplAddRow();
+    }
+  };
+})();
+</script>
   </div>
 
   <!-- Planes -->
