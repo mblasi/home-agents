@@ -1307,6 +1307,20 @@ def delete_user_context_field_proxy(uid: str, agent_id: str, field: str):
     return HTMLResponse("")
 
 
+@app.post("/users/{uid}/context/{agent_id}/{field}", response_class=HTMLResponse)
+async def set_user_context_field(uid: str, agent_id: str, field: str, request: Request):
+    form  = await request.form()
+    value = str(form.get("value", "")).strip()
+    if value:
+        _core(f"/users/{uid}/context/{agent_id}", method="PATCH", json={field: value})
+    return HTMLResponse(
+        f'<span id="ctx-saved-{agent_id}-{field}" class="text-xs text-emerald-400">'
+        f'✓ Guardado'
+        f'<script>setTimeout(()=>document.getElementById("ctx-saved-{agent_id}-{field}")?.remove(),2000)</script>'
+        f'</span>'
+    )
+
+
 @app.post("/users/{uid}/gcal", response_class=HTMLResponse)
 async def save_gcal_credentials(request: Request, uid: str):
     form     = await request.form()
