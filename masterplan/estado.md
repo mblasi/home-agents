@@ -534,6 +534,28 @@ Nota:     Modo dummy (recomendaciones + P&L hipotética). Portfolio por usuario 
            dollar_gap_pct, btc_move_pct, stock_move_pct, briefing_hour, plan_pnl_up_pct,
            plan_pnl_down_pct, plan_pnl_hours. check() itera por usuario en todas las reglas,
            cooldown keys incluyen uid. user_context_schema extendido con 4 campos nuevos.
+- [ ] 6.16 Histograma de P&L de planes a lo largo del tiempo (backoffice):
+           Vista en backoffice que muestra evolución histórica del P&L de cada plan.
+           FUENTE DE DATOS: precios históricos vía fc.get_price_at_date() / yfinance.history()
+           desde created_at hasta hoy, frecuencia diaria.
+           BACKEND:
+             - portfolio.get_plan_pnl_history(plan, freq="1d") → list[{date, pnl_pct, per_position}]
+               Calcula P&L ponderada para cada fecha entre created_at y hoy.
+               Cachea hasta 1h (yfinance devuelve datos estáticos intradía).
+             - GET /finance/plans/{uid}/history?plan=NAME — devuelve JSON con serie temporal.
+               Soporta múltiples planes: ?plan=A&plan=B (o todos si se omite).
+             - Tendencia: regresión lineal sobre la serie. Devuelta como pendiente (pct/día) + proyección 30d.
+           FRONTEND (backoffice Jinja2 + Chart.js CDN):
+             - Nueva sección en /users/{id} bajo "Planes de inversión".
+             - Línea por plan (Chart.js line chart), escala % en Y, fechas en X.
+             - Toggle para mostrar/ocultar planes individuales.
+             - Línea punteada de tendencia (regresión + proyección).
+             - Tooltip con valor exacto por fecha.
+           TESTS:
+             - get_plan_pnl_history: precio estático → P&L constante en cada punto.
+             - get_plan_pnl_history: dos tickers con pesos distintos → ponderación correcta.
+             - endpoint /history: retorna JSON con campo "series" + "trend".
+             - tendencia: serie ascendente → pendiente positiva.
 
 ---
 
