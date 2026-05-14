@@ -26,6 +26,11 @@
       <span class="text-sm text-gray-300">{{ plan.name }}</span>
     </label>
     {% endfor %}
+    <span class="mx-2 text-gray-700">|</span>
+    <label class="flex items-center gap-2 cursor-pointer select-none">
+      <input type="checkbox" id="toggle-trend" class="accent-emerald-500 w-4 h-4" checked>
+      <span class="text-sm text-gray-400">Tendencia</span>
+    </label>
     <button id="btn-refresh"
             class="ml-auto px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs rounded-lg transition-colors">
       Actualizar
@@ -51,8 +56,8 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script>
 (function () {
-  const UID = {{ uid | tojson }};
-  const PLAN_NAMES = {{ finance_plans | map(attribute='name') | list | tojson }};
+  const UID = {{ uid | tojson | safe }};
+  const PLAN_NAMES = {{ finance_plans | map(attribute='name') | list | tojson | safe }};
 
   let chart = null;
 
@@ -284,9 +289,21 @@
     renderMetrics(data);
   }
 
+  function applyTrendVisibility() {
+    if (!chart) return;
+    const show = document.getElementById('toggle-trend').checked;
+    chart.data.datasets.forEach(ds => {
+      if (ds.label && ds.label.includes('(tendencia)')) {
+        ds.hidden = !show;
+      }
+    });
+    chart.update();
+  }
+
   document.querySelectorAll('.plan-toggle').forEach(el =>
     el.addEventListener('change', load)
   );
+  document.getElementById('toggle-trend').addEventListener('change', applyTrendVisibility);
   document.getElementById('btn-refresh').addEventListener('click', load);
 
   load();
