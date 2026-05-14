@@ -617,57 +617,6 @@ async function runAllProactive(uid) {
       </div>
       {% endfor %}
 
-      {% if agent_id == 'finance' %}
-      <!-- Templates de inversión — configuración del agente, no va al LLM -->
-      <div class="mt-4 pt-3 border-t border-gray-800">
-        <div class="flex items-center justify-between mb-2">
-          <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Templates de inversión</span>
-          <button onclick="document.getElementById('tmpl-form').classList.toggle('hidden')"
-                  class="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">+ Nuevo</button>
-        </div>
-
-        <!-- Lista cargada por HTMX -->
-        <div id="finance-templates-list"
-             hx-get="/users/{{ uid }}/finance/templates"
-             hx-trigger="load"
-             hx-swap="innerHTML"
-             class="space-y-0 mb-2">
-          <span class="text-xs text-gray-600 italic">Cargando…</span>
-        </div>
-
-        <!-- Formulario nuevo template (oculto por defecto) -->
-        <div id="tmpl-form" class="hidden mt-2 bg-gray-800/50 rounded-lg p-3 space-y-2">
-          <form hx-post="/users/{{ uid }}/finance/templates"
-                hx-target="#finance-templates-list"
-                hx-swap="innerHTML"
-                hx-on::after-request="this.reset(); document.getElementById('tmpl-form').classList.add('hidden')"
-                class="space-y-2">
-            <div class="flex gap-2">
-              <input name="name" placeholder="Nombre (ej: conservador)"
-                     class="flex-1 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200
-                            focus:outline-none focus:ring-1 focus:ring-indigo-500" required>
-              <input name="review_threshold" type="number" step="0.5" value="-10"
-                     title="Umbral P&L para revisión (%)"
-                     class="w-20 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200
-                            focus:outline-none focus:ring-1 focus:ring-indigo-500">
-            </div>
-            <input name="positions_raw" placeholder="Posiciones: GGAL:30, MELI:40, GC=F:30"
-                   class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200
-                          focus:outline-none focus:ring-1 focus:ring-indigo-500" required>
-            <div class="flex gap-2 justify-end">
-              <button type="button"
-                      onclick="document.getElementById('tmpl-form').classList.add('hidden')"
-                      class="px-2 py-1 text-xs text-gray-500 hover:text-gray-300 transition-colors">Cancelar</button>
-              <button type="submit"
-                      class="px-3 py-1 text-xs bg-indigo-700 hover:bg-indigo-600 text-white rounded transition-colors">
-                Guardar
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-      {% endif %}
-
     </div>
   </div>
   {% endif %}
@@ -715,6 +664,53 @@ async function runAllProactive(uid) {
 
 <!-- Planes de inversión -->
 <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-4">
+
+  <!-- Templates -->
+  <div class="mb-5">
+    <div class="flex items-center justify-between mb-2">
+      <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Templates de inversión</h2>
+      <button onclick="document.getElementById('tmpl-form').classList.toggle('hidden')"
+              class="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">+ Nuevo</button>
+    </div>
+    <div id="finance-templates-list"
+         hx-get="/users/{{ uid }}/finance/templates"
+         hx-trigger="load"
+         hx-swap="innerHTML"
+         class="space-y-0">
+      <span class="text-xs text-gray-600 italic">Cargando…</span>
+    </div>
+    <div id="tmpl-form" class="hidden mt-2 bg-gray-800/50 rounded-lg p-3">
+      <form hx-post="/users/{{ uid }}/finance/templates"
+            hx-target="#finance-templates-list"
+            hx-swap="innerHTML"
+            hx-on::after-request="this.reset(); document.getElementById('tmpl-form').classList.add('hidden')"
+            class="space-y-2">
+        <div class="flex gap-2">
+          <input name="name" placeholder="Nombre (ej: conservador)"
+                 class="flex-1 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200
+                        focus:outline-none focus:ring-1 focus:ring-indigo-500" required>
+          <input name="review_threshold" type="number" step="0.5" value="-10"
+                 title="Umbral P&L para revisión (%)"
+                 class="w-20 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200
+                        focus:outline-none focus:ring-1 focus:ring-indigo-500">
+        </div>
+        <input name="positions_raw" placeholder="Posiciones: GGAL:30, MELI:40, GC=F:30"
+               class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200
+                      focus:outline-none focus:ring-1 focus:ring-indigo-500" required>
+        <div class="flex gap-2 justify-end">
+          <button type="button"
+                  onclick="document.getElementById('tmpl-form').classList.add('hidden')"
+                  class="px-2 py-1 text-xs text-gray-500 hover:text-gray-300 transition-colors">Cancelar</button>
+          <button type="submit"
+                  class="px-3 py-1 text-xs bg-indigo-700 hover:bg-indigo-600 text-white rounded transition-colors">
+            Guardar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Planes -->
   <div class="flex items-center justify-between mb-3">
     <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Planes de inversión</h2>
     <div class="flex items-center gap-3">
