@@ -462,7 +462,7 @@ Estado:   COMPLETA (5.2 postergada, google-free; alarma luces → HAOS nativo)
 ### FASE 6 - Agente Inversiones
 ```
 Objetivo: Consultas financieras por voz, datos privados locales
-Estado:   EN CURSO (9/10 — solo queda 6.6)
+Estado:   EN CURSO (10/12 — quedan 6.6, 6.11, 6.12)
 Nota:     Modo dummy (recomendaciones + P&L hipotética). Portfolio por usuario (FASE 2.5).
           Fuentes: yfinance (acciones/crypto/FX) + dolarapi.com (dólar oficial/blue/MEP/CCL).
 ```
@@ -499,10 +499,19 @@ Nota:     Modo dummy (recomendaciones + P&L hipotética). Portfolio por usuario 
            RISK_PROFILE_TEMPLATES (conservador/moderado/agresivo) con posiciones y umbrales de revisión.
            Tag [PROFILE:...] en system prompt: el LLM detecta el perfil en conversación y lo persiste
            via context_updates (3-tuple). _ask_llm() inyecta perfil como contexto activo.
-           proactive_check() override con capa estratégica (proactive_schedule=3600):
-           — intent si usuario tiene perfil pero no tiene planes guardados
-           — intent + notify_message si P&L de algún plan cae bajo umbral del perfil
+           proactive_check() split en dos capas:
+           — _strategic_checks(): hardcodeado — intent si falta perfil, plan, o P&L bajo umbral
+           — proactive_check(): llama _strategic_checks() + super().proactive_check() (LLM sobre historial);
+             omite LLM si no hay perfil. proactive_system_prompt específico para finanzas.
            Las alertas reactivas de precios siguen en finance_alerts.check() sin duplicación.
+- [ ] 6.11 Templates de planes automáticos: crear planes desde templates sin necesidad de conversación.
+           Auto-crear un plan por template disponible al primer proactive_check sin planes.
+           CRUD de templates en backoffice (/finance/templates): crear, editar, eliminar templates
+           con nombre, allocations (ticker:pct) y umbral de revisión.
+           Eliminar el intent de onboarding por chat (perfil requerido → reemplazado por templates).
+- [ ] 6.12 Backoffice sección planes de inversión por usuario:
+           Ver todos los planes activos, P&L actual por plan, botón eliminar.
+           Accesible desde el perfil del usuario.
 
 ---
 
@@ -831,6 +840,18 @@ Extensiones futuras: cron expressions, triggers por evento HAOS.
            "Intenciones activas": agrupadas por agente, botones "Hecha" y "Cancelar" por intent
            (HTMX PATCH al proxy ya existente, la fila desaparece al confirmar).
            `user_detail_page()` recibe `proactive_status` del core.
+- [x] 9.36 Backoffice `/agents` — lazy-load de columna "Accesible":
+           `agents_page()` usa `/agents-meta` (5ms, sin connectivity checks) en lugar de `/agents` (28s).
+           `/agents-meta` extendido con `desc`, `status`, `proactive_enabled`, `fancy_name`, `dynamic`.
+           Columna "Accesible" muestra spinner en render inicial; HTMX GET a `/api/agents/{id}/reachable`
+           carga el estado por fila en paralelo (~1-2s/fila).
+           Nuevo endpoint `/agents/{id}/reachable` en core: chequea backends de un agente individual.
+           Backoffice proxy `/api/agents/{id}/reachable` retorna fragmento HTML directamente.
+- [x] 9.37 Backoffice `user_detail.html` — campos de `user_context_schema` siempre visibles y editables:
+           Sección "Contexto por agente" usa `/agents-meta` para iterar schemas declarados.
+           Agentes con schema: controles input/select pre-llenados (visibles aunque no haya valor).
+           Agentes sin schema: read-only con botón eliminar (comportamiento original).
+           `POST /users/{uid}/context/{agent_id}/{field}` persiste via PATCH al core.
 
 ---
 

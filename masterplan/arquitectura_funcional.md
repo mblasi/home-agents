@@ -105,8 +105,10 @@ POST /process {text, source, conversation_id?}
 - **Fuentes:** BCRA (dólar oficial, blue, MEP), Yahoo Finance, MercadoLibre cotizaciones
 - **Funciones:** dólar actual, portfolio de inversiones, alertas de precio, planes de inversión por perfil de riesgo
 - **Perfil de riesgo:** conservador / moderado / agresivo — guardado en `user_context` vía tag `[PROFILE:...]`. Informa al LLM en cada conversación. Configurable desde el backoffice o por voz.
-- **Proactivo (capa estratégica, cada 1h):** detecta si el usuario tiene perfil pero no tiene planes → crea intent; detecta si la P&L ponderada de algún plan cae bajo el umbral del perfil → crea intent + notify WA.
-- **Proactivo (capa reactiva, cada 15min via `alerts()`):** brecha blue/oficial, movimientos BTC/watchlist, reporte diario de planes con P&L comparativa por WA.
+- **Proactivo — dos capas:**
+  - `_strategic_checks()` (hardcodeado): detecta si el usuario no tiene perfil → intent de configuración; tiene perfil pero no tiene planes → intent de creación; P&L ponderada de algún plan cae bajo umbral del perfil → intent + notify WA.
+  - `proactive_check()` override: llama `_strategic_checks()` + `super().proactive_check()` (LLM sobre historial de conversación). Sin perfil, omite el escaneo LLM. `proactive_system_prompt` específico para finanzas.
+  - Intervalo: 3600s (cada 1h). Alertas reactivas de precios van por `alerts()` (cada 15min), sin duplicación.
 - **Companion:** `finance_alerts.py` para alertas reactivas de precio, `portfolio.py` para portfolio + templates por perfil (`RISK_PROFILE_TEMPLATES`, `RISK_REVIEW_THRESHOLD`)
 
 ### travel — Viajes
@@ -518,7 +520,7 @@ FastAPI + Jinja2 en `:8080`. Interfaz web de administración.
 - **Traces proactivos** — página unificada `/traces` con dos solapas:
   - `proactive_check` — runs periódicos por agente, ordenados por fecha, paginados. Cada row incluye badges por `intent_type` detectado (advise/request/goal con conteo)
   - `goal_review` — ciclos de revisión de goals abiertos, ordenados por fecha, paginados
-- **Gestión de agentes** — activar/desactivar, editar metadatos, toggle proactivo por agente
+- **Gestión de agentes** — activar/desactivar, editar metadatos, toggle proactivo por agente. La página `/agents` renderiza inmediatamente desde `/agents-meta` (sin connectivity checks); la columna "Accesible" se carga en paralelo por fila vía HTMX a `/api/agents/{id}/reachable`.
 - **Intents y goals** — por usuario, con estados y ciclo de vida
 - **Rutinas** — rutinas inferidas por usuario
 - **Shared State** — estado compartido entre agentes con TTL
