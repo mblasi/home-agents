@@ -462,7 +462,7 @@ Estado:   COMPLETA (5.2 postergada, google-free; alarma luces → HAOS nativo)
 ### FASE 6 - Agente Inversiones
 ```
 Objetivo: Consultas financieras por voz, datos privados locales
-Estado:   EN CURSO (12/13 — solo queda 6.6)
+Estado:   COMPLETA
 Nota:     Modo dummy (recomendaciones + P&L hipotética). Portfolio por usuario (FASE 2.5).
           Fuentes: yfinance (acciones/crypto/FX) + dolarapi.com (dólar oficial/blue/MEP/CCL).
 ```
@@ -481,7 +481,9 @@ Nota:     Modo dummy (recomendaciones + P&L hipotética). Portfolio por usuario 
            "¿cómo fueron tus recomendaciones?" — etiqueta [REC:accion:TICKER] registra automáticamente
 - [x] 6.5  Alertas configurables (finance_alerts.py):
            Brecha blue/oficial > 10%, BTC ±5%, watchlist ±5%. Umbrales via .env.
-- [ ] 6.6  RAG sobre noticias financieras (scraping + embeddings)
+- [x] 6.6  RAG sobre noticias financieras (scraping + embeddings):
+           finance_news.py — RSS Yahoo Finance por ticker, embeddings nomic-embed-text (Ollama),
+           búsqueda cosine numpy, fallback keyword, índice JSON persistido, refresh async
 - [x] 6.7  Resumen diario automático (en finance_alerts.check()):
            Dólar oficial/blue, UYU, movimientos de watchlist. Emite a FINANCE_BRIEFING_HOUR (8am).
 - [x] 6.8  Planes de inversión diversificados (portfolio.py + finance_agent.py):
