@@ -1391,6 +1391,13 @@ def get_user_plans_history(request: Request, uid: str):
     return JSONResponse(data)
 
 
+@app.get("/users/{uid}/finance/plans/evolution", response_class=HTMLResponse)
+def user_plans_evolution(request: Request, uid: str):
+    finance_plans = _core(f"/finance/plans/{uid}") or []
+    return _render(request, "finance_pnl_history.html", "users",
+                   uid=uid, finance_plans=finance_plans)
+
+
 @app.delete("/users/{uid}/finance/plans/{plan_name}", response_class=HTMLResponse)
 def delete_user_finance_plan(uid: str, plan_name: str):
     _core(f"/finance/plans/{uid}/{plan_name}", method="DELETE")
