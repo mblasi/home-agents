@@ -1222,6 +1222,8 @@ def user_detail_page(request: Request, uid: str):
     if not user:
         return RedirectResponse("/users", status_code=303)
     agents, _ = _load_rbac_context()
+    # /agents-meta es instantáneo (sin connectivity checks) — usado para user_context_schema
+    agents_meta  = _core("/agents-meta", timeout=5) or {}
     ww_samples   = _core(f"/users/{uid}/wakeword/samples") or {"count": 0, "required": 30, "samples": []}
     ww_metrics   = _core(f"/users/{uid}/wakeword/metrics") or {"tp": 0, "fp": 0, "rbac_deny": 0}
     train_status = _core("/wakeword/train/status") or {"status": "idle"}
@@ -1237,7 +1239,7 @@ def user_detail_page(request: Request, uid: str):
     user_ctx_plain   = _core(f"/users/{uid}/context") or {}
     ml_oauth_status  = _oauth_status("ml", uid)
     return _render(request, "user_detail.html", "users",
-                   user=user, uid=uid, agents=agents,
+                   user=user, uid=uid, agents=agents, agents_meta=agents_meta,
                    ww_samples=ww_samples, ww_metrics=ww_metrics,
                    train_status=train_status,
                    user_context=user_context, user_intents=user_intents,

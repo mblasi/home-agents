@@ -552,7 +552,7 @@ async function runAllProactive(uid) {
   </p>
 
   <!-- Agentes con user_context_schema declarado → siempre visibles, editables -->
-  {% for agent_id, agent_info in agents.items() %}
+  {% for agent_id, agent_info in agents_meta.items() %}
   {% if agent_info.user_context_schema %}
   {% set schema = agent_info.user_context_schema %}
   {% set agent_ctx = user_context.get(agent_id, {}) %}
