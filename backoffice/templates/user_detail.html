@@ -741,6 +741,9 @@ async function runAllProactive(uid) {
     <div id="pnl-loading" class="absolute inset-0 flex items-center justify-center text-gray-600 text-sm">
       Cargando historial…
     </div>
+    <div id="pnl-no-data" class="hidden absolute inset-0 flex items-center justify-center text-gray-600 text-sm">
+      Historial disponible a partir del segundo día de mercado.
+    </div>
   </div>
   <p id="pnl-error" class="hidden text-xs text-red-500 mt-2">No se pudo cargar el historial.</p>
 </div>
@@ -760,27 +763,30 @@ async function runAllProactive(uid) {
     return r.json();
   }
 
-  function buildDatasets(data, planNames, showTrend) {
+  function buildDatasets(data, planNames, labels, showTrend) {
     const datasets = [];
     planNames.forEach((name, i) => {
-      const d     = data[name] || {};
-      const color = COLORS[i % COLORS.length];
+      const d        = data[name] || {};
+      const color    = COLORS[i % COLORS.length];
+      const seriesMap = Object.fromEntries((d.series || []).map(p => [p.date, p.pnl_pct]));
+      const trendMap  = Object.fromEntries((d.trend?.points || []).map(p => [p.date, p.pnl_pct]));
+
       datasets.push({
         label:           name,
-        data:            (d.series || []).map(p => ({ x: p.date, y: p.pnl_pct })),
+        data:            labels.map(date => seriesMap[date] ?? null),
         borderColor:     color,
         backgroundColor: color + '18',
         fill:            false,
         tension:         0.35,
-        pointRadius:     0,
+        pointRadius:     labels.length < 10 ? 3 : 0,
         borderWidth:     2,
         spanGaps:        false,
         order:           1,
       });
-      if (showTrend && d.trend && (d.trend.points || []).length) {
+      if (showTrend && (d.trend?.points || []).length) {
         datasets.push({
           label:       name + ' (tendencia)',
-          data:        d.trend.points.map(p => ({ x: p.date, y: p.pnl_pct })),
+          data:        labels.map(date => trendMap[date] ?? null),
           borderColor: color + '70',
           borderDash:  [6, 4],
           borderWidth: 1.5,
@@ -816,7 +822,7 @@ async function runAllProactive(uid) {
     }
     loading.style.display = 'none';
 
-    // unión de todas las fechas
+    // unión de todas las fechas (serie real + puntos de tendencia)
     const dateSet = new Set();
     plans.forEach(name => {
       const d = data[name] || {};
@@ -825,12 +831,16 @@ async function runAllProactive(uid) {
     });
     const labels = [...dateSet].sort();
 
-    // índice del último día de serie real (para separar proyección)
-    const lastSeriesDate = plans
-      .map(name => (data[name]?.series || []).at(-1)?.date)
-      .filter(Boolean).sort().at(-1) || '';
+    // sin datos suficientes: mostrar mensaje
+    const totalPoints = plans.reduce((acc, n) => acc + (data[n]?.series?.length || 0), 0);
+    const msgEl = document.getElementById('pnl-no-data');
+    if (totalPoints === 0) {
+      if (msgEl) msgEl.classList.remove('hidden');
+      return;
+    }
+    if (msgEl) msgEl.classList.add('hidden');
 
-    const datasets = buildDatasets(data, plans, showTrend);
+    const datasets = buildDatasets(data, plans, labels, showTrend);
     const ctx      = document.getElementById('pnlChart').getContext('2d');
 
     if (chart) chart.destroy();
@@ -873,12 +883,12 @@ async function runAllProactive(uid) {
           tooltip: {
             callbacks: {
               label: ctx => {
-                if (ctx.raw === null) return null;
-                const v = ctx.raw.y;
+                if (ctx.raw === null || ctx.raw === undefined) return null;
+                const v = ctx.raw;
                 return ctx.dataset.label + ': ' + (v >= 0 ? '+' : '') + v + '%';
               },
             },
-            filter: item => item.raw !== null,
+            filter: item => item.raw !== null && item.raw !== undefined,
           },
         },
       },
