@@ -561,6 +561,23 @@ Nota:     Modo dummy (recomendaciones + P&L hipotética). Portfolio por usuario 
            con contribución ponderada, sin fetch (re-render desde cache). Métricas incluyen tabla
            de P&L propio + contribución por ticker. Timezone fix (forward-fill) para planes con
            mezcla de equity/cripto/commodity.
+- [ ] 6.20 Ciclo proactivo de mejora de planes:
+           `_proactive_json_extra_schema` + `_on_proactive_llm_data` + `handle_captured_reply`
+           en FinanceAgent. El LLM proactivo recibe contexto de planes+P&L+perfil+noticias y
+           puede sugerir modificaciones via campo "plan_proposals" en el JSON de respuesta.
+           El usuario acepta/rechaza via request intent (WA o web). Se registra en plan_events.py.
+           HOOKS en ProactiveMixin: _proactive_json_extra_schema (extiende JSON schema al LLM),
+           _on_proactive_llm_data (procesa campos extra de la respuesta). _is_affirmative() parsea
+           respuestas del usuario (sí/dale/ok/...). Auto-dedup contra intents activos por título.
+
+- [ ] 6.21 Milestones en histograma P&L:
+           plan_events.py — log de eventos de plan (suggestion/applied/rejected/manual_edit),
+           almacenado en ~/.local/share/capitan/plan_events/{user_id}.json.
+           Endpoint GET /finance/plan-events/{user_id} con filtros plan_name y since (ts Unix).
+           Backoffice finance_pnl_history.html: chartjs-plugin-annotation@3, función loadMilestones()
+           carga eventos y renderiza líneas verticales: amarillo=sugerencia, verde=aplicado,
+           rojo=rechazado. Nearest-label matching para eje category.
+
 - [x] 6.16 Histograma de P&L de planes a lo largo del tiempo (backoffice):
            Vista en backoffice que muestra evolución histórica del P&L de cada plan.
            FUENTE DE DATOS: precios históricos vía fc.get_price_at_date() / yfinance.history()
@@ -2066,3 +2083,118 @@ de la colaboración entre dominios sin hardcodear lógica inter-agente.
 - [x] 27.8  **Tests** — `tests/test_agent_affinities.py`: 13 tests cubren get/set de affinities
             y shared_state_prefix, SharedState.get_by_prefix (incluye expiración y aislamiento
             de prefijos), y _build_affinity_context (sin affinities, con datos, sin prefix, sin datos).
+
+---
+
+### FASE 28 - Gestión de Modos por Canal (UX Multi-Canal)
+
+```
+Objetivo: Formalizar las capacidades de input/output de cada canal de interacción
+          (wa, mic/ear, web) y hacer que el agente respete esas restricciones al
+          elegir el modo de respuesta. Revisar el campo `notification_mode` del usuario
+          para que tenga sentido en un contexto multi-canal.
+Estado:   Pendiente
+Deps:     FASE 3.5 (WA), FASE 18 (UX audio), FASE 12 (backoffice).
+```
+
+- [ ] 28.1  **Mapa de capacidades por canal** — definir en `core/` un diccionario o clase
+            `CHANNEL_CAPS` que declare para cada canal (`"wa"`, `"ear"`, `"web"`) qué modos
+            de input y output soporta:
+            ```
+            wa:  input=[text, audio], output=[text, audio]
+            ear: input=[audio],       output=[audio]
+            web: input=[text],        output=[text]
+            ```
+            El campo `source` que ya llega en `/process` se usa para lookupear las caps.
+            Estas capacidades deben ser consultables desde el agente y desde el coordinador.
+
+- [ ] 28.2  **Restricción de modo en el coordinador** — al construir el contexto de respuesta,
+            el coordinador (o el dispatch en `agent_registry.py`) debe filtrar el modo elegido
+            por el agente contra `CHANNEL_CAPS[source].output`. Si el agente pidió `audio` pero
+            el canal es `web` (solo texto), degradar a `text` automáticamente y loguear el
+            downgrade. Si el canal tiene múltiples opciones de output (ej. WA), respetar la
+            elección del agente o la preferencia del usuario.
+
+- [ ] 28.3  **Campo `response_mode` en la respuesta del agente** — el agente puede incluir en
+            su respuesta un campo opcional `response_mode: "text" | "audio" | "auto"` para
+            señalizar preferencia. `"auto"` (default) delega la decisión al canal/preferencia
+            del usuario. El adaptador de cada canal (WA, ear, web) aplica la lógica:
+            modo solicitado ∩ caps del canal, con fallback a text.
+
+- [ ] 28.4  **Revisión de `notification_mode` del usuario** — el campo actual
+            (`notification_mode: text | audio`) fue diseñado para WA pero su semántica es
+            ambigua en multi-canal. Decidir e implementar una de estas opciones:
+            a) Reemplazarlo por preferencias por canal: `channel_prefs.wa.output_mode`,
+               `channel_prefs.ear.output_mode`, etc.
+            b) Renombrarlo a `default_output_mode` y usarlo como fallback cuando el canal
+               soporta múltiples modos y el agente devuelve `"auto"`.
+            La opción (b) es más conservadora y suficiente hasta tener más canales activos.
+            Actualizar backoffice (`user_edit.html`) para reflejar el campo renombrado/reestructurado.
+
+---
+
+### FASE 29 - Ejecución Real de Planes de Inversión
+
+```
+Objetivo: Pasar el agente de inversiones de modo "dummy" (P&L hipotética) a modo real:
+          mapear un monto de capital a un plan, ejecutar las órdenes en un broker,
+          y ofrecer palancas de entrada/salida manuales y automáticas.
+Estado:   Pendiente
+Deps:     FASE 6 (planes, portfolio.py, COMPLETA), FASE 9 (coordinador, COMPLETA),
+          FASE 26 (rutinas, para triggers automáticos).
+Nota:     Alcance inicial acotado a instrumentos con API pública disponible (crypto vía
+          exchange API, CEDEARs/acciones vía broker con API REST). El modo dummy coexiste:
+          los planes sin capital asignado siguen siendo hipotéticos.
+```
+
+- [ ] 29.1  **Abstracción de broker (`broker_client.py`)** — interfaz común para ejecutar
+            órdenes de compra/venta independientemente del proveedor. Métodos:
+            `place_order(ticker, side, amount_usd)`, `get_positions()`, `get_balance()`,
+            `cancel_order(order_id)`. Primera implementación concreta: broker simulado
+            (`SimulatedBroker`) que registra órdenes localmente sin tocar APIs externas,
+            para poder desarrollar y testear el flujo completo antes de conectar un broker real.
+            Diseño abierto para agregar `LemonBroker`, `IOLBroker`, `BitsoClient`, etc.
+
+- [ ] 29.2  **Activación de plan con capital real (`portfolio.py`)** — `activate_plan(user_id,
+            plan_name, capital_usd)`: marca el plan como "activo" con el capital asignado,
+            calcula la cantidad de cada instrumento según los pesos del plan y el precio actual,
+            y registra las órdenes de compra en `broker_client`. El plan activo tiene
+            `mode: "real" | "simulated"` y `capital_usd`, `activated_at` en su metadata.
+            Los planes sin activar conservan `mode: "dummy"` y su P&L hipotética.
+
+- [ ] 29.3  **Seguimiento de posiciones reales** — `portfolio.py` distingue posiciones dummy
+            (precio snapshot al crear el plan) de posiciones reales (cantidad efectiva comprada,
+            precio promedio de entrada). `calculate_plan_pnl()` usa precios de broker para
+            planes reales y yfinance para dummy. El backoffice muestra badge "REAL" / "DUMMY"
+            por plan, y para planes reales muestra capital invertido, valor actual y P&L en $.
+
+- [ ] 29.4  **Comandos de entrada/salida por voz y WA** — el agente de inversiones reconoce:
+            - "activá el plan X con $Y" → `activate_plan()` + confirmación explícita antes de ejecutar
+            - "salí del plan X" → liquida todas las posiciones del plan (`close_plan()`)
+            - "salí de TICKER en el plan X" → cierra solo esa posición
+            - "¿cómo están mis posiciones reales?" → resumen de planes activos con P&L en $
+            Toda orden que mueve dinero real requiere confirmación del usuario antes de ejecutar
+            (intent con `needs_reply: true` y texto "¿Confirmás la compra de X por $Y?").
+
+- [ ] 29.5  **Palancas automáticas de entrada** — sistema de triggers configurables por plan:
+            - `entry_trigger`: condición para auto-activar un plan (ej: "cuando BTC baje 5% en
+              el día", "el primer lunes de cada mes"). Implementado como regla evaluada en
+              `finance_alerts.check()` o como rutina de FASE 26.
+            - `entry_capital_usd`: capital a invertir al dispararse el trigger.
+            - Flujo: trigger evalúa → notifica al usuario con opción de confirmar o cancelar
+              dentro de una ventana de tiempo (ej: 30min). Si no hay respuesta, no ejecuta.
+            - Los triggers se configuran desde el backoffice (campo en el formulario del plan).
+
+- [ ] 29.6  **Palancas automáticas de salida** — por posición o por plan completo:
+            - `stop_loss_pct`: cierra automáticamente si P&L cae por debajo del umbral.
+            - `take_profit_pct`: cierra si P&L supera el umbral.
+            - `trailing_stop_pct`: stop dinámico que sigue el máximo alcanzado.
+            - Evaluados en cada ciclo de `finance_alerts.check()`. Al dispararse, notifica
+              por WA/TTS antes de ejecutar y da una ventana de cancelación configurable
+              (`exit_confirm_window_sec`, default 0 = inmediato para stop_loss).
+            - Configurables por plan desde el backoffice.
+
+- [ ] 29.7  **Historial de órdenes reales** — `broker_client` persiste cada orden ejecutada
+            en `finance_orders_{uid}.json`: timestamp, ticker, side, cantidad, precio, status,
+            broker. Endpoint `GET /finance/plans/{uid}/orders` en core. Sección en backoffice
+            bajo el plan activo: tabla de órdenes con filtro por plan y estado.
