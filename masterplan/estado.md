@@ -517,6 +517,18 @@ Nota:     Modo dummy (recomendaciones + P&L hipotética). Portfolio por usuario 
 - [x] 6.12 Backoffice sección planes de inversión por usuario:
            Sección "Planes de inversión" en /users/{id}: tabla con posiciones, P&L actual por plan,
            botón eliminar por fila. REST: GET /finance/plans/{uid}, DELETE /finance/plans/{uid}/{name}.
+- [x] 6.13 Reporte P&L horario por WA (intraday + total):
+           finance_alerts._send_portfolio_pnl_hourly_wa() — por cada usuario con planes y wa_phone,
+           envía WA con P&L del día ("hoy") y acumulada desde creación ("total") de cada plan.
+           portfolio.calculate_plan_pnl() incluye intraday_pct (change_pct del día) en cada row.
+           Cooldown configurable por usuario. Emojis bidireccionales: 🚀 arriba del umbral, ⚠️ abajo.
+           Se omite si toda la P&L es < 0.05% (ruido de mercado cerrado). Llamada desde check().
+- [x] 6.14 Config P&L por usuario editable desde backoffice:
+           Tres campos nuevos en user_context_schema de FinanceAgent: plan_pnl_up_pct, plan_pnl_down_pct,
+           plan_pnl_hours. finance_alerts._get_user_pnl_config() los lee via user_context.get_context(),
+           con fallback a defaults globales (.env). Globales: FINANCE_PLAN_PNL_UP_PCT=5.0,
+           FINANCE_PLAN_PNL_DOWN_PCT=-5.0, FINANCE_PLAN_PNL_HOURS=1. Clamp mínimo de 1h.
+           Valores inválidos hacen fallback silencioso al global.
 
 ---
 
@@ -857,6 +869,12 @@ Extensiones futuras: cron expressions, triggers por evento HAOS.
            Agentes con schema: controles input/select pre-llenados (visibles aunque no haya valor).
            Agentes sin schema: read-only con botón eliminar (comportamiento original).
            `POST /users/{uid}/context/{agent_id}/{field}` persiste via PATCH al core.
+- [x] 9.38 Fix: `proactive.py` — intent status del LLM no se persistía en `_persist_proactive_item()`.
+           `_intent_state.upsert()` se llamaba sin el campo `status`, reseteando siempre a "active".
+           El LLM marcaba intents como "done" con notify_message → WA se reenviaba cada hora.
+           Fix: pasar `status=item.get("status")` en los casos advise y request. También: pasar
+           `user_id` a `_send_wa_notification()` desde `_run_agent()` (inconsistencia con run_for_user_stream).
+           Regresión cubierta en `tests/test_proactive_persist.py`.
 
 ---
 

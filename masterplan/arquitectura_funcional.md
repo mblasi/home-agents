@@ -2,7 +2,7 @@
 
 Documento de referencia funcional del sistema. Se actualiza con cada cambio de funcionalidad.
 
-_Última actualización: 2026-05-10_
+_Última actualización: 2026-05-14_
 
 ---
 
@@ -109,9 +109,11 @@ POST /process {text, source, conversation_id?}
   - `_strategic_checks()` (hardcodeado): detecta si el usuario no tiene perfil → intent de configuración; tiene perfil pero no tiene planes → intent de creación; P&L ponderada de algún plan cae bajo umbral del perfil → intent + notify WA.
   - `proactive_check()` override: llama `_strategic_checks()` + `super().proactive_check()` (LLM sobre historial de conversación). Sin perfil, omite el escaneo LLM. `proactive_system_prompt` específico para finanzas.
   - Intervalo: 3600s (cada 1h). Alertas reactivas de precios van por `alerts()` (cada 15min), sin duplicación.
+- **Reporte P&L horario por WA:** `finance_alerts._send_portfolio_pnl_hourly_wa()` — se llama desde `check()` (cada 15min, cooldown configurable por usuario). Por cada usuario con planes y `wa_phone`, envía: P&L del día (`intraday_pct` = `change_pct` de `get_quote()`) y P&L acumulada desde creación. Emojis: 🚀 si total ≥ umbral up, ⚠️ si total ≤ umbral down, 📈/📉 para el resto. Se omite si toda la P&L < 0.05%. `portfolio.calculate_plan_pnl()` incluye `intraday_pct` en cada row.
+- **Config P&L por usuario:** tres campos en `user_context_schema` de `FinanceAgent` (`plan_pnl_up_pct`, `plan_pnl_down_pct`, `plan_pnl_hours`) editables desde backoffice → perfil de usuario. `_get_user_pnl_config(uid)` los lee con fallback a globales `.env` (`FINANCE_PLAN_PNL_UP_PCT=5.0`, `FINANCE_PLAN_PNL_DOWN_PCT=-5.0`, `FINANCE_PLAN_PNL_HOURS=1`).
 - **Templates de planes:** `portfolio.py` mantiene un CRUD de templates persistentes (`finance_templates.json`). Cada template tiene `name`, `positions` (ticker:pct) y `review_threshold`. Al primer `proactive_check` sin planes, `create_plans_from_templates()` crea uno por template faltante (silencioso, sin intents). CRUD en backoffice `/finance/templates`. REST: `GET/POST /finance/templates`, `DELETE /finance/templates/{name}`.
 - **RAG de noticias:** `finance_news.py` — scraping RSS Yahoo Finance por ticker, embeddings con `nomic-embed-text` (Ollama), búsqueda semántica cosine (numpy), fallback keyword si Ollama no responde. Índice persistido en `~/.local/share/capitan/finance_news_index.json` (TTL 30min). Las noticias más relevantes a la query del usuario se inyectan al system prompt del LLM. El refresh corre en background thread tanto en `process()` como en `alerts()`, por lo que el índice se mantiene fresco independientemente de la interacción del usuario.
-- **Companion:** `finance_alerts.py` para alertas reactivas de precio, `portfolio.py` para portfolio + templates, `finance_news.py` para RAG de noticias
+- **Companion:** `finance_alerts.py` para alertas reactivas de precio y P&L horario, `portfolio.py` para portfolio + templates, `finance_news.py` para RAG de noticias
 
 ### travel — Viajes
 
