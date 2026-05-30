@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+{% block title %}Rutinas{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <div>
+    <h1 class="text-2xl font-bold">Rutinas detectadas</h1>
+    <p class="text-xs text-gray-500 mt-1">
+      Patrones de comportamiento identificados automáticamente — candidatas, activas, pausadas y descartadas.
+    </p>
+  </div>
+  <div class="flex items-center gap-3">
+    <a href="/goals" class="text-xs text-gray-500 hover:text-gray-400 transition-colors">← Goals</a>
+    <span class="text-xs text-gray-600">{{ routines | length }} rutina{{ 's' if routines | length != 1 }}</span>
+  </div>
+</div>
+
+{% if not routines %}
+<div class="bg-gray-900 border border-gray-800 rounded-xl p-8 text-center">
+  <div class="text-4xl mb-3">🔄</div>
+  <p class="text-gray-400 text-sm">No hay rutinas registradas.</p>
+  <p class="text-gray-600 text-xs mt-1">
+    Los agentes detectan rutinas cuando observan patrones repetidos en el comportamiento del usuario.
+    Se promueven de candidata a activa cuando confianza ≥ 60% y ocurrencias ≥ 3.
+  </p>
+</div>
+{% else %}
+
+{% set status_colors = {
+  'candidate': 'bg-yellow-900/40 text-yellow-400 border-yellow-800/50',
+  'active':    'bg-emerald-900/40 text-emerald-400 border-emerald-800/50',
+  'paused':    'bg-blue-900/40 text-blue-400 border-blue-800/50',
+  'dismissed': 'bg-gray-800 text-gray-500 border-gray-700/50',
+} %}
+{% set status_labels = {
+  'candidate': 'candidata',
+  'active':    'activa',
+  'paused':    'pausada',
+  'dismissed': 'descartada',
+} %}
+{% set trigger_labels = {
+  'time':     '⏰ horario',
+  'context':  '🔀 contexto',
+  'pattern':  '📊 patrón',
+} %}
+{% set next_statuses = {
+  'candidate': [['active', 'activar'], ['dismissed', 'descartar']],
+  'active':    [['paused', 'pausar'], ['dismissed', 'descartar']],
+  'paused':    [['active', 'reactivar'], ['dismissed', 'descartar']],
+} %}
+
+<div class="space-y-4">
+{% for r in routines %}
+{% set scolor = status_colors.get(r.status, 'bg-gray-800 text-gray-400 border-gray-700') %}
+{% set slabel = status_labels.get(r.status, r.status) %}
+{% set user_info = users.get(r.user_id, {}) %}
+{% set ainfo = agents.get(r.get('agent_id', ''), {}) %}
+{% set transitions = next_statuses.get(r.status, []) %}
+{% set notes = r.get('notes', []) %}
+{% set confidence_pct = (r.get('confidence', 0) * 100) | round(0) | int %}
+{% set occ = r.get('occurrence_count', 0) %}
+{% set trigger_type = r.get('trigger_type', '') %}
+{% set trigger_label = trigger_labels.get(trigger_type, trigger_type) %}
+{% set rid = r.get('routine_id', '') %}
+
+<div class="bg-gray-900 border border-gray-800 rounded-xl p-4"
+     id="routine-row-{{ rid }}">
+
+  <div class="flex items-start gap-3">
+    <div class="text-xl shrink-0 pt-0.5">🔄</div>
+
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center gap-2 flex-wrap mb-1">
+        <span class="text-sm font-semibold text-gray-100">{{ r.get('title', rid) }}</span>
+        <span class="px-2 py-0.5 rounded-full text-[10px] font-medium border {{ scolor }}">
+          {{ slabel }}
+        </span>
+        {% if trigger_type %}
+        <span class="px-2 py-0.5 rounded-full text-[10px] bg-gray-800 text-gray-400 border border-gray-700/50">
+          {{ trigger_label }}
+        </span>
+        {% endif %}
+      </div>
+
+      {% if r.get('description') %}
+      <p class="text-xs text-gray-400 mb-2">{{ r.description }}</p>
+      {% endif %}
+
+      <!-- Métricas -->
+      <div class="flex items-center gap-4 mb-2">
+        <!-- Confianza -->
+        <div class="flex items-center gap-2">
+          <span class="text-[10px] text-gray-500">confianza</span>
+          <div class="w-20 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+            <div class="h-full rounded-full {% if confidence_pct >= 60 %}bg-emerald-500{% elif confidence_pct >= 30 %}bg-yellow-500{% else %}bg-gray-600{% endif %}"
+                 style="width: {{ confidence_pct }}%"></div>
+          </div>
+          <span class="text-[10px] {% if confidence_pct >= 60 %}text-emerald-400{% elif confidence_pct >= 30 %}text-yellow-400{% else %}text-gray-500{% endif %}">
+            {{ confidence_pct }}%
+          </span>
+        </div>
+        <!-- Ocurrencias -->
+        <div class="flex items-center gap-1.5">
+          <span class="text-[10px] text-gray-500">ocurrencias</span>
+          <span class="text-[10px] {% if occ >= 3 %}text-emerald-400{% else %}text-gray-400{% endif %}">
+            {{ occ }}/3
+          </span>
+        </div>
+        <!-- Trigger time si existe -->
+        {% if r.get('trigger_time') %}
+        <div class="flex items-center gap-1.5">
+          <span class="text-[10px] text-gray-500">hora</span>
+          <span class="text-[10px] text-gray-300 font-mono">{{ r.trigger_time }}</span>
+        </div>
+        {% endif %}
+        {% if r.get('trigger_days') %}
+        <div class="flex items-center gap-1.5">
+          <span class="text-[10px] text-gray-500">días</span>
+          <span class="text-[10px] text-gray-300">{{ r.trigger_days | join(', ') }}</span>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Agente y acción -->
+      <div class="flex items-center gap-2 mb-2">
+        {% if ainfo %}
+        <span class="text-[10px] bg-gray-800 text-gray-400 px-2 py-0.5 rounded border border-gray-700/50">
+          {{ ainfo.get('icon', '🤖') }} {{ ainfo.get('name', r.get('agent_id', '')) }}
+        </span>
+        {% endif %}
+        {% if r.get('action_template') %}
+        <span class="text-[10px] text-gray-500 font-mono">{{ r.action_template }}</span>
+        {% endif %}
+      </div>
+
+      <!-- Notas (últimas 3) -->
+      {% if notes %}
+      <div class="mb-2 space-y-1">
+        {% for note in notes[-3:] %}
+        {% set nainfo = agents.get(note.agent_id, {}) %}
+        <div class="flex items-start gap-2 text-[10px] text-gray-500">
+          <span class="shrink-0">{{ nainfo.get('icon', '·') }}</span>
+          <span class="text-gray-400">{{ note.text }}</span>
+        </div>
+        {% endfor %}
+        {% if notes | length > 3 %}
+        <span class="text-[10px] text-gray-600">+ {{ notes | length - 3 }} nota{{ 's' if notes | length - 3 != 1 }} más</span>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <div class="flex items-center gap-3 text-[10px] text-gray-600">
+        <a href="/users/{{ r.user_id }}/edit" class="hover:text-gray-400 transition-colors">
+          {{ user_info.get('name', r.user_id) }}
+        </a>
+        {% if r.get('trigger_context') %}
+        <span>·</span>
+        <span>{{ r.trigger_context }}</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Acciones de transición -->
+    <div class="shrink-0 flex flex-col gap-1.5 items-end">
+      {% for new_status, label in transitions %}
+      <button
+        hx-post="/routines/{{ r.user_id }}/{{ rid }}/transition"
+        hx-vals='{"new_status": "{{ new_status }}", "agent_id": "backoffice"}'
+        hx-target="#routine-row-{{ rid }}"
+        hx-swap="outerHTML"
+        hx-headers='{"Content-Type": "application/json"}'
+        class="px-2 py-1 text-xs rounded transition-colors border whitespace-nowrap
+               {% if new_status == 'dismissed' %}
+               text-gray-600 hover:text-red-400 hover:bg-red-900/20 border-gray-700/50
+               {% elif new_status == 'active' %}
+               text-emerald-400 hover:text-emerald-300 hover:bg-emerald-900/20 border-emerald-800/50
+               {% elif new_status == 'paused' %}
+               text-blue-400 hover:text-blue-300 hover:bg-blue-900/20 border-blue-800/50
+               {% else %}
+               text-gray-400 hover:text-gray-300 hover:bg-gray-800 border-gray-700/50
+               {% endif %}">
+        {{ label }}
+      </button>
+      {% endfor %}
+      <button
+        hx-delete="/routines/{{ r.user_id }}/{{ rid }}"
+        hx-target="#routine-row-{{ rid }}"
+        hx-swap="outerHTML"
+        hx-confirm="¿Eliminar esta rutina?"
+        class="px-2 py-1 text-xs text-gray-600 hover:text-red-400 hover:bg-red-900/20
+               rounded transition-colors">
+        ✕
+      </button>
+    </div>
+  </div>
+</div>
+{% endfor %}
+</div>
+{% endif %}
+{% endblock %}

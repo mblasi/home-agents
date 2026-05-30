@@ -77,6 +77,41 @@ de la sesión como mínimo. Hacer siempre `--dry-run` primero para verificar.
 
 ---
 
+## Tests — política obligatoria
+
+Los tests viven en `core/tests/`. Se ejecutan con:
+```zsh
+source ~/home-agents-env/bin/activate
+cd ~/workspace/home-agents/core
+python -m pytest tests/ -q
+```
+
+**Regla estricta: cualquier modificación o corrección de funcionalidad en `core/` requiere actualizar o generar los tests correspondientes antes de commitear.**
+
+Criterios:
+- **Nueva función o clase** → agregar tests unitarios que cubran el comportamiento documentado.
+- **Modificación de lógica** → actualizar los tests existentes que dependen de esa lógica.
+- **Corrección de bug** → agregar un test que reproduzca el bug antes del fix y pase después.
+- **Nueva dependencia externa** (HTTP, filesystem) → mockear con `unittest.mock.patch` o `monkeypatch`.
+
+Archivos de test existentes:
+- `test_ha_client.py` — `_load_env`, `_load_haos_config`, `get_state`, `call_service`, `ENTITIES`
+- `test_agent_parse.py` — `_parse_all`, `_compose_response`, `_haos_error_message`
+- `test_agent_mocked.py` — `HaosAgent.process`, `_ask_and_parse`, overrides del registry
+- `test_agent_registry.py` — `dispatch`, `get_registry`, `get_fancy_display`, `write_active_agent`
+- `test_conversations.py` — `ConversationManager`, `is_close_phrase`, `is_acknowledgment`
+- `test_users.py` — CRUD de usuarios, documentos, `expiring_documents`
+- `test_rbac.py` — `allowed`, `set_role_agents`, permisos por rol
+- `test_intent_state.py` — ciclo de vida de intents, `get_pending_request`, `get_needs_reminder`
+
+Convenciones:
+- Usar `monkeypatch` o `patch.dict(sys.modules, ...)` para aislar filesystem y HTTP.
+- No parchear `ha_client.requests.post` y `agent.requests.post` en simultáneo — apuntan al mismo módulo `requests`; parchear `ha_client.call_service` directamente en su lugar.
+- Módulos con `import X as _x` local (dentro de una función) requieren `patch.dict(sys.modules, {"X": mock})`.
+- Los tests no deben hacer llamadas reales a Ollama, HAOS ni al filesystem del usuario.
+
+---
+
 ## Documentación obligatoria
 
 Cada vez que se agregue o corrija funcionalidad, **antes de cerrar la sesión**:
