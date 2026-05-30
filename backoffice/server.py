@@ -485,6 +485,45 @@ async def proactive_run(agent_id: str, request: Request):
     )
 
 
+@app.get("/agents/{agent_id}/tools", response_class=HTMLResponse)
+def agent_tools_partial(agent_id: str, request: Request):
+    tools = _core(f"/agents/{agent_id}/tools") or []
+    agent = _core(f"/agents/{agent_id}") or {}
+    has_sources = bool((agent.get("tool_sources") or []))
+    return templates.TemplateResponse(
+        request, "agent_tools_partial.html",
+        {"agent_id": agent_id, "tools": tools, "has_tool_sources": has_sources,
+         "refresh_result": None},
+    )
+
+
+@app.post("/agents/{agent_id}/tools/refresh", response_class=HTMLResponse)
+def agent_tools_refresh(agent_id: str, request: Request):
+    result = _core(f"/agents/{agent_id}/tools/refresh", method="POST") or {}
+    tools  = result.pop("tools", [])
+    agent  = _core(f"/agents/{agent_id}") or {}
+    has_sources = bool((agent.get("tool_sources") or []))
+    return templates.TemplateResponse(
+        request, "agent_tools_partial.html",
+        {"agent_id": agent_id, "tools": tools, "has_tool_sources": has_sources,
+         "refresh_result": result},
+    )
+
+
+@app.patch("/agents/{agent_id}/tools/{tool_name}", response_class=HTMLResponse)
+async def agent_tool_toggle(agent_id: str, tool_name: str, request: Request):
+    body = await request.json()
+    _core(f"/agents/{agent_id}/tools/{tool_name}", method="PATCH", json=body)
+    tools  = _core(f"/agents/{agent_id}/tools") or []
+    agent  = _core(f"/agents/{agent_id}") or {}
+    has_sources = bool((agent.get("tool_sources") or []))
+    return templates.TemplateResponse(
+        request, "agent_tools_partial.html",
+        {"agent_id": agent_id, "tools": tools, "has_tool_sources": has_sources,
+         "refresh_result": None},
+    )
+
+
 _ROLES_AGENTS = ["admin", "familiar", "adolescente", "niño", "invitado", "guest"]
 
 
