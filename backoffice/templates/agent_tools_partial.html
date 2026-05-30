@@ -1,0 +1,73 @@
+{% if tools is defined %}
+<div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-4" id="tools-section">
+  <div class="flex items-center justify-between mb-4">
+    <div>
+      <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Tools</h2>
+      <p class="text-xs text-gray-600 mt-0.5">Funciones que el LLM puede invocar al procesar pedidos</p>
+    </div>
+    <button
+      hx-post="/agents/{{ agent_id }}/tools/refresh"
+      hx-target="#tools-section"
+      hx-swap="outerHTML"
+      hx-indicator="this"
+      class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 text-xs font-medium rounded-lg transition-colors htmx-indicator:opacity-50">
+      ↻ Refresh tools
+    </button>
+  </div>
+
+  {% if refresh_result %}
+  <div class="mb-3 px-3 py-2 bg-indigo-900/20 border border-indigo-900/40 rounded-lg text-xs text-indigo-300">
+    Refresh completado: {{ refresh_result.added }} añadidas, {{ refresh_result.updated }} actualizadas
+    {% if refresh_result.sources %}
+    — desde <span class="font-mono text-indigo-400">{{ refresh_result.sources | join(", ") }}</span>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if tools %}
+  <div class="space-y-2">
+    {% for t in tools %}
+    <div class="flex items-start gap-3 py-2.5 border-b border-gray-800 last:border-0">
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2 flex-wrap">
+          <code class="text-xs font-mono text-indigo-300 bg-indigo-900/20 px-1.5 py-0.5 rounded">{{ t.name }}</code>
+          {% if not t.enabled %}
+          <span class="text-xs text-gray-600 bg-gray-800 px-1.5 py-0.5 rounded">deshabilitada</span>
+          {% endif %}
+        </div>
+        <p class="text-xs text-gray-400 mt-1">{{ t.description }}</p>
+        {% if t.source_url %}
+        <p class="text-xs text-gray-700 font-mono mt-0.5 truncate">{{ t.source_url }}</p>
+        {% endif %}
+        {% if t.last_refreshed_at %}
+        <p class="text-xs text-gray-700 mt-0.5">
+          último refresh: {{ t.last_refreshed_at | int | datetimefmt }}
+        </p>
+        {% endif %}
+      </div>
+      <button
+        hx-patch="/agents/{{ agent_id }}/tools/{{ t.name }}"
+        hx-vals='{"enabled": {{ "false" if t.enabled else "true" }}}'
+        hx-target="#tools-section"
+        hx-swap="outerHTML"
+        hx-headers='{"Content-Type": "application/json"}'
+        class="shrink-0 px-2 py-1 text-xs rounded border transition-colors
+          {% if t.enabled %}bg-emerald-900/30 text-emerald-400 border-emerald-800 hover:bg-emerald-900/60
+          {% else %}bg-gray-800 text-gray-500 border-gray-700 hover:bg-gray-700{% endif %}">
+        {{ "on" if t.enabled else "off" }}
+      </button>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="text-sm text-gray-600">
+    Sin tools definidas.
+    {% if has_tool_sources %}
+    Usá el botón "Refresh tools" para hidratar desde los backends declarados.
+    {% else %}
+    Este agente no tiene <code class="font-mono text-xs">tool_sources</code> declarados.
+    {% endif %}
+  </p>
+  {% endif %}
+</div>
+{% endif %}
