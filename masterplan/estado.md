@@ -2212,11 +2212,11 @@ Objetivo: Reemplazar el patrón "prompt con acciones en texto + parse manual" po
           Las tools son administrables desde el backoffice y se hidratan a partir de
           schemas OpenAPI: generados automáticamente para el core-api, o a través de
           adapters para APIs externas.
-Estado:   Pendiente
+Estado:   COMPLETA
 Deps:     FASE 9 (coordinador), FASE 24 (tracing).
 ```
 
-- [ ] 30.1  **`ToolDef` y `ToolStore` (`tool_store.py`)** — modelo de datos para una tool y su
+- [x] 30.1  **`ToolDef` y `ToolStore` (`tool_store.py`)** — modelo de datos para una tool y su
             store de persistencia por agente:
             - `ToolDef`: `name`, `description`, `parameters` (JSON Schema), `source_url`
               (de dónde se hidrataron), `last_refreshed_at`, `enabled: bool`.
@@ -2226,14 +2226,14 @@ Deps:     FASE 9 (coordinador), FASE 24 (tracing).
             - Cada agente puede tener tools o no. Un agente sin tools sigue funcionando
               con su lógica actual como fallback.
 
-- [ ] 30.2  **Schema OpenAPI del core-api (`GET /openapi-tools`)** — endpoint en `server.py`
+- [x] 30.2  **Schema OpenAPI del core-api (`GET /openapi-tools`)** — endpoint en `server.py`
             que retorna un schema OpenAPI 3.0 de los endpoints internos de core que son
             candidatos a ser tools (subset explícitamente marcado, no toda la API).
             Los endpoints candidatos se anotan con un decorator o campo `expose_as_tool=True`.
             El schema incluye description, parameters y response summary para cada operación.
             Este endpoint es el que usan los agentes del sistema para auto-hidratarse.
 
-- [ ] 30.3  **Adapter OpenAPI para backends externos (`openapi_adapter.py`)** — módulo que,
+- [x] 30.3  **Adapter OpenAPI para backends externos (`openapi_adapter.py`)** — módulo que,
             dado un backend con API documentada, produce un schema OpenAPI normalizado:
             - Si el backend expone `/openapi.json` o `/swagger.json`: lo consume directamente.
             - Si no: recibe un documento de descripción (markdown/texto) y lo convierte a
@@ -2244,7 +2244,7 @@ Deps:     FASE 9 (coordinador), FASE 24 (tracing).
             El adapter expone `get_schema(backend_id) -> dict` que retorna el schema
             normalizado independientemente del origen.
 
-- [ ] 30.4  **Hidratación de tools por agente (`tool_hydrator.py`)** — lógica en el backend
+- [x] 30.4  **Hidratación de tools por agente (`tool_hydrator.py`)** — lógica en el backend
             core que, dado un `agent_id`, obtiene el schema de cada backend asociado al agente
             (via 30.2 o 30.3), filtra las operaciones relevantes para ese agente, y actualiza
             el `ToolStore` con las `ToolDef` resultantes. Endpoint `POST /agents/{agent_id}/tools/refresh`
@@ -2252,7 +2252,7 @@ Deps:     FASE 9 (coordinador), FASE 24 (tracing).
             backend corresponde a qué agente" se declara en el agente mismo (`backends` ya
             existe en `base_agent.py`; extender con `tool_sources: list[str]`).
 
-- [ ] 30.5  **Agentic loop en `process()` (`agent_loop.py`)** — implementación genérica del
+- [x] 30.5  **Agentic loop en `process()` (`agent_loop.py`)** — implementación genérica del
             loop de tool calling sobre Ollama (`/api/chat` con campo `tools`):
             ```
             messages = [system] + conv.context() + [user]
@@ -2270,7 +2270,7 @@ Deps:     FASE 9 (coordinador), FASE 24 (tracing).
             Los agentes existentes migran a este loop cuando tienen tools habilitadas;
             sin tools, siguen con su lógica actual intacta.
 
-- [ ] 30.6  **`ToolCall` en traces (`trace_store.py`)** — agregar formalmente el evento de
+- [x] 30.6  **`ToolCall` en traces (`trace_store.py`)** — agregar formalmente el evento de
             invocación de tool al modelo de trace:
             - Nueva dataclass `ToolCall`: `tool_name`, `arguments: dict`, `result: dict`,
               `latency_ms`, `ts`, `iteration: int` (número de vuelta del loop).
@@ -2279,7 +2279,7 @@ Deps:     FASE 9 (coordinador), FASE 24 (tracing).
               `record_tool_call()` (nuevo helper en `trace_store.py`).
             - Las `LLMCall` del loop se registran con `source = "agent_{agent_id}_iter_{n}"`.
 
-- [ ] 30.7  **Backoffice — gestión de tools por agente** — sección nueva en la página de
+- [x] 30.7  **Backoffice — gestión de tools por agente** — sección nueva en la página de
             configuración de cada agente en el backoffice:
             - Lista de tools disponibles con nombre, descripción, origen (URL del schema)
               y último refresh.
@@ -2289,13 +2289,13 @@ Deps:     FASE 9 (coordinador), FASE 24 (tracing).
             - Si el agente no tiene `tool_sources` declarados, la sección muestra un
               mensaje informativo en lugar de un error.
 
-- [ ] 30.8  **Migración piloto: `SystemAgent`** — migrar `system_agent.py` como primer agente
+- [x] 30.8  **Migración piloto: `SystemAgent`** — migrar `system_agent.py` como primer agente
             al nuevo modelo. Sus tools se hidratan desde el core-api (30.2): `list_agents`,
             `get_intents`, `list_proactive_runs`, `get_trace`, `get_goal`, etc. El `_SYSTEM`
             hardcodeado se reemplaza por un system prompt genérico sin lista de acciones.
             Los tests existentes se actualizan para cubrir el loop y la invocación de tools.
 
-- [ ] 30.9  **Tests** — `tests/test_tool_store.py`: CRUD de ToolDef, enable/disable, persistencia.
+- [x] 30.9  **Tests** — `tests/test_tool_store.py`: CRUD de ToolDef, enable/disable, persistencia.
             `tests/test_tool_hydrator.py`: hidratación desde schema mockeado (sin llamadas
             reales). `tests/test_agent_loop.py`: loop completo con Ollama mockeado — verifica
             iteraciones, límite de ciclos, registro en trace.
