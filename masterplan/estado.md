@@ -1668,6 +1668,169 @@ Estado:   COMPLETA
 
 ---
 
+### FASE 21 - Consolidación en SER9 (Paso Intermedio)
+```
+Objetivo: Mover toda la infraestructura de producción a la Beelink SER9 Pro.
+          La laptop queda como entorno de desarrollo puro (sin servicios corriendo).
+          Misma restricción de modelo 7B que la configuración actual.
+          HAOS migra desde el PC viejo dedicado al SER9.
+Estado:   Pendiente
+Hardware: Beelink SER9 Pro — AMD Ryzen AI 7 HX 255, 32GB DDR5, Radeon 780M (RDNA 3)
+Stack:    Proxmox VE → VM HAOS + LXC Ubuntu privilegiado (core + backoffice + wa + Ollama)
+Nota:     Stepping stone a FASE 8 (servidor con GPU discreta). No escala modelos: sigue en 7B.
+```
+
+#### Arquitectura objetivo
+
+```
+SER9 (Proxmox VE)
+├── VM: HAOS                     — imagen oficial, bridge LAN → IP real (192.168.68.101)
+└── LXC Ubuntu privilegiado      — todos los servicios home-agents
+    ├── core                     — FastAPI :8765
+    ├── backoffice               — FastAPI :8080
+    ├── wa                       — Node.js (whatsapp-web.js)
+    ├── ear                      — ⚠ PENDIENTE (ver 21.21)
+    └── ollama                   — CPU + ROCm 780M vía /dev/kfd + /dev/dri passthrough
+
+Laptop → desarrollo puro (git, editor, deploy vía SSH)
+```
+
+LXC privilegiado (no VM) para que el passthrough de /dev/kfd + /dev/dri/renderD128 (ROCm)
+y /dev/snd (audio ALSA, si corre el ear) sea directo y sin complejidad de IOMMU de APU.
+
+#### Etapa A — Proxmox y red
+
+- [ ] 21.1  Instalar Proxmox VE en el SER9 (ISO oficial, bare metal).
+            IP estática en la interfaz física del host PVE.
+            Hostname: `capitan`, accesible como `capitan.local` (mDNS) o por IP fija.
+- [ ] 21.2  Crear bridge `vmbr0` sobre la interfaz física.
+            El bridge da a las VMs y LXCs IP real en la LAN (sin NAT).
+            Reservar IP del HAOS VM en el router (DHCP reservation por MAC → 192.168.68.101).
+- [ ] 21.3  SSH desde laptop configurado: clave pública copiada al host PVE y al LXC.
+            Alias en `~/.ssh/config`: `Host capitan` → IP fija del LXC.
+
+#### Etapa B — VM de HAOS
+
+- [ ] 21.4  Backup completo del HAOS actual: Settings → System → Backups → Download .tar.
+- [ ] 21.5  Crear VM en Proxmox con imagen oficial HAOS:
+            Descargar `haos_ova-*.qcow2` (o usar Proxmox Helper Scripts — tteck).
+            VM con red en `vmbr0` → IP real en LAN → reservar 192.168.68.101 por MAC.
+- [ ] 21.6  Restaurar el backup en el nuevo HAOS.
+            Verificar: integraciones activas, entity_ids idénticos, Long-Lived Token funcionando.
+            Smoke test: `curl http://192.168.68.101:8123/api/` con el token del .env.
+- [ ] 21.7  Autostart de la VM: Options → Start at boot → Yes.
+- [ ] 21.8  Apagar el PC viejo (solo tras confirmar 21.6 completo y token funcionando).
+
+#### Etapa C — LXC Ubuntu privilegiado
+
+- [ ] 21.9  Crear LXC privilegiado (Ubuntu 24.04) en Proxmox:
+            RAM: 12GB, cores: 6, storage: 40GB mínimo.
+            Red en `vmbr0` → IP fija (ej: 192.168.68.102).
+            `features: nesting=1` (necesario para systemd --user).
+            Autostart: Yes.
+- [ ] 21.10 Pasar dispositivos GPU al LXC (en `/etc/pve/lxc/<id>.conf` en el host PVE):
+            ```
+            lxc.cgroup2.devices.allow: c 226:* rwm
+            lxc.cgroup2.devices.allow: c 234:0 rwm
+            lxc.mount.entry: /dev/dri dev/dri none bind,optional,create=dir
+            lxc.mount.entry: /dev/kfd dev/kfd none bind,optional,create=file
+            ```
+            (Solo relevante si se confirma ROCm — ver 21.13/21.14.)
+- [ ] 21.11 Instalar en el LXC: Python 3.13, Node 18, git, ffmpeg (incluye ffplay), build-essential.
+            Instalar Piper: descargar binario v1.2.0 + voces en `~/.local/share/piper/`.
+            Crear `~/home-agents-env` (venv).
+
+#### Etapa D — Ollama en el LXC
+
+- [ ] 21.12 Instalar Ollama en el LXC (`curl -fsSL https://ollama.ai/install.sh | sh`).
+            Pull `qwen2.5:7b`. Systemd unit generada automáticamente.
+- [ ] 21.13 Benchmark CPU-only como baseline:
+            `time ollama run qwen2.5:7b "responde solo: hola"` → latencia warm.
+- [ ] 21.14 Intentar ROCm 780M en el LXC:
+            Instalar ROCm 6.x dentro del LXC. Verificar visibilidad de `/dev/kfd` y `/dev/dri/renderD128`.
+            Si el chip es gfx1151 (Strix Point): puede necesitar `HSA_OVERRIDE_GFX_VERSION=11.0.0`.
+            Re-benchmarkar. Si latencia warm < 2s y estable → mantener ROCm. Si no → CPU-only.
+- [ ] 21.15 Documentar resultado del benchmark y decisión ROCm en NOTAS.
+
+#### Etapa E — Migración de home-agents al LXC
+
+- [ ] 21.16 Clonar `home-agents` con submodules en el LXC:
+            `git clone --recurse-submodules git@github.com:mblasi/home-agents.git ~/workspace/home-agents`
+            Instalar deps Python: `pip install -r core/requirements.txt`
+            Instalar deps Node: `npm install` en `ear/wa/` (o donde esté el cliente WA).
+- [ ] 21.17 Crear `core/.env` en el LXC:
+            `OLLAMA_URL=http://localhost:11434`
+            `HAOS_URL=http://192.168.68.101:8123`
+            Resto de vars: copiar desde la laptop (HAOS_TOKEN, BACKOFFICE_TOKEN, etc.).
+- [ ] 21.18 Instalar y habilitar systemd user units: `capitan-core.service`, `capitan-backoffice.service`.
+            `loginctl enable-linger <user>` para que las units arranquen sin sesión activa.
+            Smoke test: `curl http://localhost:8765/health` desde el LXC.
+- [ ] 21.19 Levantar el cliente WA (`node ear/wa/index.js` o como esté estructurado),
+            escanear QR, verificar reconexión automática y respuesta a mensajes.
+- [ ] 21.20 Test end-to-end desde la laptop:
+            `curl -X POST http://capitan.local:8765/process -H 'Content-Type: application/json' -d '{"text":"prende la luz"}'`
+            Backoffice accesible en `http://capitan.local:8080`.
+
+#### Etapa F — Ear (decisión pendiente)
+
+- [ ] 21.21 **⚠ DECISIÓN PENDIENTE**: ¿el ear corre en el LXC del SER9 o en la laptop como satélite?
+            Opciones:
+            A) **SER9 (preferida)**: mic + speaker USB conectados al SER9.
+               Requiere: `/dev/snd` + dispositivo USB pasados al LXC, ALSA configurado dentro del LXC.
+               La laptop queda 100% desarrollo sin servicios corriendo.
+            B) **Laptop**: `CORE_URL=http://capitan.local:8765` en `ear/.env`. Sin cambios en el ear.
+               Ventaja: sin hardware extra. Desventaja: laptop sigue corriendo un servicio.
+            Cuando se decida: implementar y marcar completo.
+
+#### Etapa G — Workflow de deployment desde laptop
+
+- [ ] 21.22 Crear `scripts/deploy.sh` en el repo umbrella:
+            ```bash
+            #!/usr/bin/env zsh
+            # Deploy home-agents al LXC de producción en el SER9.
+            set -e
+            ssh capitan "
+              cd ~/workspace/home-agents &&
+              git pull --recurse-submodules &&
+              source ~/home-agents-env/bin/activate &&
+              pip install -q -r core/requirements.txt &&
+              systemctl --user restart capitan-core capitan-backoffice
+            "
+            echo "Deploy completo."
+            ```
+            Uso: `bash scripts/deploy.sh` desde la laptop tras mergear un PR a main.
+- [ ] 21.23 Actualizar `CLAUDE.md` del repo umbrella: reflejar nueva arquitectura, IP/hostname
+            del LXC, comandos de deploy y de smoke test remoto.
+
+#### Procedimientos de actualización (referencia operativa)
+
+```zsh
+# Ollama — en el LXC via SSH
+ssh capitan "sudo systemctl stop ollama && curl -fsSL https://ollama.ai/install.sh | sh && sudo systemctl start ollama"
+# Los modelos descargados sobreviven la actualización.
+
+# HAOS — desde la UI del HAOS en la VM (192.168.68.101:8123)
+# Settings → System → Updates → Check for updates / Install
+# La VM de Proxmox no se toca.
+
+# home-agents (core + backoffice)
+bash scripts/deploy.sh   # desde la laptop, tras mergear PR a main
+
+# ear — si está en el LXC del SER9
+ssh capitan "cd ~/workspace/home-agents && git pull --recurse-submodules && systemctl --user restart capitan"
+
+# ear — si está en la laptop (opción B de 21.21)
+git -C ~/workspace/home-agents pull --recurse-submodules && systemctl --user restart capitan
+
+# OS del LXC
+ssh capitan "sudo apt update && sudo apt upgrade -y"
+
+# Proxmox host — desde la UI de PVE o via SSH al host
+ssh root@<ip-pve> "apt update && apt dist-upgrade -y"
+```
+
+---
+
 ## NOTAS Y DECISIONES TOMADAS
 
 ### 2026-04-27
