@@ -1297,16 +1297,24 @@ Nota:     Completa también 21.21 (decisión ear). Ver Anexo A.2 (origen).
 
 #### Etapa A — Protocolo y nodo satélite básico
 - [ ] 16.1  Protocolo nodo↔servidor: especificación de mensajes WebSocket para streaming
-            de audio en chunks. Estructura: `{node_id, room, chunk_b64, sample_rate}`.
+            de audio en chunks. Estructura de chunk: `{node_id, room, chunk_b64, sample_rate}`.
             El nodo envía chunks post-wake-word; el core responde con texto de respuesta.
             Fallback: POST HTTP con el audio completo si WebSocket no disponible.
+            Nota de diseño multi-nodo: el mensaje de handshake inicial (al conectar) debe
+            incluir un campo `capabilities: {tts_local, mic_channels, hw_type}` para que el
+            servidor adapte el formato de respuesta sin asumir el tipo de hardware. La respuesta
+            TTS del servidor debe ser tipada: `{type: "tts_wav", wav_b64}` si el nodo no puede
+            sintetizar, o `{type: "tts_text", text}` si puede (ej: RPi 5 con Piper local).
+            NSPanel Pro declara `tts_local: false`; RPi 5 declara `tts_local: true`.
 - [ ] 16.2  `ear/satellite.py` — cliente ligero para el nodo satélite: detecta wake word
             con openWakeWord (modelo capitan.onnx), captura el comando, envía chunks al
             core vía WebSocket, recibe texto de respuesta y sintetiza TTS local con Piper.
             Sin STT ni LLM locales — toda la inferencia pesada queda en la laptop central.
             Configurable: CORE_WS_URL, ROOM, DEVICE_INDEX_MIC, DEVICE_INDEX_SPK.
 - [ ] 16.3  `core/audio_nodes.py` + `GET /audio-nodes` — registro en memoria de nodos
-            conectados: `{node_id, room, ip, last_seen, state: active|offline}`.
+            conectados: `{node_id, room, ip, last_seen, state: active|offline, capabilities}`.
+            `capabilities` se persiste del handshake inicial (ver 16.1); el registry lo expone
+            en el GET para que el backoffice y el router sepan qué puede hacer cada nodo.
             Auto-registro al conectar vía WebSocket; limpieza de nodos expirados.
             Nota de diseño: este registry debe ser extensible para FASE 10 (inferencia
             distribuida tiene su propio node_registry.py). Considerar base común o
@@ -1323,6 +1331,10 @@ Nota:     Completa también 21.21 (decisión ear). Ver Anexo A.2 (origen).
             `source.room`. Si el room tiene un Echo asignado: sintetizar TTS a WAV y
             reproducir via HAOS `media_player.play_media`. Si no: TTS local como ahora.
             Tabla de routing: `room → entity_id` configurable en `.env` o agents.json.
+            Nota de diseño multi-nodo: si el nodo origen tiene `capabilities.tts_local: true`
+            (RPi 5), enviar `{type: "tts_text"}` en lugar de WAV — el nodo sintetiza con
+            Piper local, menor latencia y sin saturar el WebSocket con audio. El path Echo
+            es ortogonal: aplica cuando el room tiene Echo asignado, independiente del nodo.
 - [ ] 16.7  Backoffice `/rooms` — CRUD de ambientes: nombre, entity_id del Echo asignado,
             node_id del satélite si hay uno conectado. Tabla editable con estado en tiempo real.
 
@@ -1331,9 +1343,49 @@ Nota:     Completa también 21.21 (decisión ear). Ver Anexo A.2 (origen).
             marcar offline si no responde en 3 intentos. Backoffice muestra estado en tiempo real.
 - [ ] 16.9  Panel en dashboard zellij (`panel_nodes.py`): nodos de audio activos, ambiente
             del último comando, latencia STT+LLM por nodo, estado online/offline.
-- [ ] 16.10 Guía de instalación del nodo satélite en Raspberry Pi Zero 2W: dependencias
-            (Python, openWakeWord, Piper, pyaudio), configuración de audio (ALSA),
-            systemd service con auto-reconexión, verificación end-to-end.
+- [ ] 16.10 Guía de instalación del nodo satélite en nodo Linux genérico (referencia:
+            Raspberry Pi OS): dependencias (Python, openWakeWord, Piper, pyaudio/sounddevice),
+            configuración de audio (ALSA), systemd service con auto-reconexión, verificación
+            end-to-end. Aplica a cualquier SBC Linux — RPi Zero 2W, RPi 5, etc.
+
+#### Etapa D — Nodo potenciado: RPi 5 + pantalla oficial + ReSpeaker hat
+
+```
+Objetivo: Soportar un segundo tipo de nodo con más capacidades que el NSPanel Pro:
+          mic array (4 canales, beamforming), TTS local con Piper, pantalla Linux (Chromium
+          kiosk) y pleno control de ALSA. El protocolo de Etapa A es idéntico — la
+          diferencia está en las capabilities declaradas en el handshake y en cómo el
+          servidor y el nodo adaptan el pipeline de respuesta.
+          NSPanel Pro sigue funcionando sin cambios.
+Hardware: Raspberry Pi 5 (4GB+) + pantalla oficial 7" o 10" + ReSpeaker 4-mic hat (seeed).
+          Alimentación directa (USB-C) o PoE hat para montaje en pared sin cables visibles.
+```
+
+- [ ] 16.11 Schema de capabilities para el handshake de registro. Definir el objeto canónico:
+            `{hw_type: "nspanel"|"rpi5"|"generic", tts_local: bool, mic_channels: int,
+            stt_local: bool, has_display: bool, display_type: "none"|"ha_companion"|"browser"}`.
+            NSPanel Pro: `{hw_type:"nspanel", tts_local:false, mic_channels:1, stt_local:false,
+            has_display:true, display_type:"ha_companion"}`.
+            RPi 5: `{hw_type:"rpi5", tts_local:true, mic_channels:4, stt_local:false,
+            has_display:true, display_type:"browser"}`.
+            El servidor nunca bifurca por `hw_type` — solo por las capabilities booleanas.
+            Retrocompatible: nodos que no envíen capabilities asumen el perfil NSPanel (defaults).
+- [ ] 16.12 TTS bifurcado por capability en `ws_audio.py`: si `node.capabilities.tts_local`
+            → enviar `{type:"tts_text", text:"..."}` al nodo (sintetiza con Piper local).
+            Si no → enviar `{type:"tts_wav", wav_b64:"..."}` como hace hoy con NSPanel.
+            El nodo NSPanel existente ignora mensajes de tipo desconocido — no se rompe.
+- [ ] 16.13 `ear/satellite_rpi.py` — cliente satélite nativo Linux para RPi 5:
+            mismo protocolo WS que `satellite.py`, declara capabilities RPi 5.
+            Audio: ALSA / sounddevice apuntando al ReSpeaker (plughw:seeed4micvoicec,0),
+            captura en 16kHz (ReSpeaker lo soporta nativamente — sin resampleo).
+            TTS: Piper local con voz daniela, ffplay, igual que el ear actual.
+            Configurable: CORE_WS_URL, ROOM, DISPLAY_URL (URL del dashboard HA para Chromium).
+- [ ] 16.14 Setup guide RPi 5 + pantalla oficial + ReSpeaker hat:
+            Raspberry Pi OS Lite (64-bit), seeed-voicecard driver, Piper TTS, Chromium en
+            kiosk mode (`/etc/xdg/autostart/kiosk.desktop` apuntando a DISPLAY_URL),
+            rotación de pantalla si montaje vertical, systemd service `capitan-satellite.service`
+            con auto-reconexión al SER9. Verificación end-to-end: wake word → STT → LLM →
+            TTS local → respuesta audible + dashboard HA visible.
 
 ---
 
@@ -2500,7 +2552,7 @@ Hardware: Beelink SER9 Pro — Ryzen AI 7 HX 255, 32GB DDR5, Radeon 780M (RDNA 3
 - [x] 31.2  Warm LLM keepalive: configurar `OLLAMA_KEEP_ALIVE` para evitar descarga del
             modelo entre requests. Por defecto Ollama descarga el modelo tras 5 min idle.
             Agregar `OLLAMA_KEEP_ALIVE=-1` al systemd unit del LXC.
-- [ ] 31.3  Lazy entity index: diferir la construcción del entity index (nomic-embed-text)
+- [x] 31.3  Lazy entity index: diferir la construcción del entity index (nomic-embed-text)
             al primer request en lugar de hacerlo en startup. Elimina los 30s de arranque
             del core. El índice se construye en background al recibir el primer /process.
 - [x] 31.4  Benchmark warm vs cold: medir latencia warm (modelo ya cargado) vs cold para
@@ -2534,7 +2586,7 @@ Motivación: actualmente los datos (usuarios, intents, conversaciones, portfolio
 - [ ] 32.4  Migrar módulos críticos: users.py, conversations.py, intents.py, portfolios.
             Un módulo a la vez con tests. Los JSON se mantienen como fallback hasta
             que todos los módulos estén migrados.
-- [ ] 32.5  Backup automático: script diario que hace `sqlite3 capitan.db .dump > backup.sql`
+- [x] 32.5  Backup automático: script diario que hace `sqlite3 capitan.db .dump > backup.sql`
             y lo guarda en un directorio de backups rotados (7 días).
 - [ ] 32.6  Eliminar JSON files: una vez todos los módulos migrados y backup operativo,
             borrar los archivos JSON y el código de lectura legacy.
