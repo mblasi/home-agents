@@ -1296,7 +1296,7 @@ Nota:     Completa también 21.21 (decisión ear). Ver Anexo A.2 (origen).
 ```
 
 #### Etapa A — Protocolo y nodo satélite básico
-- [ ] 16.1  Protocolo nodo↔servidor: especificación de mensajes WebSocket para streaming
+- [x] 16.1  Protocolo nodo↔servidor: especificación de mensajes WebSocket para streaming
             de audio en chunks. Estructura de chunk: `{node_id, room, chunk_b64, sample_rate}`.
             El nodo envía chunks post-wake-word; el core responde con texto de respuesta.
             Fallback: POST HTTP con el audio completo si WebSocket no disponible.
@@ -1319,7 +1319,7 @@ Nota:     Completa también 21.21 (decisión ear). Ver Anexo A.2 (origen).
             Nota de diseño: este registry debe ser extensible para FASE 10 (inferencia
             distribuida tiene su propio node_registry.py). Considerar base común o
             interfaz unificada para evitar dos sistemas de health-check paralelos.
-- [ ] 16.4  `core/ws_audio.py` — servidor WebSocket `/ws/audio` en el core: recibe chunks
+- [x] 16.4  `core/ws_audio.py` — servidor WebSocket `/ws/audio` en el core: recibe chunks
             del nodo, acumula y pasa al STT local (faster-whisper), llama internamente a
             `process()` con `source.room` del nodo, devuelve el texto de respuesta al nodo.
 - [ ] 16.5  Propagación de `source.room` en el pipeline completo: historial,
@@ -2546,7 +2546,7 @@ Deps:     FASE 21 (SER9 operativo con LXC — COMPLETA)
 Hardware: Beelink SER9 Pro — Ryzen AI 7 HX 255, 32GB DDR5, Radeon 780M (RDNA 3 / gfx1103)
 ```
 
-- [ ] 31.1  Vulkan backend: benchmarkar `OLLAMA_GPU_BACKEND=vulkan` vs ROCm en SER9.
+- [x] 31.1  Vulkan backend: benchmarkar `OLLAMA_GPU_BACKEND=vulkan` vs ROCm en SER9.
             La 780M tiene soporte Vulkan nativo y estable — puede superar el ROCm parcial.
             Medir latencia warm con ambos backends. Documentar ganador en NOTAS.
 - [x] 31.2  Warm LLM keepalive: configurar `OLLAMA_KEEP_ALIVE` para evitar descarga del

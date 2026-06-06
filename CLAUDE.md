@@ -388,3 +388,7 @@ Pipeline anterior (hasta FASE 21): laptop con mic/speaker local. Ya reemplazado.
   accesibles via sounddevice/PortAudio, ADB over WiFi, root, Termux. Función dual:
   dashboard HA (Companion App, usuario por panel) + nodo de voz home-agents (Python/Termux).
   Raspberry Pi Zero 2W era la alternativa original pero NSPanel Pro ya está en la casa.
+- Ollama GPU iGPU (Radeon 780M): requiere `OLLAMA_IGPU_ENABLE=1` en Ollama 0.30+.
+  Sin esa var, Ollama 0.30+ descarta GPUs integradas silenciosamente → fallback a CPU.
+  Config en `/etc/systemd/system/ollama.service.d/keepalive.conf`.
+  Latencia warm con GPU: ~3-5s | sin GPU: ~74s.
