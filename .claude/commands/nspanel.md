@@ -16,6 +16,8 @@ Comandos disponibles:
 - `packages` — instalar Python + sounddevice en Termux
 - `help` — ver ayuda completa
 
+Para dar de alta un panel nuevo: ver `docs/nspanel-setup.md` — guía completa paso a paso.
+
 Si el usuario no especifica qué panel, usá el default (192.168.68.113 — comedor).
 Si especifica un ambiente (ej: "dormitorio"), pedí la IP o buscala en CLAUDE.md.
 
