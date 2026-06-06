@@ -1281,17 +1281,18 @@ Stack:    ytmusicapi (OAuth), yt-dlp (stream resolver), HAOS media_player servic
 ### FASE 16 - Red de Nodos de Audio Multi-Ambiente
 
 ```
-Objetivo: Distribuir la interfaz de voz por toda la casa sin centralizar el audio
-          en un único dispositivo. Nodos ligeros capturan voz por habitación y
-          delegan todo el procesamiento (STT, LLM, TTS) al servidor central en la laptop.
-          Output alternativo via los Echos ya instalados (HAOS media_player) sin
-          necesidad de hardware nuevo para empezar.
+Objetivo: Distribuir la interfaz de voz por toda la casa. Los NSPanel Pro (Android, Termux)
+          son los únicos puntos de captura y reproducción de audio. El ear corre en el SER9
+          como servidor de audio puro (sin hardware local): recibe audio de los NSPanels,
+          corre STT+TTS, delega al core, devuelve el WAV de respuesta.
+          La laptop queda 100% desarrollo sin servicios.
 Estado:   Pendiente
-Deps:     FASE 1 (ear/listen.py, STT, TTS), FASE 3 (core/server.py, /process),
-          FASE 2.5 (speaker_id — los nodos lo propagan), FASE 12 (backoffice)
-Hardware: Etapa A requiere Raspberry Pi Zero 2W + micrófono USB + parlante 3.5mm.
-          Etapa B funciona con hardware existente (Echos via HAOS).
-Nota:     Ver también Anexo A.2 (origen de esta fase).
+Deps:     FASE 1 (STT, TTS, Piper), FASE 3 (core/server.py, /process),
+          FASE 21 (SER9 operativo — COMPLETA), FASE 2.5 (speaker_id), FASE 12 (backoffice)
+Hardware: NSPanel Pro — Android 8.1, sounddevice/PortAudio, mic (pcmC0D0c) + speaker (pcmC0D0p).
+          Termux + Python instalados. HA Companion como dashboard. ADB over WiFi.
+          SER9 LXC — ear como servidor HTTP/WebSocket, STT+TTS sin /dev/snd local.
+Nota:     Completa también 21.21 (decisión ear). Ver Anexo A.2 (origen).
 ```
 
 #### Etapa A — Protocolo y nodo satélite básico
@@ -1307,6 +1308,9 @@ Nota:     Ver también Anexo A.2 (origen de esta fase).
 - [ ] 16.3  `core/audio_nodes.py` + `GET /audio-nodes` — registro en memoria de nodos
             conectados: `{node_id, room, ip, last_seen, state: active|offline}`.
             Auto-registro al conectar vía WebSocket; limpieza de nodos expirados.
+            Nota de diseño: este registry debe ser extensible para FASE 10 (inferencia
+            distribuida tiene su propio node_registry.py). Considerar base común o
+            interfaz unificada para evitar dos sistemas de health-check paralelos.
 - [ ] 16.4  `core/ws_audio.py` — servidor WebSocket `/ws/audio` en el core: recibe chunks
             del nodo, acumula y pasa al STT local (faster-whisper), llama internamente a
             `process()` con `source.room` del nodo, devuelve el texto de respuesta al nodo.
@@ -1700,35 +1704,35 @@ y /dev/snd (audio ALSA, si corre el ear) sea directo y sin complejidad de IOMMU 
 
 #### Etapa A — Proxmox y red
 
-- [ ] 21.1  Instalar Proxmox VE en el SER9 (ISO oficial, bare metal).
+- [x] 21.1  Instalar Proxmox VE en el SER9 (ISO oficial, bare metal).
             IP estática en la interfaz física del host PVE.
             Hostname: `capitan`, accesible como `capitan.local` (mDNS) o por IP fija.
-- [ ] 21.2  Crear bridge `vmbr0` sobre la interfaz física.
+- [x] 21.2  Crear bridge `vmbr0` sobre la interfaz física.
             El bridge da a las VMs y LXCs IP real en la LAN (sin NAT).
             Reservar IP del HAOS VM en el router (DHCP reservation por MAC → 192.168.68.101).
-- [ ] 21.3  SSH desde laptop configurado: clave pública copiada al host PVE y al LXC.
+- [x] 21.3  SSH desde laptop configurado: clave pública copiada al host PVE y al LXC.
             Alias en `~/.ssh/config`: `Host capitan` → IP fija del LXC.
 
 #### Etapa B — VM de HAOS
 
-- [ ] 21.4  Backup completo del HAOS actual: Settings → System → Backups → Download .tar.
-- [ ] 21.5  Crear VM en Proxmox con imagen oficial HAOS:
+- [x] 21.4  Backup completo del HAOS actual: Settings → System → Backups → Download .tar.
+- [x] 21.5  Crear VM en Proxmox con imagen oficial HAOS:
             Descargar `haos_ova-*.qcow2` (o usar Proxmox Helper Scripts — tteck).
             VM con red en `vmbr0` → IP real en LAN → reservar 192.168.68.101 por MAC.
-- [ ] 21.6  Restaurar el backup en el nuevo HAOS.
+- [x] 21.6  Restaurar el backup en el nuevo HAOS.
             Verificar: integraciones activas, entity_ids idénticos, Long-Lived Token funcionando.
             Smoke test: `curl http://192.168.68.101:8123/api/` con el token del .env.
-- [ ] 21.7  Autostart de la VM: Options → Start at boot → Yes.
-- [ ] 21.8  Apagar el PC viejo (solo tras confirmar 21.6 completo y token funcionando).
+- [x] 21.7  Autostart de la VM: Options → Start at boot → Yes.
+- [x] 21.8  Apagar el PC viejo (solo tras confirmar 21.6 completo y token funcionando).
 
 #### Etapa C — LXC Ubuntu privilegiado
 
-- [ ] 21.9  Crear LXC privilegiado (Ubuntu 24.04) en Proxmox:
+- [x] 21.9  Crear LXC privilegiado (Ubuntu 24.04) en Proxmox:
             RAM: 12GB, cores: 6, storage: 40GB mínimo.
             Red en `vmbr0` → IP fija (ej: 192.168.68.102).
             `features: nesting=1` (necesario para systemd --user).
             Autostart: Yes.
-- [ ] 21.10 Pasar dispositivos GPU al LXC (en `/etc/pve/lxc/<id>.conf` en el host PVE):
+- [x] 21.10 Pasar dispositivos GPU al LXC (en `/etc/pve/lxc/<id>.conf` en el host PVE):
             ```
             lxc.cgroup2.devices.allow: c 226:* rwm
             lxc.cgroup2.devices.allow: c 234:0 rwm
@@ -1736,55 +1740,60 @@ y /dev/snd (audio ALSA, si corre el ear) sea directo y sin complejidad de IOMMU 
             lxc.mount.entry: /dev/kfd dev/kfd none bind,optional,create=file
             ```
             (Solo relevante si se confirma ROCm — ver 21.13/21.14.)
-- [ ] 21.11 Instalar en el LXC: Python 3.13, Node 18, git, ffmpeg (incluye ffplay), build-essential.
+- [x] 21.11 Instalar en el LXC: Python 3.13, Node 18, git, ffmpeg (incluye ffplay), build-essential.
             Instalar Piper: descargar binario v1.2.0 + voces en `~/.local/share/piper/`.
             Crear `~/home-agents-env` (venv).
 
 #### Etapa D — Ollama en el LXC
 
-- [ ] 21.12 Instalar Ollama en el LXC (`curl -fsSL https://ollama.ai/install.sh | sh`).
+- [x] 21.12 Instalar Ollama en el LXC (`curl -fsSL https://ollama.ai/install.sh | sh`).
             Pull `qwen2.5:7b`. Systemd unit generada automáticamente.
-- [ ] 21.13 Benchmark CPU-only como baseline:
+- [x] 21.13 Benchmark CPU-only como baseline:
             `time ollama run qwen2.5:7b "responde solo: hola"` → latencia warm.
-- [ ] 21.14 Intentar ROCm 780M en el LXC:
+- [x] 21.14 Intentar ROCm 780M en el LXC:
             Instalar ROCm 6.x dentro del LXC. Verificar visibilidad de `/dev/kfd` y `/dev/dri/renderD128`.
             Si el chip es gfx1151 (Strix Point): puede necesitar `HSA_OVERRIDE_GFX_VERSION=11.0.0`.
             Re-benchmarkar. Si latencia warm < 2s y estable → mantener ROCm. Si no → CPU-only.
-- [ ] 21.15 Documentar resultado del benchmark y decisión ROCm en NOTAS.
+- [x] 21.15 Documentar resultado del benchmark y decisión ROCm en NOTAS.
+            Resultado: CPU-only 27.5s | ROCm gfx1103 (780M) 13.3s — 2x mejora.
+            Decisión: mantener ROCm con HSA_OVERRIDE_GFX_VERSION=11.0.0 en ollama.service.d/rocm.conf.
+            /dev/kfd major 511 (no 234). chmod 666 /dev/kfd necesario al boot.
 
 #### Etapa E — Migración de home-agents al LXC
 
-- [ ] 21.16 Clonar `home-agents` con submodules en el LXC:
+- [x] 21.16 Clonar `home-agents` con submodules en el LXC:
             `git clone --recurse-submodules git@github.com:mblasi/home-agents.git ~/workspace/home-agents`
             Instalar deps Python: `pip install -r core/requirements.txt`
             Instalar deps Node: `npm install` en `ear/wa/` (o donde esté el cliente WA).
-- [ ] 21.17 Crear `core/.env` en el LXC:
+- [x] 21.17 Crear `core/.env` en el LXC:
             `OLLAMA_URL=http://localhost:11434`
             `HAOS_URL=http://192.168.68.101:8123`
             Resto de vars: copiar desde la laptop (HAOS_TOKEN, BACKOFFICE_TOKEN, etc.).
-- [ ] 21.18 Instalar y habilitar systemd user units: `capitan-core.service`, `capitan-backoffice.service`.
+- [x] 21.18 Instalar y habilitar systemd user units: `capitan-core.service`, `capitan-backoffice.service`.
             `loginctl enable-linger <user>` para que las units arranquen sin sesión activa.
             Smoke test: `curl http://localhost:8765/health` desde el LXC.
-- [ ] 21.19 Levantar el cliente WA (`node ear/wa/index.js` o como esté estructurado),
+- [x] 21.19 Levantar el cliente WA (`node ear/wa/index.js` o como esté estructurado),
             escanear QR, verificar reconexión automática y respuesta a mensajes.
-- [ ] 21.20 Test end-to-end desde la laptop:
+- [x] 21.20 Test end-to-end desde la laptop:
             `curl -X POST http://capitan.local:8765/process -H 'Content-Type: application/json' -d '{"text":"prende la luz"}'`
             Backoffice accesible en `http://capitan.local:8080`.
 
-#### Etapa F — Ear (decisión pendiente)
+#### Etapa F — Ear (decisión tomada)
 
-- [ ] 21.21 **⚠ DECISIÓN PENDIENTE**: ¿el ear corre en el LXC del SER9 o en la laptop como satélite?
-            Opciones:
-            A) **SER9 (preferida)**: mic + speaker USB conectados al SER9.
-               Requiere: `/dev/snd` + dispositivo USB pasados al LXC, ALSA configurado dentro del LXC.
-               La laptop queda 100% desarrollo sin servicios corriendo.
-            B) **Laptop**: `CORE_URL=http://capitan.local:8765` en `ear/.env`. Sin cambios en el ear.
-               Ventaja: sin hardware extra. Desventaja: laptop sigue corriendo un servicio.
-            Cuando se decida: implementar y marcar completo.
+- [ ] 21.21 **Decisión**: el ear corre en el LXC del SER9 como servidor de audio — SIN hardware
+            de audio local (no mic, no speaker, no /dev/snd). Es un proceso servidor que:
+            - Recibe audio (WAV/chunks) desde los NSPanel Pro vía WebSocket o HTTP
+            - Corre STT (faster-whisper) sobre ese audio
+            - Llama al core (/process) y obtiene respuesta
+            - Sintetiza TTS (Piper) y devuelve el WAV al NSPanel que lo emite
+            Los NSPanel Pro son los únicos puntos de captura y reproducción de audio.
+            La laptop queda 100% desarrollo sin ningún servicio corriendo.
+            Implementación: ver FASE 16 (Red de Nodos de Audio Multi-Ambiente).
+            Esta tarea se completa al terminar FASE 16 Etapa A (16.1-16.4).
 
 #### Etapa G — Workflow de deployment desde laptop
 
-- [ ] 21.22 Crear `scripts/deploy.sh` en el repo umbrella:
+- [x] 21.22 Crear `scripts/deploy.sh` en el repo umbrella:
             ```bash
             #!/usr/bin/env zsh
             # Deploy home-agents al LXC de producción en el SER9.
@@ -1799,7 +1808,7 @@ y /dev/snd (audio ALSA, si corre el ear) sea directo y sin complejidad de IOMMU 
             echo "Deploy completo."
             ```
             Uso: `bash scripts/deploy.sh` desde la laptop tras mergear un PR a main.
-- [ ] 21.23 Actualizar `CLAUDE.md` del repo umbrella: reflejar nueva arquitectura, IP/hostname
+- [x] 21.23 Actualizar `CLAUDE.md` del repo umbrella: reflejar nueva arquitectura, IP/hostname
             del LXC, comandos de deploy y de smoke test remoto.
 
 #### Procedimientos de actualización (referencia operativa)
@@ -1889,8 +1898,17 @@ micrófono y parlantes). Para hacer el agente realmente útil en toda la casa, s
 necesitan nodos de audio en distintos ambientes (cocina, living, dormitorio, etc.)
 que actúen como interfaces de voz distribuidas sobre la red WiFi hogareña.
 
+**Hardware elegido: NSPanel Pro (Sonoff)**:
+- Android 8.1 AOSP (Rockchip PX30 / RK3308), 64GB almacenamiento
+- Micrófono y parlante accesibles desde Python via sounddevice/PortAudio (codec RK809)
+- ADB over WiFi habilitado (puerto 5555), root disponible
+- Termux instalado para scripts Python de voz; Termux:Boot para autoarranque
+- HA Companion App como dashboard táctil (usuario HA por panel → dashboard por ambiente)
+- Función dual: dashboard HA táctil + nodo de voz para home-agents
+- Setup: ADB connect → instalar Termux → SSH → instalar Python + sounddevice + portaudio
+
 **Arquitectura propuesta**:
-- Nodos ligeros (Raspberry Pi Zero 2W o similar) con micrófono + parlante
+- Nodos ligeros (NSPanel Pro o Raspberry Pi Zero 2W) con micrófono + parlante
 - Cada nodo corre wake word detection localmente (openWakeWord, modelo capitan.onnx)
 - Al detectar wake word, el nodo captura el audio del comando y lo envía via WebSocket
   o MQTT al servidor central (la laptop)
@@ -2462,3 +2480,30 @@ Deps:     FASE 9 (coordinador), FASE 24 (tracing).
             `tests/test_tool_hydrator.py`: hidratación desde schema mockeado (sin llamadas
             reales). `tests/test_agent_loop.py`: loop completo con Ollama mockeado — verifica
             iteraciones, límite de ciclos, registro en trace.
+
+---
+
+### FASE 31 - Optimización de Performance LLM en SER9
+
+```
+Objetivo: Explorar palancas de mejora de latencia LLM en el SER9 (Beelink, Radeon 780M gfx1103).
+          Baseline actual: 27.5s CPU-only, 13.3s ROCm con HSA_OVERRIDE_GFX_VERSION=11.0.0.
+          Target: reducir latencia warm por debajo de 5s sin cambiar el modelo.
+Estado:   Pendiente
+Deps:     FASE 21 (SER9 operativo con LXC — COMPLETA)
+Hardware: Beelink SER9 Pro — Ryzen AI 7 HX 255, 32GB DDR5, Radeon 780M (RDNA 3 / gfx1103)
+```
+
+- [ ] 31.1  Vulkan backend: benchmarkar `OLLAMA_GPU_BACKEND=vulkan` vs ROCm en SER9.
+            La 780M tiene soporte Vulkan nativo y estable — puede superar el ROCm parcial.
+            Medir latencia warm con ambos backends. Documentar ganador en NOTAS.
+- [ ] 31.2  Warm LLM keepalive: configurar `OLLAMA_KEEP_ALIVE` para evitar descarga del
+            modelo entre requests. Por defecto Ollama descarga el modelo tras 5 min idle.
+            Agregar `OLLAMA_KEEP_ALIVE=-1` al systemd unit del LXC.
+- [ ] 31.3  Lazy entity index: diferir la construcción del entity index (nomic-embed-text)
+            al primer request en lugar de hacerlo en startup. Elimina los 30s de arranque
+            del core. El índice se construye en background al recibir el primer /process.
+- [ ] 31.4  Benchmark warm vs cold: medir latencia warm (modelo ya cargado) vs cold para
+            entender el real bottleneck. Si warm < 3s, el problema es solo el cold start.
+- [ ] 31.5  Quantización alternativa: benchmarkar qwen2.5:7b con distintas quantizaciones
+            (q4_0 vs q4_k_m vs q5_k_m) en SER9 para encontrar el mejor balance velocidad/calidad.

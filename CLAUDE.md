@@ -155,6 +155,7 @@ Agregar tareas nuevas: primero en `estado.md`, luego crear el issue en GH con
 
 ## Hardware
 
+### Laptop (desarrollo puro — sin servicios)
 ```
 CPU:  AMD Ryzen 9 5900HX — 8 cores / 16 threads — znver3
 GPU:  Radeon Vega 8 integrada — comparte RAM — NO útil para ML
@@ -162,7 +163,37 @@ RAM:  64GB DDR4
 OS:   Gentoo Linux — GCC 15.2.1 znver3 — kernel x86_64
 ```
 
-Toda la inferencia corre en CPU con cuantización int8. No intentar usar la GPU.
+La laptop NO corre servicios en producción. Solo git, editor, deploy vía SSH.
+
+### Servidor central — SER9 (Beelink SER9 Pro)
+```
+CPU:  AMD Ryzen AI 7 HX 255, 32GB DDR5
+GPU:  Radeon 780M (RDNA 3 / gfx1103) — ROCm con HSA_OVERRIDE_GFX_VERSION=11.0.0
+OS:   Proxmox VE — IP 192.168.68.99
+```
+
+Stack en Proxmox:
+- VM 100: HAOS — IP 192.168.68.101 (reserva DHCP por MAC)
+- LXC 101 (capitan-lxc): Ubuntu 24.04 — IP 192.168.68.132
+  - core (FastAPI :8765, `0.0.0.0`)
+  - backoffice (FastAPI :8080)
+  - wa (Node.js whatsapp-web.js)
+  - ear (servidor de audio — FASE 16, pendiente)
+  - Ollama (:11434) con ROCm — 13.3s warm (vs 27.5s CPU-only)
+
+SSH: `ssh capitan` → host PVE | `ssh capitan-lxc` → LXC Ubuntu
+
+### Nodos distribuidos — NSPanel Pro (Sonoff)
+```
+SoC:      Rockchip PX30 (quad-core ARM Cortex-A35)
+Android:  8.1.0 AOSP — firmware eWeLink 3.7.0
+Audio:    codec RK809 — pcmC0D0c (mic) + pcmC0D0p (parlante) — sounddevice/PortAudio OK
+ADB:      over WiFi puerto 5555 — root disponible
+Termux:   instalado — Python 3.13, sounddevice, portaudio
+SSH:      Termux sshd en puerto 8022
+Dashboard: HA Companion App (minimal) — usuario HA por panel → default dashboard por ambiente
+IP actual: 192.168.68.113 (comedor)
+```
 
 ## Entorno Python
 
@@ -290,36 +321,32 @@ CORE_TIMEOUT=30
 ## Comandos frecuentes
 
 ```zsh
-# Activar entorno
+# Activar entorno (laptop)
 source ~/home-agents-env/bin/activate
 
-# Correr el core (debe estar antes que ear)
-cd ~/workspace/home-agents/core
-uvicorn server:app --host 127.0.0.1 --port 8765
+# Deploy al SER9 (desde laptop, tras mergear PR a main)
+bash scripts/deploy.sh           # actualiza core + backoffice
+bash scripts/deploy.sh --restart-wa  # incluye WA
 
-# Correr el agente (pipeline completo)
-bash ~/workspace/home-agents/ear/dashboard.sh          # dashboard interactivo
-systemctl --user start capitan-core     # core como servicio
-systemctl --user start capitan          # ear como servicio
-systemctl --user stop capitan-core
-systemctl --user stop capitan
-journalctl --user -u capitan -f         # logs ear
-journalctl --user -u capitan-core -f    # logs core
+# Logs en SER9
+ssh capitan-lxc "journalctl --user -u capitan-core -f"
+ssh capitan-lxc "journalctl --user -u capitan-backoffice -f"
+ssh capitan-lxc "journalctl --user -u capitan-wa -f"
 
-# Test del core
-curl http://localhost:8765/health
-curl -X POST http://localhost:8765/process \
+# Test del core en SER9
+curl http://192.168.68.132:8765/health
+curl -X POST http://192.168.68.132:8765/process \
   -H 'Content-Type: application/json' \
   -d '{"text":"prende la luz"}'
 
-# Debug wake word scores en tiempo real
-python ~/workspace/home-agents/ear/wakeword/debug_scores.py
+# Servicios en SER9
+ssh capitan-lxc "systemctl --user status capitan-core capitan-backoffice capitan-wa"
+ssh capitan-lxc "systemctl --user restart capitan-core"
 
-# Test TTS
-python ~/workspace/home-agents/ear/tts.py
-
-# Test parser LLM + HA (directo, sin servidor)
-python ~/workspace/home-agents/core/agent.py
+# NSPanel Pro
+bash scripts/nspanel.sh connect       # conectar ADB
+bash scripts/nspanel.sh ssh           # abrir shell Termux
+bash scripts/nspanel.sh status        # ver estado
 
 # Sync issues con GitHub
 python scripts/sync_issues.py
@@ -328,26 +355,24 @@ python scripts/sync_issues.py
 git submodule update --remote
 ```
 
-## Pipeline actual
+## Pipeline actual (objetivo FASE 16)
 
 ```
-[MIC hw:1,0 44100Hz]          ← ear/listen.py
-    ↓ scipy resample_poly up=160 down=441
-[16000Hz]
-    ↓ faster-whisper small int8 cpu          ~4.6s
-[texto]
-    ↓ HTTP POST :8765/process              ~10ms overhead
-[core/server.py]
-    ↓ qwen2.5:7b Ollama :11434               ~3.5s
-[ACTION: domain.service | entity_id: X]
-    ↓ parser
-[HAOS REST API :8123]
-    ↓ HTTP response
-[ear/listen.py]
-    ↓ Piper TTS respuesta → ffplay
+[NSPanel Pro — mic]
+    ↓ wake word detectado (Python/Termux)
+    ↓ WebSocket/HTTP → SER9 LXC ear (servidor de audio)
+        ↓ faster-whisper small int8 + ROCm       ~4.6s STT
+        ↓ HTTP POST :8765/process
+        [core/server.py — SER9 LXC]
+            ↓ qwen2.5:7b Ollama + ROCm            ~13.3s warm
+        [ACTION → HAOS REST API :8123 → VM HAOS SER9]
+        ↓ Piper TTS → WAV
+    ↓ WAV de respuesta → NSPanel Pro speaker
 
-Latencia warm: ~8s | Latencia cold: ~15.7s
+Latencia warm objetivo: ~18s (STT+LLM+TTS) | mejoras en FASE 31
 ```
+
+Pipeline anterior (hasta FASE 21): laptop con mic/speaker local. Ya reemplazado.
 
 ## Decisiones tomadas (no reabrir)
 
@@ -355,7 +380,11 @@ Latencia warm: ~8s | Latencia cold: ~15.7s
 - STT: faster-whisper sobre openai-whisper
 - Wake word: training propio con openWakeWord (Porcupine descartado)
 - Reproducción: ffplay (aplay descartado)
-- Arquitectura: todo en laptop, HAOS solo recibe REST
+- Arquitectura: SER9 es el servidor central, laptop es desarrollo puro
 - Resampling: scipy.signal.resample_poly (no librosa, más rápido)
 - Voz TTS: es_AR-daniela-high (claude y davefx descartadas)
 - Comunicación ear↔core: HTTP REST en localhost:8765 (no IPC — permite múltiples ears)
+- Hardware nodos distribuidos: NSPanel Pro (Sonoff) — Android 8.1/PX30, mic+parlante
+  accesibles via sounddevice/PortAudio, ADB over WiFi, root, Termux. Función dual:
+  dashboard HA (Companion App, usuario por panel) + nodo de voz home-agents (Python/Termux).
+  Raspberry Pi Zero 2W era la alternativa original pero NSPanel Pro ya está en la casa.
