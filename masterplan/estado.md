@@ -2497,13 +2497,44 @@ Hardware: Beelink SER9 Pro — Ryzen AI 7 HX 255, 32GB DDR5, Radeon 780M (RDNA 3
 - [ ] 31.1  Vulkan backend: benchmarkar `OLLAMA_GPU_BACKEND=vulkan` vs ROCm en SER9.
             La 780M tiene soporte Vulkan nativo y estable — puede superar el ROCm parcial.
             Medir latencia warm con ambos backends. Documentar ganador en NOTAS.
-- [ ] 31.2  Warm LLM keepalive: configurar `OLLAMA_KEEP_ALIVE` para evitar descarga del
+- [x] 31.2  Warm LLM keepalive: configurar `OLLAMA_KEEP_ALIVE` para evitar descarga del
             modelo entre requests. Por defecto Ollama descarga el modelo tras 5 min idle.
             Agregar `OLLAMA_KEEP_ALIVE=-1` al systemd unit del LXC.
 - [ ] 31.3  Lazy entity index: diferir la construcción del entity index (nomic-embed-text)
             al primer request en lugar de hacerlo en startup. Elimina los 30s de arranque
             del core. El índice se construye en background al recibir el primer /process.
-- [ ] 31.4  Benchmark warm vs cold: medir latencia warm (modelo ya cargado) vs cold para
+- [x] 31.4  Benchmark warm vs cold: medir latencia warm (modelo ya cargado) vs cold para
             entender el real bottleneck. Si warm < 3s, el problema es solo el cold start.
 - [ ] 31.5  Quantización alternativa: benchmarkar qwen2.5:7b con distintas quantizaciones
             (q4_0 vs q4_k_m vs q5_k_m) en SER9 para encontrar el mejor balance velocidad/calidad.
+
+---
+
+### FASE 32 - Migración de datos a base de datos formal
+
+```
+Objetivo: Reemplazar los JSON files en ~/.local/share/capitan/ por una base de datos
+          estructurada (SQLite). Elimina problemas de concurrencia, mejora queries,
+          facilita backup y migración entre servidores.
+Estado:   Pendiente
+Deps:     FASE 21 (SER9 estable — COMPLETA)
+Motivación: actualmente los datos (usuarios, intents, conversaciones, portfolios,
+            contextos, routines, etc.) son ~30 archivos JSON sin esquema formal,
+            sin transacciones, sin índices. Migración costosa pero necesaria para escalar.
+```
+
+- [ ] 32.1  Inventario y esquema: mapear todos los archivos JSON actuales a tablas SQLite.
+            Identificar relaciones (user → intents, user → conversations, user → portfolio).
+            Definir esquema con migraciones (alembic o schema_version manual).
+- [ ] 32.2  Capa de acceso unificada: crear `core/db.py` con conexión SQLite y helpers
+            CRUD que reemplacen los json read/write actuales. Mantener API idéntica
+            para no romper agentes existentes.
+- [ ] 32.3  Migración de datos existentes: script `scripts/migrate_to_db.py` que lee los
+            JSON actuales y los inserta en la DB. Idempotente y con dry-run.
+- [ ] 32.4  Migrar módulos críticos: users.py, conversations.py, intents.py, portfolios.
+            Un módulo a la vez con tests. Los JSON se mantienen como fallback hasta
+            que todos los módulos estén migrados.
+- [ ] 32.5  Backup automático: script diario que hace `sqlite3 capitan.db .dump > backup.sql`
+            y lo guarda en un directorio de backups rotados (7 días).
+- [ ] 32.6  Eliminar JSON files: una vez todos los módulos migrados y backup operativo,
+            borrar los archivos JSON y el código de lectura legacy.
