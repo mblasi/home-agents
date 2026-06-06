@@ -27,8 +27,8 @@ if [[ $RESTART_WA -eq 0 ]]; then
   : # WA ya reiniciado arriba
 fi
 
-echo "=== Smoke test (esperando 40s para warmup de entity index) ==="
-sleep 40
+echo "=== Smoke test (esperando 5s) ==="
+sleep 5
 ssh capitan-lxc "curl -sf http://localhost:8765/health" && echo "core OK" || echo "core NO responde"
 ssh capitan-lxc "curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/" | grep -qE '^(200|307)' && echo "backoffice OK" || echo "backoffice NO responde"
 
