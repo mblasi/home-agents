@@ -19,9 +19,12 @@ ssh capitan-lxc "
   echo 'Servicios reiniciados.'
 "
 
-if [[ $RESTART_WA -eq 1 ]]; then
-  echo "Reiniciando WA..."
-  ssh capitan-lxc "systemctl --user restart capitan-wa 2>/dev/null || echo 'WA no está como servicio — reiniciá manualmente'"
+# WA siempre se reinicia después del core — no reintenta conexiones caídas
+echo "Reiniciando WA..."
+ssh capitan-lxc "systemctl --user restart capitan-wa"
+
+if [[ $RESTART_WA -eq 0 ]]; then
+  : # WA ya reiniciado arriba
 fi
 
 echo "=== Smoke test (esperando 40s para warmup de entity index) ==="
