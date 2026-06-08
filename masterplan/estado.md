@@ -1306,16 +1306,16 @@ Nota:     Completa también 21.21 (decisión ear). Ver Anexo A.2 (origen).
             TTS del servidor debe ser tipada: `{type: "tts_wav", wav_b64}` si el nodo no puede
             sintetizar, o `{type: "tts_text", text}` si puede (ej: RPi 5 con Piper local).
             NSPanel Pro declara `tts_local: false`; RPi 5 declara `tts_local: true`.
-- [ ] 16.2  `ear/satellite.py` — cliente ligero para el nodo satélite: detecta wake word
+- [x] 16.2  `ear/satellite.py` — cliente ligero para el nodo satélite: detecta wake word
             con openWakeWord (modelo capitan.onnx), captura el comando, envía chunks al
             core vía WebSocket, recibe texto de respuesta y sintetiza TTS local con Piper.
             Sin STT ni LLM locales — toda la inferencia pesada queda en la laptop central.
             Configurable: CORE_WS_URL, ROOM, DEVICE_INDEX_MIC, DEVICE_INDEX_SPK.
-- [ ] 16.3  `core/audio_nodes.py` + `GET /audio-nodes` — registro en memoria de nodos
-            conectados: `{node_id, room, ip, last_seen, state: active|offline, capabilities}`.
-            `capabilities` se persiste del handshake inicial (ver 16.1); el registry lo expone
-            en el GET para que el backoffice y el router sepan qué puede hacer cada nodo.
-            Auto-registro al conectar vía WebSocket; limpieza de nodos expirados.
+- [x] 16.3  Registro de nodos en `ear/audio_server.py` + `GET /nodes` — registro en memoria:
+            `{node_id, room, ip, last_seen, state: active|offline}`. Auto-registro en cada
+            `POST /process-audio`; estado `offline` tras NODE_TTL (120s) sin actividad.
+            Implementado en el audio_server (no en core/audio_nodes.py — ver nota de
+            implementación). `capabilities` queda pendiente para Etapa D (16.11).
             Nota de diseño: este registry debe ser extensible para FASE 10 (inferencia
             distribuida tiene su propio node_registry.py). Considerar base común o
             interfaz unificada para evitar dos sistemas de health-check paralelos.
@@ -1325,6 +1325,33 @@ Nota:     Completa también 21.21 (decisión ear). Ver Anexo A.2 (origen).
 - [ ] 16.5  Propagación de `source.room` en el pipeline completo: historial,
             backoffice y dashboard muestran el ambiente de origen de cada comando.
             El campo ya existe en `source`; esta tarea lo hace obligatorio para nodos.
+            Progreso: `audio_server.py` ya envía `source={room, channel:"ear"}` al core en
+            cada comando. Falta verificar que historial/backoffice lo muestren.
+
+#### Nota de implementación (Etapa A — MVP funcionando)
+
+```
+La Etapa A se implementó con HTTP (el fallback de 16.1), no WebSocket — más simple
+y robusto para el MVP. Arquitectura real en producción:
+
+NSPanel Pro (Termux)                      SER9 LXC
+  ear/satellite.py                          ear/audio_server.py (:8766)
+  - openWakeWord (capitan.onnx)             - faster-whisper STT
+  - graba comando post-wake-word            - strip wake word prefix
+  - POST /process-audio (WAV)        ──→    - POST core /process
+  - reproduce WAV respuesta          ←──    - Piper TTS → WAV
+
+audio_server.py vive en ear/ (no core/) porque reusa tts.py y el modelo de STT
+del ear. El registry de nodos (16.3) está embebido en audio_server.py.
+Latencia end-to-end: ~5s warm.
+
+Dependencias NSPanel (Termux): python, portaudio, onnxruntime (pkg), openwakeword
+(pip --no-deps + tqdm), Termux:API (APK GitHub, da permiso RECORD_AUDIO).
+Ver docs/nspanel-setup.md para el bootstrap completo.
+
+Pendiente Etapa A: feedback sonoro tras wake word (FASE 18) — sin él, el usuario no
+sabe cuándo hablar y el STT captura ruido. Es el bloqueante de UX principal.
+```
 
 #### Etapa B — Output via Echo (sin hardware nuevo)
 - [ ] 16.6  `core/response_router.py` — routear la respuesta al speaker correcto según
