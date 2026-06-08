@@ -158,6 +158,34 @@ ssh -p 8022 -o HostKeyAlgorithms=+ssh-rsa u0_a53@<IP> \
 
 ---
 
+## Paso 5b — Indicador visual (Termux:GUI) — FASE 18.3
+
+Barra fina overlay sobre HA Companion que muestra el estado del pipeline de voz.
+
+```zsh
+# APK Termux:GUI (GitHub, 0.1.6)
+wget -O /tmp/termux-gui.apk "https://github.com/termux/termux-gui/releases/download/0.1.6/app-release.apk"
+adb -s <IP>:5555 install /tmp/termux-gui.apk
+
+# Sacar la app de estado "stopped" (Android no entrega broadcasts a apps recién instaladas)
+adb -s <IP>:5555 shell "monkey -p com.termux.gui -c android.intent.category.LAUNCHER 1"
+
+# Permiso de overlay
+adb -s <IP>:5555 shell appops set com.termux.gui SYSTEM_ALERT_WINDOW allow
+```
+
+Paquete Python en Termux (SSH):
+```bash
+pip install termuxgui
+```
+
+Si tu pantalla no es 750px de ancho, ajustá `UI_SCREEN_WIDTH_PX` en `~/.config/satellite.env`
+(obtené el ancho con `adb shell wm size`).
+
+> Si Termux:GUI no está instalado, `satellite.py` corre igual sin indicador (degradación elegante).
+
+---
+
 ## Paso 6 — Boot script (HA Companion + sshd + satellite)
 
 Crear `~/.termux/boot/start-ha.sh` en el NSPanel:

@@ -1595,26 +1595,49 @@ El asistente responderá con:
 ### FASE 18 - Mejoras de UX de Audio
 
 ```
-Objetivo: Mejorar la experiencia de interacción por voz: feedback sonoro al detectar
-          la wake word y duck de volumen automático para no interferir con audio en
-          reproducción mientras el usuario habla.
-Estado:   Pendiente
-Deps:     FASE 1 (pipeline base, COMPLETA), FASE 16 deseable para extensión a nodos.
+Objetivo: Mejorar la experiencia de interacción por voz: feedback sonoro y visual al
+          detectar la wake word, distinguiendo cada estado del pipeline. Aplica a los
+          nodos NSPanel (FASE 16). Duck de volumen para la laptop/legacy.
+Estado:   EN CURSO (18.1 + 18.3 completas; 18.2 pendiente para laptop)
+Deps:     FASE 1 (pipeline base, COMPLETA), FASE 16 (nodos de audio).
 ```
 
-- [ ] 18.1  **Sonido de confirmación en wake word** — reproducir un beep/chime breve
-            (archivo WAV) via ffplay inmediatamente al detectar la wake word, antes de
-            iniciar la grabación del comando. El sonido debe ser corto (<500ms) y
-            no solaparse con la grabación STT. Archivo de audio en `ear/assets/wakeword_ack.wav`.
+- [x] 18.1  **Sonido de confirmación en wake word** — beep/chime de éxito (campana
+            ascendente C5→G5 con armónicos, ~420ms) en `ear/assets/wakeword_ack.wav`.
+            En `satellite.py` se reproduce tras detectar la wake word, antes de grabar.
+            En Android se para el input stream durante el playback (OpenSLES no permite
+            input+output simultáneos) y se reanuda para grabar el comando.
 
 - [ ] 18.2  **Duck de volumen durante grabación** — al detectar wake word, bajar el
             volumen del sistema al mínimo posible (o mutear) antes de grabar el comando,
             y restaurarlo al nivel previo al terminar. Usar `pactl set-sink-volume` para
             control de PulseAudio/PipeWire. Debe detectar el nivel actual, bajar, grabar,
             y restaurar incluso si la grabación falla o el pipeline lanza excepción
-            (try/finally). Implementar en `ear/listen.py`.
+            (try/finally). Implementar en `ear/listen.py` (laptop/legacy).
 
-Estado:   Pendiente
+- [x] 18.3  **Indicador visual de estado en el nodo** — `ear/satellite_ui.py`: barra fina
+            overlay (Termux:GUI) full-width en el borde superior, sobre HA Companion, que
+            cambia color/animación por estado: listening=shimmer azul lento, wake=verde,
+            recording=ámbar, waiting=respiro cian rápido, speaking=azul. Da feedback de
+            "qué está pasando" sin estorbar la UI de HA. Degradación elegante si no hay
+            Termux:GUI. Nota: los overlays de Termux:GUI no renderizan layouts anidados,
+            por eso es una barra única animada por color (no segmentos espaciales).
+
+#### Nota de implementación (calidad de audio del NSPanel)
+
+```
+El mic del NSPanel Pro capta muy bajo (RMS voz ~1000-1200, ruido ~25) con el preset
+genérico de PortAudio (sin AGC). Mitigaciones implementadas en audio_server.py:
+  - Normalización RMS (target 3500, gain hasta 30x) ANTES del STT
+  - vad_filter de Whisper SOBRE el audio normalizado (aísla voz, descarta ruido)
+  - condition_on_previous_text=False, no_speech_threshold=0.6 (anti-alucinación)
+Y en satellite.py:
+  - Gate de energía antes del wake word (silencio no scorea → sin falsos positivos)
+  - Descarte de comandos casi-silenciosos antes de enviar
+Pendiente/futuro: AGC nativo de Android (termux-microphone-record / preset
+VOICE_RECOGNITION de OpenSLES) o nodo RPi 5 + ReSpeaker (FASE 16 Etapa D) para
+calidad de captura superior.
+```
 
 ---
 
