@@ -1430,14 +1430,14 @@ Flujo existente: core/wakeword_trainer.py (positivos TTS+reales, negativos está
             Escribe en el mismo `wakeword_metrics.json` que lee el backoffice (audio_server
             corre en el SER9, co-ubicado con el core). Coherente con `_update_wakeword_metrics`
             de listen.py. El backoffice muestra las métricas de nodos sin cambios.
-- [ ] 16.16 Captura orgánica de muestras (gated): el nodo envía junto al comando el audio
+- [x] 16.16 Captura orgánica de muestras (gated): el nodo envía junto al comando el audio
             de la wake word que disparó la detección (el buffer pre-comando). `audio_server`:
             - FP (STT vacío) → guarda como hard negative en `wakeword/data/capitán/negative/`.
               Estos son ruido ambiente real — atacan directamente los falsos positivos.
             - TP (comando válido + speaker conocido) → sube como positivo real vía
               `/users/{uid}/wakeword/samples`. Gate anti-veneno: solo si STT no-vacío y speaker≠guest.
             El retrain (`/wakeword/train`) ya consume ambos directorios — sin cambios en el trainer.
-- [ ] 16.17 Propagación del modelo reentrenado a los nodos (pull): core expone
+- [x] 16.17 Propagación del modelo reentrenado a los nodos (pull): core expone
             `GET /wakeword/model` (devuelve capitan.onnx) y `GET /wakeword/model/version`
             (hash/mtime). `satellite.py` chequea la versión al arrancar y cada N minutos;
             si cambió, baja el modelo nuevo y recarga sin reiniciar. Cierra el loop de mejora
