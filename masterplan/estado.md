@@ -1443,6 +1443,37 @@ Flujo existente: core/wakeword_trainer.py (positivos TTS+reales, negativos está
             si cambió, baja el modelo nuevo y recarga sin reiniciar. Cierra el loop de mejora
             continua: retrain en backoffice → nodos actualizados automáticamente.
 
+#### Etapa F — Voice-ID resuelto server-side (nodo agnóstico al usuario)
+
+```
+Principio de diseño: el NODO es agnóstico al usuario — solo captura y emite audio crudo.
+          Toda la inteligencia (STT, voice-id, LLM, TTS) vive en el SERVER (audio_server),
+          que ya recibe el audio crudo del comando. El voice-id se resuelve ahí: el server
+          identifica quién habló y el core devuelve la respuesta personalizada.
+          El nodo no necesita cambios — solo el audio_server agrega el paso de identificación.
+Objetivo: que los comandos de los nodos se personalicen por usuario (hoy van como 'guest').
+Infra existente: ear/speaker_id.py (resemblyzer/GE2E, threshold 0.75), embeddings por
+          usuario en ~/.local/share/capitan/embeddings/<uid>.npy (ya migrados al SER9),
+          onboarding paso 'frases_speaker_id' que genera el embedding.
+```
+
+- [ ] 16.18 Voice-ID en `audio_server.py` (server-side): tras el STT, correr
+            `speaker_id.identify(audio)` sobre el comando crudo recibido del nodo y propagar
+            el `speaker_id` real al core (hoy va None → 'guest'). Reusa ear/speaker_id.py +
+            los embeddings migrados. El core ya consume `source.speaker_id` para personalizar
+            (users, RBAC, contexto por usuario). Cargar perfiles al iniciar; recargar al
+            agregar usuarios. El nodo no cambia — sigue enviando solo audio crudo.
+- [ ] 16.19 Gate opcional por speaker conocido (server-side): si
+            `WAKEWORD_REQUIRE_KNOWN_SPEAKER=true`, el audio_server rechaza comandos cuyo
+            speaker_id sea 'guest' (voz no enrolada) → devuelve 204 o un aviso. Coherente con
+            el flag homónimo de listen.py. El nodo solo reproduce lo que el server devuelva.
+- [ ] 16.20 Enrollment de voice-id con el mic del nodo: el nodo captura frases (audio crudo)
+            y las envía al audio_server, que computa el embedding (resemblyzer) y lo guarda en
+            embeddings/<uid>.npy. `satellite.py --enroll-voice <uid>` + endpoint
+            `/enroll-voice` en audio_server. El nodo sigue agnóstico (solo graba y manda audio);
+            el server hace todo el cómputo. Coherente con 'frases_speaker_id' del onboarding.
+            Métricas de identificación (speaker correcto vs guest) — cohesión con 16.15.
+
 ---
 
 ### FASE 17 - Chat Visual con la Plataforma

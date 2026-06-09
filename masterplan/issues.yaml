@@ -437,6 +437,11 @@
 "16.16": 465
 "16.17": 466
 
+# ── FASE 16 Etapa F — Voice-ID server-side ────────────────────────────────────
+"16.18": 467
+"16.19": 468
+"16.20": 469
+
 # ── FASE 18 — UX de audio ─────────────────────────────────────────────────────
 "18.1": {number: 25, repo: mblasi/home-agents-ear}
 "18.2": {number: 26, repo: mblasi/home-agents-ear}
