@@ -193,8 +193,9 @@ no matchea → el usuario sale como "guest", indistinguible del TV). Por cada us
 este panel:
 
 ```zsh
-/nspanel-enroll-voice 5 <user_id> <IP>
-# o directo: satellite.py --enroll-voice <user_id> 5
+/nspanel-enroll-voice <user_id> [N] [IP]
+# ej: /nspanel-enroll-voice matias 5 192.168.68.113
+# o directo en el panel: satellite.py --enroll-voice <user_id> 5
 ```
 
 El usuario habla ~4s tras cada beep (5 frases). El audio_server computa el embedding y lo

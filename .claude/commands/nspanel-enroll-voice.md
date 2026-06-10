@@ -35,5 +35,7 @@ ssh -p 8022 -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa -
 ```bash
 ssh capitan-lxc "journalctl --user -u capitan-audio-server --since '30 seconds ago' --no-pager | grep voice-id | tail -3"
 ```
-   Si el usuario da conf > 0.75 (conocido) y el TV < 0.75 (guest), activar el gate:
-   `REQUIRE_KNOWN_SPEAKER=true` en el .env del ear del SER9.
+   El gate ya está activo (`SPEAKER_THRESHOLD=0.6`, `REQUIRE_KNOWN_SPEAKER=true` en
+   ear/.env del SER9). Verificar que el usuario dé conf > 0.6 (conocido) y el TV < 0.6
+   (guest). Si la confianza del usuario queda justa, correr el enrollment de nuevo para
+   reforzar el embedding (promedia con el previo).
