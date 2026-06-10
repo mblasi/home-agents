@@ -1511,6 +1511,29 @@ inicie la sesión de captura; el nodo graba y sube como hoy. Server-side computa
                 usuario con el mic de ese nodo. Muestra la confianza resultante.
             Estado en vivo de la sesión (grabando frase i/N, subida ok).
 
+#### Etapa H — Provisioning multi-panel (N nodos NSPanel)
+
+```
+Puede haber N paneles (comedor, dormitorio, cocina...). Hoy se referencian por IP cruda y
+el alta es manual (docs/nspanel-setup.md). Falta formalizar: un registro de paneles como
+fuente de verdad y un flujo de alta guiado, para que comandos y backoffice referencien
+paneles por nombre/ambiente en vez de IP.
+```
+
+- [ ] 16.23 Registro de paneles (`masterplan/panels.yaml` o config): por panel → {name,
+            room, ip, mac, users, node_id}. Fuente de verdad del provisioning. `scripts/nspanel.sh`
+            y los slash commands resuelven panel por nombre/ambiente → IP (ej: "comedor" → .113).
+            Reserva DHCP por MAC documentada. Distinto del registry runtime (16.3, GET /nodes,
+            que es estado en vivo): este es de provisioning/config.
+- [ ] 16.24 Flujo formal de alta de panel: script/comando `nspanel.sh provision <name> <ip> <room>`
+            que automatiza el bootstrap (docs/nspanel-setup.md: ADB, Termux, deps, modelos,
+            satellite, boot script, Termux:GUI) de forma guiada y registra el panel en panels.yaml.
+            Idempotente; reporta qué pasos faltan si algo falla.
+- [ ] 16.25 Comandos y backoffice por panel: todos los comandos que afectan a un panel
+            (`/nspanel*`, enroll, etc.) aceptan el panel por **nombre/ambiente** (resuelto vía
+            16.23), no solo IP cruda. El backoffice lista los paneles del registro y permite
+            elegir a cuál dirigir cada acción (enrollment, reboot, ver estado).
+
 ---
 
 ### FASE 17 - Chat Visual con la Plataforma
