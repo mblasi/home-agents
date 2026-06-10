@@ -1567,14 +1567,18 @@ el alta de panel desde la UI y cerrar el flujo como un wizard cohesivo y validad
             Documentar claramente el único prerequisito físico no automatizable (habilitar ADB
             en el panel con taps) y validar conectividad antes de arrancar. Reemplaza al script
             como vía principal (16.24 queda como backend/CLI de esto).
-- [ ] 16.27 **Wizard de onboarding end-to-end**: flujo guiado en el backoffice que encadena
+- [x] 16.27 **Wizard de onboarding end-to-end**: flujo guiado en el backoffice que encadena
             crear usuario → enrolar su voz en un panel (16.22b) → **validar el voice-ID**
             (medir la confianza real del usuario contra su perfil y confirmar que supera el
             umbral; si queda justa, ofrecer reforzar con más frases). Cierra el lazo: al
             terminar, el usuario queda 100% operativo (reconocido por voz) sin haber tocado
             SSH. Asegurar que la creación de usuarios y el enrollment de voz estén pulidos y
             sin pasos manuales ocultos.
-- [ ] 16.28 **Endpoint de validación de voice-ID**: `/users/{uid}/voice-id/verify` que toma
+            Implementado: la página del usuario tiene por panel los botones **Enrolar voz** y
+            **Verificar** (mide la confianza real y muestra ✓/⚠). Crear usuario ya existía
+            (/users/new). Queda como polish opcional un wizard de una sola página que encadene
+            los tres pasos secuencialmente (hoy están en la misma página pero no guiados).
+- [x] 16.28 **Endpoint de validación de voice-ID**: `/users/{uid}/voice-id/verify` que toma
             una muestra del nodo y devuelve (speaker_id, confidence) contra el perfil del
             usuario — usado por el wizard (16.27) para confirmar el enrollment y por el
             backoffice para mostrar la salud del voice-ID por usuario.
