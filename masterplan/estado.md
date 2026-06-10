@@ -1151,6 +1151,12 @@ Stack elegido:
             sin botón de entrenar. Dispara el mismo POST /wakeword/train; los nodos bajan el
             modelo nuevo solos (16.17).
 
+- [ ] 12.17 **Backoffice mobile-friendly** — el backoffice se usa desde el celular; hoy el
+            layout (sidebar fijo, tablas anchas, grids de 3 columnas) no es responsive. Hacer
+            el layout adaptable: sidebar colapsable/hamburguesa en pantallas chicas, tablas con
+            scroll o cards en mobile, grids que bajen a 1 columna, tamaños táctiles. Verificar
+            las vistas principales (usuarios, wake word, agentes, chat, logs).
+
 ---
 
 ### FASE 13 - Agente NotebookLM
@@ -1454,6 +1460,14 @@ Flujo existente: core/wakeword_trainer.py (positivos TTS+reales, negativos está
             (hash/mtime). `satellite.py` chequea la versión al arrancar y cada N minutos;
             si cambió, baja el modelo nuevo y recarga sin reiniciar. Cierra el loop de mejora
             continua: retrain en backoffice → nodos actualizados automáticamente.
+- [ ] 16.30 **Cap de negativos capturados (no crecer al infinito)**: hoy `_save_negative`
+            guarda un hard negative por cada falso positivo del nodo, sin límite → el directorio
+            `negative/` tiende a infinito (disco + dataset desbalanceado). Acotar la colección:
+            límite por nodo (FIFO/rotación: al superar N, borrar los más viejos), o muestreo
+            probabilístico decreciente a medida que se acumulan. Idealmente, frenar la captura
+            cuando el voice-id ya suprime los FP (si el gate descarta el TV, ya no hace falta
+            seguir juntando). Exponer el conteo y un "limpiar negativos viejos" en la página
+            global de wake word (12.16).
 
 #### Etapa F — Voice-ID resuelto server-side (nodo agnóstico al usuario)
 
