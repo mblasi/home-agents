@@ -1,0 +1,17 @@
+# Registro de paneles NSPanel Pro (FASE 16.23) — fuente de verdad del provisioning.
+#
+# Cada panel es un nodo de voz home-agents + dashboard HA. Los slash commands, scripts
+# y el backoffice resuelven el panel por `name` o `room` → IP (en vez de IP cruda).
+#
+# Distinto del registry runtime (audio_server GET /nodes, estado en vivo): esto es config.
+#
+# Al dar de alta un panel (16.24), agregar su entrada acá.
+
+panels:
+  - name: comedor
+    room: comedor
+    ip: 192.168.68.113
+    mac: ""               # reserva DHCP por MAC (completar)
+    node_id: nspanel-comedor
+    ha_user: nspanelcomedor
+    users: [matias]       # usuarios con voice-id enrolado en este panel

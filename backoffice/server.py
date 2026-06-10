@@ -32,6 +32,7 @@ from fastapi.templating import Jinja2Templates
 # ── Configuración ──────────────────────────────────────────────────────────────
 
 CORE_URL      = os.environ.get("CORE_URL",      "http://localhost:8765")
+AUDIO_SERVER_URL = os.environ.get("AUDIO_SERVER_URL", "http://localhost:8766")
 _LLM_BASE_URL = (os.environ.get("LLM_BASE_URL") or os.environ.get("OLLAMA_URL") or "http://localhost:11434")
 BACKOFFICE_TOKEN = os.environ.get("BACKOFFICE_TOKEN", "")
 OAUTH_APP_URL = os.environ.get("OAUTH_APP_URL", "").rstrip("/")
@@ -174,6 +175,28 @@ def _core(path: str, method: str = "GET", timeout: int = 3, **kwargs):
         return r.json()
     except Exception:
         return None
+
+
+def _audio(path: str, method: str = "GET", timeout: int = 5, **kwargs):
+    """Llama al audio_server (node-facing: registry de nodos + canal de enrollment, 16.21)."""
+    try:
+        r = requests.request(method, f"{AUDIO_SERVER_URL}{path}", timeout=timeout, **kwargs)
+        r.raise_for_status()
+        return r.json()
+    except Exception:
+        return None
+
+
+def _panels() -> list[dict]:
+    """Registro de paneles (16.23). Lee panels.yaml de la raíz del repo."""
+    try:
+        import yaml
+        p = Path(__file__).parent.parent / "panels.yaml"
+        if not p.is_file():
+            return []
+        return (yaml.safe_load(p.read_text(encoding="utf-8")) or {}).get("panels", []) or []
+    except Exception:
+        return []
 
 
 def _llm_ok() -> bool:
@@ -1366,7 +1389,7 @@ def user_detail_page(request: Request, uid: str):
     return _render(request, "user_detail.html", "users",
                    user=user, uid=uid, agents=agents, agents_meta=agents_meta,
                    ww_samples=ww_samples, ww_metrics=ww_metrics,
-                   train_status=train_status,
+                   train_status=train_status, panels=_panels(),
                    user_context=user_context, user_intents=user_intents,
                    proactive_status=proactive_status,
                    user_ctx_plain=user_ctx_plain,
@@ -1637,6 +1660,94 @@ def proactive_run_all_for_user(uid: str, concurrency: int = 3):
 
 
 # ── Onboarding wizard ─────────────────────────────────────────────────────────
+
+# ── Wake word global + enrollment por nodo (12.16 / 16.22 / 16.25) ────────────
+
+def _enroll_session_fragment(node_id: str, target: str = "") -> str:
+    """Fragmento HTMX con el estado de la sesión de enrollment en un nodo (16.21).
+    `target` = id del contenedor que se auto-refresca (reusable: página global y de user)."""
+    target = target or f"enroll-{node_id}"
+    st = _audio(f"/nodes/{node_id}/enroll/status") or {"phase": "idle"}
+    phase = st.get("phase", "idle")
+    i, n = st.get("i", 0), st.get("n", 0)
+    kind = st.get("type", "")
+    label = "voz" if kind == "voice" else "wake word"
+    poll = (f'<span hx-get="/nodes/{node_id}/enroll/status-fragment?target={target}"'
+            f' hx-trigger="every 2s" hx-target="#{target}" hx-swap="innerHTML"></span>')
+    if phase in ("pending", "recording", "uploading"):
+        pct = int(i / n * 100) if n else 0
+        verb = {"pending": "esperando al panel…", "recording": f"grabando {label} {i}/{n}",
+                "uploading": f"subiendo {i}/{n}"}.get(phase, phase)
+        return (f'<p class="text-sm text-blue-300 animate-pulse mb-1">{verb} — pedile a la persona '
+                f'que hable tras cada beep en el panel</p>'
+                f'<div class="w-full bg-gray-700 rounded-full h-2"><div class="bg-blue-500 h-2 '
+                f'rounded-full transition-all" style="width:{pct}%"></div></div>{poll}')
+    if phase == "done":
+        return f'<p class="text-sm text-emerald-400">✓ enrollment de {label} completo ({i}/{n})</p>'
+    if phase == "error":
+        return '<p class="text-sm text-red-400">✗ error en el enrollment</p>'
+    return '<p class="text-xs text-gray-500">sin sesión activa</p>'
+
+
+@app.post("/nodes/{node_id}/enroll/{kind}/{uid}", response_class=HTMLResponse)
+def trigger_node_enroll(node_id: str, kind: str, uid: str, n: int = Query(0),
+                        target: str = Query("")):
+    """Dispara un enrollment en un nodo (16.22) vía el canal del audio_server (16.21).
+    kind = wakeword (muestras de 'Capitán', cross-user) | voice (frases de voz, per-user)."""
+    default_n = 20 if kind == "wakeword" else 5
+    _audio(f"/nodes/{node_id}/enroll", method="POST",
+           params={"type": kind, "user_id": uid, "n": n or default_n})
+    return HTMLResponse(_enroll_session_fragment(node_id, target))
+
+
+@app.get("/nodes/{node_id}/enroll/status-fragment", response_class=HTMLResponse)
+def node_enroll_status_fragment(node_id: str, target: str = Query("")):
+    return HTMLResponse(_enroll_session_fragment(node_id, target))
+
+
+@app.get("/wakeword", response_class=HTMLResponse)
+def wakeword_page(request: Request):
+    """Página global de wake word (12.16): entrenamiento transversal + métricas + captura por nodo."""
+    train_status = _core("/wakeword/train/status") or {"status": "idle"}
+    users = _core("/users") or []
+    breakdown = []
+    for u in users:
+        uid = u.get("id") if isinstance(u, dict) else u
+        s = _core(f"/users/{uid}/wakeword/samples") or {"count": 0}
+        breakdown.append({"uid": uid, "count": s.get("count", 0)})
+    panels = _panels()
+    nodes = {n["node_id"]: n for n in (_audio("/nodes") or [])}
+    return _render(request, "wakeword.html", "wakeword",
+                   train_status=train_status, breakdown=breakdown,
+                   panels=panels, nodes=nodes)
+
+
+@app.post("/wakeword/train", response_class=HTMLResponse)
+def wakeword_train_trigger():
+    """Dispara el retrain transversal (12.16). Devuelve fragmento que polea el estado."""
+    _core("/wakeword/train", method="POST", timeout=5)
+    return HTMLResponse(_wakeword_train_fragment())
+
+
+def _wakeword_train_fragment() -> str:
+    st = _core("/wakeword/train/status") or {"status": "idle"}
+    status = st.get("status", "idle")
+    poll = ('<span hx-get="/wakeword/train/status-fragment" hx-trigger="every 3s"'
+            ' hx-target="#train-status" hx-swap="innerHTML"></span>')
+    if status in ("running", "pending"):
+        return (f'<p class="text-sm text-amber-300 animate-pulse">entrenando… (~30-60s)</p>{poll}')
+    if status == "done":
+        return (f'<p class="text-sm text-emerald-400">✓ entrenado — {st.get("n_positive","?")} positivos / '
+                f'{st.get("n_negative","?")} negativos. Los nodos bajan el modelo nuevo solos (≤10 min).</p>')
+    if status == "error":
+        return f'<p class="text-sm text-red-400">✗ error: {st.get("error","")[:120]}</p>'
+    return '<p class="text-xs text-gray-500">idle</p>'
+
+
+@app.get("/wakeword/train/status-fragment", response_class=HTMLResponse)
+def wakeword_train_status_fragment():
+    return HTMLResponse(_wakeword_train_fragment())
+
 
 _ENROLL_LABELS = {
     "frases_speaker_id":  ("Identificación de voz", 5),

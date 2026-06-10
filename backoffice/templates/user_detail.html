@@ -324,33 +324,26 @@
   </div>
   {% endif %}
 
-  {# Entrenar modelo #}
-  <div class="flex items-center gap-3 pt-1 border-t border-gray-800">
-    <button
-      hx-post="/wakeword/train/start"
-      hx-target="#train-status-detail"
-      hx-swap="innerHTML"
-      {% if train_status.status == "running" %}disabled{% endif %}
-      class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50
-             disabled:cursor-not-allowed text-white rounded-lg text-xs font-medium
-             transition-colors">
-      Entrenar modelo
-    </button>
-    <div id="train-status-detail">
-      {% if train_status.status == "running" %}
-        <span class="text-xs text-blue-400 animate-pulse"
-              hx-get="/wakeword/train/status"
-              hx-trigger="every 3s"
-              hx-target="#train-status-detail"
-              hx-swap="innerHTML">⟳ Entrenando…</span>
-      {% elif train_status.status == "done" %}
-        <span class="text-xs text-emerald-400">✓ Modelo entrenado ({{ train_status.duration_s }}s — {{ train_status.n_positive }} positivos)</span>
-      {% elif train_status.status == "error" %}
-        <span class="text-xs text-red-400">✗ Error: {{ train_status.error | default("desconocido") }}</span>
-      {% else %}
-        <span class="text-xs text-gray-600">Modelo sin entrenar recientemente</span>
-      {% endif %}
+  {# Voice-ID per-user por panel (16.22b). El entrenamiento del wake word es TRANSVERSAL
+     → vive en la página global, no acá. #}
+  <div class="pt-2 border-t border-gray-800">
+    <div class="flex items-center justify-between mb-2">
+      <span class="text-xs text-gray-400">Mejorar identificación de voz (voice-ID) en un panel:</span>
+      <a href="/wakeword" class="text-xs text-indigo-400 hover:text-indigo-300 underline">Entrenar wake word (global) →</a>
     </div>
+    <div class="flex flex-wrap items-center gap-2">
+      {% for p in panels %}
+      <button hx-post="/nodes/{{ p.node_id }}/enroll/voice/{{ uid }}?target=voice-enroll-{{ uid }}"
+              hx-target="#voice-enroll-{{ uid }}" hx-swap="innerHTML"
+              class="px-3 py-1.5 bg-blue-700 hover:bg-blue-600 text-white rounded-lg text-xs font-medium transition-colors">
+        🎙 {{ p.name }}
+      </button>
+      {% else %}
+      <span class="text-xs text-gray-600">No hay paneles registrados (panels.yaml)</span>
+      {% endfor %}
+    </div>
+    <p class="text-xs text-gray-600 mt-1">La persona debe estar frente al panel y hablar tras cada beep.</p>
+    <div id="voice-enroll-{{ uid }}" class="mt-2"></div>
   </div>
 </div>
 

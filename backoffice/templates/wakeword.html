@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Wake word{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-bold">Wake word "Capitán"</h1>
+  <a href="/users" class="text-sm text-gray-400 hover:text-gray-200">← Usuarios</a>
+</div>
+
+<p class="text-sm text-gray-400 mb-6">
+  El modelo de wake word es <strong>único y compartido</strong> (transversal a todos los usuarios).
+  Combina las muestras positivas de "Capitán" de todos + los negativos (genéricos + capturados de
+  los nodos). Reentrenar genera un modelo nuevo; los nodos lo bajan solos (≤10 min).
+</p>
+
+{# Estado del dataset (último entrenamiento) #}
+<div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-4">
+  <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Dataset</h2>
+  <div class="grid grid-cols-3 gap-3 mb-4">
+    <div class="bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-2 text-center">
+      <div class="text-xs text-gray-500 mb-1">Positivos (último train)</div>
+      <div class="text-lg font-bold text-emerald-400">{{ train_status.n_positive | default("—") }}</div>
+      <div class="text-xs text-gray-600">{{ train_status.n_positive_real | default(0) }} reales</div>
+    </div>
+    <div class="bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-2 text-center">
+      <div class="text-xs text-gray-500 mb-1">Negativos</div>
+      <div class="text-lg font-bold text-blue-400">{{ train_status.n_negative | default("—") }}</div>
+      <div class="text-xs text-gray-600">genéricos + nodos</div>
+    </div>
+    <div class="bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-2 text-center">
+      <div class="text-xs text-gray-500 mb-1">Estado</div>
+      <div class="text-lg font-bold {{ 'text-emerald-400' if train_status.status == 'done' else 'text-gray-500' }}">
+        {{ train_status.status | default("idle") }}
+      </div>
+    </div>
+  </div>
+
+  {# Desglose por usuario #}
+  <div class="mb-4">
+    <div class="text-xs text-gray-500 mb-1">Muestras por usuario</div>
+    <div class="flex flex-wrap gap-2">
+      {% for b in breakdown %}
+      <span class="px-2 py-0.5 text-xs rounded-full bg-gray-800 border border-gray-700 text-gray-300">
+        {{ b.uid }}: <strong>{{ b.count }}</strong>
+      </span>
+      {% else %}
+      <span class="text-xs text-gray-600">sin usuarios</span>
+      {% endfor %}
+    </div>
+  </div>
+
+  {# Entrenar (transversal) #}
+  <div class="flex items-center gap-3 pt-2 border-t border-gray-800">
+    <button hx-post="/wakeword/train" hx-target="#train-status" hx-swap="innerHTML"
+            class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium transition-colors">
+      Entrenar modelo
+    </button>
+    <div id="train-status">
+      {% if train_status.status == "done" %}
+        <span class="text-xs text-emerald-400">✓ último: {{ train_status.n_positive }} positivos / {{ train_status.n_negative }} negativos</span>
+      {% else %}
+        <span class="text-xs text-gray-600">sin entrenar recientemente</span>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{# Captura de muestras de wake word por panel (16.22a) #}
+<div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+  <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Capturar muestras en un panel</h2>
+  <p class="text-xs text-gray-600 mb-3">
+    Graba muestras de "Capitán" con el mic de un panel y las suma al dataset compartido.
+    La persona debe estar frente al panel y decir "Capitán" tras cada beep. Después, entrenar.
+  </p>
+  <div class="space-y-3">
+    {% for p in panels %}
+    <div class="flex items-center gap-3 p-2 bg-gray-800/40 rounded-lg">
+      <div class="flex-1">
+        <span class="text-sm text-gray-200">{{ p.name }}</span>
+        {% set node = nodes.get(p.node_id) %}
+        <span class="ml-2 text-xs {{ 'text-emerald-400' if node and node.state == 'active' else 'text-gray-600' }}">
+          {{ '● online' if node and node.state == 'active' else '○ offline' }}
+        </span>
+      </div>
+      <button hx-post="/nodes/{{ p.node_id }}/enroll/wakeword/_global?target=enroll-{{ p.node_id }}"
+              hx-target="#enroll-{{ p.node_id }}" hx-swap="innerHTML"
+              class="px-3 py-1.5 bg-blue-700 hover:bg-blue-600 text-white rounded-lg text-xs font-medium transition-colors">
+        🎙 Capturar
+      </button>
+    </div>
+    <div id="enroll-{{ p.node_id }}" class="px-2"></div>
+    {% else %}
+    <span class="text-xs text-gray-600">No hay paneles registrados (panels.yaml)</span>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
