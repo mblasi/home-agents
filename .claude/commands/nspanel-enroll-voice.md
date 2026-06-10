@@ -4,18 +4,21 @@ Necesario porque los embeddings enrolados con el mic del laptop NO matchean el a
 mic del NSPanel (características distintas) → el usuario sale como "guest". Re-enrolar desde
 el panel genera el embedding correcto y el voice-id distingue al usuario del TV/charla ajena.
 
-Uso: `/nspanel-enroll-voice [N] [user_id] [IP]`
+Uso: `/nspanel-enroll-voice <user_id> [N] [IP]`
+- user_id: **usuario a enrolar** (REQUERIDO — ej: matias, sabina, valeria). Si no se indica,
+  preguntar al usuario para qué persona es; NO asumir matias.
 - N: cantidad de frases a grabar (default 5, ~4s c/u)
-- user_id: usuario (default matias)
 - IP: panel (default 192.168.68.113 — comedor)
 
 El server (audio_server) computa el embedding y actualiza embeddings/<uid>.npy (promedia
 con el previo). El voice-id es server-side; el nodo solo graba y manda audio crudo.
 
+Extraé `user_id`, `N` e `IP` de $ARGUMENTS. Si no hay user_id explícito, pedilo antes de seguir.
+
 Pasos:
-1. Lanzar el enrollment de voz detached:
+1. Lanzar el enrollment de voz detached (UID = el usuario indicado):
 ```bash
-IP="${3:-192.168.68.113}"; N="${1:-5}"; UID="${2:-matias}"
+UID="<user_id indicado>"; N="${N:-5}"; IP="${IP:-192.168.68.113}"
 ssh -p 8022 -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa -o StrictHostKeyChecking=no -o ConnectTimeout=10 u0_a53@$IP \
   "export PATH=/data/data/com.termux/files/usr/bin:\$PATH; pkill -9 python3.13 2>/dev/null; sleep 2; nohup python3.13 \$HOME/satellite.py --enroll-voice $UID $N > ~/.enrollvoice.log 2>&1 < /dev/null & disown; echo lanzado"
 ```
