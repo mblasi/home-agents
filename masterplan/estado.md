@@ -1139,6 +1139,18 @@ Stack elegido:
 - [x] 12.15 **Integraciones**: test de conexión on-demand a HAOS / Ollama / proveedores de clima,
             lista de entity_ids mapeados en ha_client.py, estado de modelos cargados en Ollama
 
+- [ ] 12.16 **Página global de wake word** — mover la acción de entrenamiento fuera del
+            contexto por-usuario (hoy el botón "Entrenar wake word" vive en user_form/user_detail,
+            pero el retrain es TRANSVERSAL: combina las muestras de todos los usuarios en un único
+            modelo compartido — la UX engaña). Nueva sección "Wake word" en system settings que
+            muestre la salud real del modelo: total de positivos (TTS base + reales por usuario,
+            con desglose), total de negativos (genéricos + capturados de nodos), métricas del
+            último training (val_accuracy, fp_rate, fecha), un solo botón "Entrenar" + estado en
+            vivo, y aviso si el dataset está desbalanceado. La página por-usuario mantiene solo
+            su contador de muestras + "Agregar muestras" (su contribución al modelo compartido),
+            sin botón de entrenar. Dispara el mismo POST /wakeword/train; los nodos bajan el
+            modelo nuevo solos (16.17).
+
 ---
 
 ### FASE 13 - Agente NotebookLM
@@ -1457,22 +1469,47 @@ Infra existente: ear/speaker_id.py (resemblyzer/GE2E, threshold 0.75), embedding
           onboarding paso 'frases_speaker_id' que genera el embedding.
 ```
 
-- [ ] 16.18 Voice-ID en `audio_server.py` (server-side): tras el STT, correr
+- [x] 16.18 Voice-ID en `audio_server.py` (server-side): tras el STT, correr
             `speaker_id.identify(audio)` sobre el comando crudo recibido del nodo y propagar
             el `speaker_id` real al core (hoy va None → 'guest'). Reusa ear/speaker_id.py +
             los embeddings migrados. El core ya consume `source.speaker_id` para personalizar
             (users, RBAC, contexto por usuario). Cargar perfiles al iniciar; recargar al
             agregar usuarios. El nodo no cambia — sigue enviando solo audio crudo.
-- [ ] 16.19 Gate opcional por speaker conocido (server-side): si
+- [x] 16.19 Gate opcional por speaker conocido (server-side): si
             `WAKEWORD_REQUIRE_KNOWN_SPEAKER=true`, el audio_server rechaza comandos cuyo
             speaker_id sea 'guest' (voz no enrolada) → devuelve 204 o un aviso. Coherente con
             el flag homónimo de listen.py. El nodo solo reproduce lo que el server devuelva.
-- [ ] 16.20 Enrollment de voice-id con el mic del nodo: el nodo captura frases (audio crudo)
+- [x] 16.20 Enrollment de voice-id con el mic del nodo: el nodo captura frases (audio crudo)
             y las envía al audio_server, que computa el embedding (resemblyzer) y lo guarda en
             embeddings/<uid>.npy. `satellite.py --enroll-voice <uid>` + endpoint
             `/enroll-voice` en audio_server. El nodo sigue agnóstico (solo graba y manda audio);
             el server hace todo el cómputo. Coherente con 'frases_speaker_id' del onboarding.
-            Métricas de identificación (speaker correcto vs guest) — cohesión con 16.15.
+            CLAVE: resuelve el mismatch de mic — el embedding del laptop daba 0.45 (=guest);
+            re-enrolado desde el NSPanel da 0.77 (=conocido), separable del TV. Gate activado
+            con SPEAKER_THRESHOLD=0.6. Slash commands `/nspanel-enroll`, `/nspanel-enroll-voice`.
+
+#### Etapa G — Formalizar enrollment desde el backoffice (operación sin SSH)
+
+```
+Hoy los enrollments se disparan con slash commands (SSH/ADB al nodo). Para operación
+normal deberían iniciarse desde el backoffice, eligiendo un nodo. El nodo es el único
+con mic, así que el backoffice manda un comando al nodo (vía audio_server) para que
+inicie la sesión de captura; el nodo graba y sube como hoy. Server-side computa todo.
+```
+
+- [ ] 16.21 Canal de comando backoffice→nodo para enrollment: el audio_server expone un
+            "enrollment pendiente" por nodo (`POST /nodes/{id}/enroll` con tipo wakeword|voice,
+            user_id, N). El satellite lo consulta en su loop (o por WebSocket) y al detectarlo
+            entra en modo enrollment (beeps + captura + upload), luego vuelve a escuchar.
+            Evita depender de SSH/ADB para operar.
+- [ ] 16.22 UI de enrollment en el backoffice (dos flujos):
+            (a) **Wake word (cross-user)** — desde la página global de wake word (12.16):
+                botón "Capturar muestras en nodo X" → dispara 16.21 tipo wakeword → suma
+                positivos al dataset compartido → luego "Entrenar".
+            (b) **Voice-ID (per-user)** — desde la página del usuario: botón "Mejorar mi
+                voz en nodo X" → dispara 16.21 tipo voice → re-computa el embedding del
+                usuario con el mic de ese nodo. Muestra la confianza resultante.
+            Estado en vivo de la sesión (grabando frase i/N, subida ok).
 
 ---
 

@@ -186,6 +186,31 @@ Si tu pantalla no es 750px de ancho, ajustá `UI_SCREEN_WIDTH_PX` en `~/.config/
 
 ---
 
+## Paso 5c — Voice-ID: re-enrolar la voz del usuario (FASE 16.20)
+
+El embedding de voz de cada usuario debe enrolarse con el **mic del NSPanel** (el del laptop
+no matchea → el usuario sale como "guest", indistinguible del TV). Por cada usuario que use
+este panel:
+
+```zsh
+/nspanel-enroll-voice 5 <user_id> <IP>
+# o directo: satellite.py --enroll-voice <user_id> 5
+```
+
+El usuario habla ~4s tras cada beep (5 frases). El audio_server computa el embedding y lo
+guarda en `embeddings/<uid>.npy`.
+
+Activar el gate (rechaza voces no enroladas = TV/charla ajena) en `ear/.env` del SER9:
+```
+SPEAKER_THRESHOLD=0.6
+REQUIRE_KNOWN_SPEAKER=true
+```
+
+> Verificar: decí "Capitán, <comando>" → el log del audio_server debe mostrar
+> `voice-id: <uid> (conf>0.6)`. El TV debe dar `guest (conf<0.6)`.
+
+---
+
 ## Paso 6 — Boot script (HA Companion + sshd + satellite)
 
 Crear `~/.termux/boot/start-ha.sh` en el NSPanel:

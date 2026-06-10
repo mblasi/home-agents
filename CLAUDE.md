@@ -392,3 +392,18 @@ Pipeline anterior (hasta FASE 21): laptop con mic/speaker local. Ya reemplazado.
   Sin esa var, Ollama 0.30+ descarta GPUs integradas silenciosamente → fallback a CPU.
   Config en `/etc/systemd/system/ollama.service.d/keepalive.conf`.
   Latencia warm con GPU: ~3-5s | sin GPU: ~74s.
+- Wake word retrain en SER9 (`/wakeword/train`): el venv necesita `torch` (CPU),
+  `torchaudio` (variante +cpu, matchear versión de torch), training deps de openWakeWord
+  (audiomentations, speechbrain, librosa, acoustics, pronouncing...) y `onnxscript` para el
+  export ONNX. Parches del venv: openwakeword `__init__.py` (scipy import opcional) y
+  `acoustics/__init__.py` (agregar `import acoustics.standards` arriba — circular import).
+  `wakeword_trainer.py` deriva el path de openwakeword dinámicamente (no hardcodear python3.13).
+- Voice-ID en nodos (server-side, audio_server): `speaker_id.identify()` sobre el comando.
+  CRÍTICO: el embedding debe enrolarse con el MISMO mic que se usa en runtime. El embedding
+  del laptop da ~0.45 sobre audio del NSPanel (= guest, indistinguible del TV); re-enrolado
+  desde el NSPanel da ~0.77. Gate `REQUIRE_KNOWN_SPEAKER=true` + `SPEAKER_THRESHOLD=0.6` en
+  ear/.env → el TV (guest) se descarta, el usuario conocido pasa. Re-enrolar: `/nspanel-enroll-voice`.
+- Mic del NSPanel: capta muy bajo (RMS voz ~1000, ruido ~25) sin AGC. audio_server normaliza
+  por RMS antes del STT + vad_filter sobre el audio normalizado. Falsos positivos del wake
+  word con TV/radio se resuelven con: retrain (negativos del TV capturados orgánicamente en
+  204) + voice-id gate (el TV no matchea ningún perfil enrolado).
