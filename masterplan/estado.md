@@ -1567,6 +1567,9 @@ el alta de panel desde la UI y cerrar el flujo como un wizard cohesivo y validad
             Documentar claramente el único prerequisito físico no automatizable (habilitar ADB
             en el panel con taps) y validar conectividad antes de arrancar. Reemplaza al script
             como vía principal (16.24 queda como backend/CLI de esto).
+            Avance: página `/panels` lista (registro + estado online/offline en vivo), alta en
+            el registro (nombre/ambiente/IP) y quitar — operativa. FALTA: el bootstrap remoto
+            del dispositivo desde la UI con progreso (depende de 16.24).
 - [x] 16.27 **Wizard de onboarding end-to-end**: flujo guiado en el backoffice que encadena
             crear usuario → enrolar su voz en un panel (16.22b) → **validar el voice-ID**
             (medir la confianza real del usuario contra su perfil y confirmar que supera el
