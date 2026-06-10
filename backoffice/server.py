@@ -1360,7 +1360,7 @@ async def create_user_submit(request: Request):
                        user=payload, uid=None, error="No se pudo crear el usuario (¿ID ya existe?)",
                        agents=agents, role_perms=role_perms)
     uid = payload["id"]
-    return RedirectResponse(f"/users/{uid}/onboard", status_code=303)
+    return RedirectResponse(f"/users/{uid}", status_code=303)
 
 
 @app.get("/users/{uid}", response_class=HTMLResponse)
@@ -1808,138 +1808,8 @@ def panels_delete(name: str):
     return HTMLResponse("")
 
 
-_ENROLL_LABELS = {
-    "frases_speaker_id":  ("Identificación de voz", 5),
-    "muestras_wake_word": ("Muestras de wake word", 30),
-}
-_NEXT_STEP = {
-    "frases_speaker_id":  "muestras_wake_word",
-    "muestras_wake_word": "completo",
-}
-
-
-def _enroll_fragment(uid: str, sid: str, progress: int, total: int, status: str, step: str) -> str:
-    label = _ENROLL_LABELS.get(step, (step, total))[0]
-    pct = int(progress / total * 100) if total else 0
-
-    if status == "pending":
-        body = (
-            '<p class="text-gray-400 text-sm animate-pulse">Esperando al dispositivo ear…</p>'
-            f'<span hx-get="/users/{uid}/enroll/status/{sid}"'
-            f' hx-trigger="every 2s" hx-target="#enroll-fragment" hx-swap="innerHTML"></span>'
-        )
-    elif status == "in_progress":
-        body = (
-            f'<p class="text-sm text-gray-300 mb-2">{label}: {progress}/{total}</p>'
-            f'<div class="w-full bg-gray-700 rounded-full h-2 mb-1">'
-            f'  <div class="bg-blue-500 h-2 rounded-full transition-all" style="width:{pct}%"></div>'
-            f'</div>'
-            f'<p class="text-xs text-gray-500">{pct}%</p>'
-            f'<span hx-get="/users/{uid}/enroll/status/{sid}"'
-            f' hx-trigger="every 2s" hx-target="#enroll-fragment" hx-swap="innerHTML"></span>'
-        )
-    elif status == "done":
-        next_step = _NEXT_STEP.get(step, "completo")
-        if next_step == "completo":
-            next_html = (
-                '<a href="/users" class="text-emerald-400 underline text-sm">Ver usuarios</a>'
-            )
-        else:
-            next_label = _ENROLL_LABELS.get(next_step, (next_step,))[0]
-            next_html = (
-                f'<a href="/users/{uid}/onboard" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 '
-                f'text-white rounded-lg text-xs font-medium">Continuar → {next_label}</a>'
-            )
-        body = (
-            f'<p class="text-emerald-400 text-sm font-medium mb-3">✓ {label} completado ({progress}/{total})</p>'
-            + next_html
-        )
-    elif status in ("cancelled", "error"):
-        body = f'<p class="text-red-400 text-sm">✗ {status.capitalize()} — recargá la página para reintentar.</p>'
-    else:
-        body = f'<p class="text-gray-500 text-xs">{status}</p>'
-
-    return body
-
-
-@app.get("/users/{uid}/onboard", response_class=HTMLResponse)
-def user_onboard_page(request: Request, uid: str):
-    user = _core(f"/users/{uid}")
-    if not user:
-        return RedirectResponse("/users", status_code=303)
-    step = user.get("onboarding_step", "completo")
-    return _render(request, "user_onboard.html", "users",
-                   user=user, uid=uid, step=step,
-                   enroll_labels=_ENROLL_LABELS, next_step=_NEXT_STEP)
-
-
-@app.post("/users/{uid}/enroll/start", response_class=HTMLResponse)
-async def start_enroll(uid: str, request: Request):
-    form = await request.form()
-    step = str(form.get("step", ""))
-    if step not in _ENROLL_LABELS:
-        return HTMLResponse('<p class="text-red-400 text-xs">Paso inválido</p>')
-    result = _core("/enrollment/sessions", method="POST", json={"user_id": uid, "step": step})
-    if not result:
-        return HTMLResponse('<p class="text-red-400 text-xs">El core no está disponible</p>')
-    sid = result["session_id"]
-    total = result["total"]
-    return HTMLResponse(_enroll_fragment(uid, sid, 0, total, "pending", step))
-
-
-@app.get("/users/{uid}/enroll/status/{sid}", response_class=HTMLResponse)
-def enroll_status_fragment(uid: str, sid: str):
-    session = _core(f"/enrollment/sessions/{sid}")
-    if not session:
-        return HTMLResponse('<p class="text-red-400 text-xs">Sesión expirada o no encontrada</p>')
-    return HTMLResponse(_enroll_fragment(
-        uid, sid,
-        session.get("progress", 0),
-        session.get("total", 1),
-        session.get("status", "pending"),
-        session.get("step", ""),
-    ))
-
-
-_POLLING_SPAN = (
-    '<span class="text-blue-400 text-xs animate-pulse"'
-    ' hx-get="/wakeword/train/status"'
-    ' hx-trigger="every 3s"'
-    ' hx-target="#train-status"'
-    ' hx-swap="innerHTML">⟳ Entrenando…</span>'
-)
-
-
-@app.post("/wakeword/train/start", response_class=HTMLResponse)
-def start_wakeword_train():
-    """Proxy para lanzar reentrenamiento desde el backoffice (HTMX)."""
-    result = _core("/wakeword/train", method="POST") or {}
-    status = result.get("status", "error")
-    if status == "started":
-        return HTMLResponse(_POLLING_SPAN)
-    elif status == "conflict":
-        return HTMLResponse('<span class="text-orange-400 text-xs">Ya hay un entrenamiento en curso</span>')
-    return HTMLResponse('<span class="text-red-400 text-xs">Error al iniciar entrenamiento</span>')
-
-
-@app.get("/wakeword/train/status", response_class=HTMLResponse)
-def wakeword_train_status_fragment():
-    """Fragmento HTMX (innerHTML de #train-status) con el estado actual del entrenamiento."""
-    result = _core("/wakeword/train/status") or {"status": "idle"}
-    status = result.get("status", "idle")
-    if status == "running":
-        return HTMLResponse(_POLLING_SPAN)
-    elif status == "done":
-        n_pos = result.get("n_positive", "?")
-        n_real = result.get("n_positive_real", 0)
-        dur = result.get("duration_s", "?")
-        return HTMLResponse(
-            f'<span class="text-emerald-400 text-xs">✓ Listo — {n_pos} positivos ({n_real} reales), {dur}s</span>'
-        )
-    elif status == "error":
-        err = result.get("error", "desconocido")
-        return HTMLResponse(f'<span class="text-red-400 text-xs">✗ Error: {err[:60]}</span>')
-    return HTMLResponse('<span class="text-gray-600 text-xs">Sin entrenamientos recientes</span>')
+# Stack legacy de onboarding/enrollment laptop-ear eliminado en 16.29.
+# El enrollment es por nodo (audio_server) + página /wakeword + /panels.
 
 
 # ── RBAC roles ─────────────────────────────────────────────────────────────────
