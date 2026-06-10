@@ -1682,6 +1682,13 @@ def _enroll_session_fragment(node_id: str, target: str = "") -> str:
                 f'que hable tras cada beep en el panel</p>'
                 f'<div class="w-full bg-gray-700 rounded-full h-2"><div class="bg-blue-500 h-2 '
                 f'rounded-full transition-all" style="width:{pct}%"></div></div>{poll}')
+    if phase == "done" and kind == "verify":
+        conf = st.get("confidence", 0.0)
+        if st.get("matches"):
+            return (f'<p class="text-sm text-emerald-400">✓ voz reconocida — {st.get("speaker","?")} '
+                    f'(confianza {conf}). El usuario queda operativo por voz.</p>')
+        return (f'<p class="text-sm text-amber-300">⚠ no reconocida con suficiente confianza '
+                f'(dio {st.get("speaker","?")} / {conf}). Reforzá el enrollment con más frases.</p>')
     if phase == "done":
         return f'<p class="text-sm text-emerald-400">✓ enrollment de {label} completo ({i}/{n})</p>'
     if phase == "error":
@@ -1694,7 +1701,7 @@ def trigger_node_enroll(node_id: str, kind: str, uid: str, n: int = Query(0),
                         target: str = Query("")):
     """Dispara un enrollment en un nodo (16.22) vía el canal del audio_server (16.21).
     kind = wakeword (muestras de 'Capitán', cross-user) | voice (frases de voz, per-user)."""
-    default_n = 20 if kind == "wakeword" else 5
+    default_n = {"wakeword": 20, "voice": 5, "verify": 1}.get(kind, 5)
     _audio(f"/nodes/{node_id}/enroll", method="POST",
            params={"type": kind, "user_id": uid, "n": n or default_n})
     return HTMLResponse(_enroll_session_fragment(node_id, target))

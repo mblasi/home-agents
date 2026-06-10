@@ -331,18 +331,25 @@
       <span class="text-xs text-gray-400">Mejorar identificación de voz (voice-ID) en un panel:</span>
       <a href="/wakeword" class="text-xs text-indigo-400 hover:text-indigo-300 underline">Entrenar wake word (global) →</a>
     </div>
-    <div class="flex flex-wrap items-center gap-2">
-      {% for p in panels %}
+    {% for p in panels %}
+    <div class="flex flex-wrap items-center gap-2 mb-1">
+      <span class="text-xs text-gray-500 w-20">{{ p.name }}</span>
       <button hx-post="/nodes/{{ p.node_id }}/enroll/voice/{{ uid }}?target=voice-enroll-{{ uid }}"
               hx-target="#voice-enroll-{{ uid }}" hx-swap="innerHTML"
               class="px-3 py-1.5 bg-blue-700 hover:bg-blue-600 text-white rounded-lg text-xs font-medium transition-colors">
-        🎙 {{ p.name }}
+        🎙 Enrolar voz
       </button>
-      {% else %}
-      <span class="text-xs text-gray-600">No hay paneles registrados (panels.yaml)</span>
-      {% endfor %}
+      <button hx-post="/nodes/{{ p.node_id }}/enroll/verify/{{ uid }}?target=voice-enroll-{{ uid }}"
+              hx-target="#voice-enroll-{{ uid }}" hx-swap="innerHTML"
+              class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-xs font-medium transition-colors">
+        ✓ Verificar
+      </button>
     </div>
-    <p class="text-xs text-gray-600 mt-1">La persona debe estar frente al panel y hablar tras cada beep.</p>
+    {% else %}
+    <span class="text-xs text-gray-600">No hay paneles registrados (panels.yaml)</span>
+    {% endfor %}
+    <p class="text-xs text-gray-600 mt-1">Enrolar: hablá 5 frases tras los beeps. Verificar: 1 frase
+      para medir la confianza del voice-id. La persona debe estar frente al panel.</p>
     <div id="voice-enroll-{{ uid }}" class="mt-2"></div>
   </div>
 </div>
