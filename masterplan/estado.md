@@ -1534,6 +1534,37 @@ paneles por nombre/ambiente en vez de IP.
             16.23), no solo IP cruda. El backoffice lista los paneles del registro y permite
             elegir a cuál dirigir cada acción (enrollment, reboot, ver estado).
 
+#### Etapa I — Onboarding 100% desde el backoffice (sin SSH/ADB manual)
+
+```
+Objetivo: que un operador pueda, SOLO desde el backoffice, (1) dar de alta un panel nuevo,
+(2) crear usuarios, y (3) asegurar el voice-ID de cada uno — todo end-to-end, sin tocar
+una terminal. Hoy crear usuario y enrolar voz ya andan desde la web (12.x / 16.22); falta
+el alta de panel desde la UI y cerrar el flujo como un wizard cohesivo y validado.
+```
+
+- [ ] 16.26 **Alta de panel desde el backoffice (100% funcional)**: página de administración
+            de paneles (`/panels`) que lista los paneles (registro + estado online/offline) y
+            permite **dar de alta uno nuevo desde la UI**: el operador ingresa nombre, ambiente
+            e IP; el backoffice corre el bootstrap remoto automatizable (la lógica de 16.24
+            expuesta como servicio: install apps vía ADB, deps, copia de modelos+satellite,
+            permisos de mic, boot script, Termux:GUI), mostrando **progreso paso a paso** y
+            registrando el panel en panels.yaml al terminar. Editar/eliminar/reboot por panel.
+            Documentar claramente el único prerequisito físico no automatizable (habilitar ADB
+            en el panel con taps) y validar conectividad antes de arrancar. Reemplaza al script
+            como vía principal (16.24 queda como backend/CLI de esto).
+- [ ] 16.27 **Wizard de onboarding end-to-end**: flujo guiado en el backoffice que encadena
+            crear usuario → enrolar su voz en un panel (16.22b) → **validar el voice-ID**
+            (medir la confianza real del usuario contra su perfil y confirmar que supera el
+            umbral; si queda justa, ofrecer reforzar con más frases). Cierra el lazo: al
+            terminar, el usuario queda 100% operativo (reconocido por voz) sin haber tocado
+            SSH. Asegurar que la creación de usuarios y el enrollment de voz estén pulidos y
+            sin pasos manuales ocultos.
+- [ ] 16.28 **Endpoint de validación de voice-ID**: `/users/{uid}/voice-id/verify` que toma
+            una muestra del nodo y devuelve (speaker_id, confidence) contra el perfil del
+            usuario — usado por el wizard (16.27) para confirmar el enrollment y por el
+            backoffice para mostrar la salud del voice-ID por usuario.
+
 ---
 
 ### FASE 17 - Chat Visual con la Plataforma
