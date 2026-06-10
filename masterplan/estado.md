@@ -1139,7 +1139,7 @@ Stack elegido:
 - [x] 12.15 **Integraciones**: test de conexión on-demand a HAOS / Ollama / proveedores de clima,
             lista de entity_ids mapeados en ha_client.py, estado de modelos cargados en Ollama
 
-- [ ] 12.16 **Página global de wake word** — mover la acción de entrenamiento fuera del
+- [x] 12.16 **Página global de wake word** — mover la acción de entrenamiento fuera del
             contexto por-usuario (hoy el botón "Entrenar wake word" vive en user_form/user_detail,
             pero el retrain es TRANSVERSAL: combina las muestras de todos los usuarios en un único
             modelo compartido — la UX engaña). Nueva sección "Wake word" en system settings que
@@ -1497,12 +1497,12 @@ con mic, así que el backoffice manda un comando al nodo (vía audio_server) par
 inicie la sesión de captura; el nodo graba y sube como hoy. Server-side computa todo.
 ```
 
-- [ ] 16.21 Canal de comando backoffice→nodo para enrollment: el audio_server expone un
+- [x] 16.21 Canal de comando backoffice→nodo para enrollment: el audio_server expone un
             "enrollment pendiente" por nodo (`POST /nodes/{id}/enroll` con tipo wakeword|voice,
             user_id, N). El satellite lo consulta en su loop (o por WebSocket) y al detectarlo
             entra en modo enrollment (beeps + captura + upload), luego vuelve a escuchar.
             Evita depender de SSH/ADB para operar.
-- [ ] 16.22 UI de enrollment en el backoffice (dos flujos):
+- [x] 16.22 UI de enrollment en el backoffice (dos flujos):
             (a) **Wake word (cross-user)** — desde la página global de wake word (12.16):
                 botón "Capturar muestras en nodo X" → dispara 16.21 tipo wakeword → suma
                 positivos al dataset compartido → luego "Entrenar".
@@ -1520,7 +1520,7 @@ fuente de verdad y un flujo de alta guiado, para que comandos y backoffice refer
 paneles por nombre/ambiente en vez de IP.
 ```
 
-- [ ] 16.23 Registro de paneles (`masterplan/panels.yaml` o config): por panel → {name,
+- [x] 16.23 Registro de paneles (`masterplan/panels.yaml` o config): por panel → {name,
             room, ip, mac, users, node_id}. Fuente de verdad del provisioning. `scripts/nspanel.sh`
             y los slash commands resuelven panel por nombre/ambiente → IP (ej: "comedor" → .113).
             Reserva DHCP por MAC documentada. Distinto del registry runtime (16.3, GET /nodes,
@@ -1529,7 +1529,7 @@ paneles por nombre/ambiente en vez de IP.
             que automatiza el bootstrap (docs/nspanel-setup.md: ADB, Termux, deps, modelos,
             satellite, boot script, Termux:GUI) de forma guiada y registra el panel en panels.yaml.
             Idempotente; reporta qué pasos faltan si algo falla.
-- [ ] 16.25 Comandos y backoffice por panel: todos los comandos que afectan a un panel
+- [x] 16.25 Comandos y backoffice por panel: todos los comandos que afectan a un panel
             (`/nspanel*`, enroll, etc.) aceptan el panel por **nombre/ambiente** (resuelto vía
             16.23), no solo IP cruda. El backoffice lista los paneles del registro y permite
             elegir a cuál dirigir cada acción (enrollment, reboot, ver estado).

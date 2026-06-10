@@ -1,22 +1,24 @@
 Capturá muestras positivas de la wake word "Capitán" desde el mic de un NSPanel, para
 mejorar la detección del wake word vía retrain.
 
-Uso: `/nspanel-enroll <user_id> [N] [IP]`
+Uso: `/nspanel-enroll <user_id> [N] [panel]`
 - user_id: **usuario al que se asocian las muestras** (REQUERIDO — ej: matias, sabina, valeria).
   Si no se indica, preguntar para qué persona es; NO asumir matias.
 - N: cantidad de muestras (default 20)
-- IP: panel (default 192.168.68.113 — comedor)
+- panel: nombre/ambiente (ej: `comedor`) o IP cruda. Default: comedor. Se resuelve con
+  `python scripts/panels.py resolve <panel>` (registro panels.yaml, 16.23).
 
 Aunque el modelo de wake word es único/compartido (transversal), las muestras se guardan por
 usuario (para tracking y métricas). Después hay que reentrenar con `/retrain` para que el
 modelo nuevo las use (y los nodos lo bajan solos, 16.17).
 
-Extraé `user_id`, `N` e `IP` de $ARGUMENTS. Si no hay user_id explícito, pedilo antes de seguir.
+Extraé `user_id`, `N` y `panel` de $ARGUMENTS. Si no hay user_id explícito, pedilo antes de seguir.
 
 Pasos:
-1. Lanzar el enrollment detached en el NSPanel (UID = el usuario indicado):
+1. Resolver el panel a IP y lanzar el enrollment detached:
 ```bash
-UID="<user_id indicado>"; N="${N:-20}"; IP="${IP:-192.168.68.113}"
+UID="<user_id indicado>"; N="${N:-20}"; PANEL="${PANEL:-comedor}"
+IP=$(python ~/workspace/home-agents/scripts/panels.py resolve "$PANEL" ip 2>/dev/null || echo "$PANEL")
 ssh -p 8022 -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa -o StrictHostKeyChecking=no -o ConnectTimeout=10 u0_a53@$IP \
   "export PATH=/data/data/com.termux/files/usr/bin:\$PATH; pkill -9 python3.13 2>/dev/null; sleep 2; nohup python3.13 \$HOME/satellite.py --enroll $UID $N > ~/.enroll.log 2>&1 < /dev/null & disown; echo lanzado"
 ```
