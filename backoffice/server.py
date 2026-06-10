@@ -1724,29 +1724,33 @@ def wakeword_page(request: Request):
 
 @app.post("/wakeword/train", response_class=HTMLResponse)
 def wakeword_train_trigger():
-    """Dispara el retrain transversal (12.16). Devuelve fragmento que polea el estado."""
+    """Dispara el retrain transversal (12.16). Captura el trained_at previo como baseline
+    para distinguir un 'done' NUEVO del último entrenamiento viejo, y polea hasta verlo."""
+    baseline = float((_core("/wakeword/train/status") or {}).get("trained_at", 0) or 0)
     _core("/wakeword/train", method="POST", timeout=5)
-    return HTMLResponse(_wakeword_train_fragment())
+    return HTMLResponse(_wakeword_train_fragment(baseline=baseline, just_triggered=True))
 
 
-def _wakeword_train_fragment() -> str:
+def _wakeword_train_fragment(baseline: float = 0.0, just_triggered: bool = False) -> str:
     st = _core("/wakeword/train/status") or {"status": "idle"}
     status = st.get("status", "idle")
-    poll = ('<span hx-get="/wakeword/train/status-fragment" hx-trigger="every 3s"'
-            ' hx-target="#train-status" hx-swap="innerHTML"></span>')
-    if status in ("running", "pending"):
-        return (f'<p class="text-sm text-amber-300 animate-pulse">entrenando… (~30-60s)</p>{poll}')
-    if status == "done":
+    trained_at = float(st.get("trained_at", 0) or 0)
+    poll = (f'<span hx-get="/wakeword/train/status-fragment?baseline={baseline}" hx-trigger="every 3s"'
+            f' hx-target="#train-status" hx-swap="innerHTML"></span>')
+    # 'done' sólo cuenta si es NUEVO (posterior al baseline) — evita mostrar el viejo al instante.
+    if status == "done" and trained_at > baseline:
         return (f'<p class="text-sm text-emerald-400">✓ entrenado — {st.get("n_positive","?")} positivos / '
                 f'{st.get("n_negative","?")} negativos. Los nodos bajan el modelo nuevo solos (≤10 min).</p>')
     if status == "error":
-        return f'<p class="text-sm text-red-400">✗ error: {st.get("error","")[:120]}</p>'
-    return '<p class="text-xs text-gray-500">idle</p>'
+        return f'<p class="text-sm text-red-400">✗ error: {str(st.get("error",""))[:120]}</p>'
+    if status == "running" or just_triggered or (status == "done" and trained_at <= baseline):
+        return f'<p class="text-sm text-amber-300 animate-pulse">entrenando… (~30-60s)</p>{poll}'
+    return '<p class="text-xs text-gray-500">sin entrenar recientemente</p>'
 
 
 @app.get("/wakeword/train/status-fragment", response_class=HTMLResponse)
-def wakeword_train_status_fragment():
-    return HTMLResponse(_wakeword_train_fragment())
+def wakeword_train_status_fragment(baseline: float = Query(0)):
+    return HTMLResponse(_wakeword_train_fragment(baseline=baseline))
 
 
 _ENROLL_LABELS = {
