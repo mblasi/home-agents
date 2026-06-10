@@ -1760,6 +1760,54 @@ def wakeword_train_status_fragment(baseline: float = Query(0)):
     return HTMLResponse(_wakeword_train_fragment(baseline=baseline))
 
 
+# ── Gestión de paneles (16.26 / Etapa H-I) ────────────────────────────────────
+
+def _save_panels(panels: list[dict]) -> bool:
+    """Escribe el registro de paneles (panels.yaml en la raíz del repo)."""
+    try:
+        import yaml
+        p = Path(__file__).parent.parent / "panels.yaml"
+        header = ("# Registro de paneles NSPanel Pro (FASE 16.23) — editado desde el backoffice.\n"
+                  "# Fuente de verdad del provisioning. Resuelto por nombre/ambiente → IP.\n\n")
+        p.write_text(header + yaml.safe_dump({"panels": panels}, allow_unicode=True, sort_keys=False),
+                     encoding="utf-8")
+        return True
+    except Exception:
+        return False
+
+
+@app.get("/panels", response_class=HTMLResponse)
+def panels_page(request: Request):
+    """Administración de paneles (16.26): lista del registro + estado en vivo del audio_server."""
+    panels = _panels()
+    nodes = {n["node_id"]: n for n in (_audio("/nodes") or [])}
+    return _render(request, "panels.html", "panels", panels=panels, nodes=nodes)
+
+
+@app.post("/panels/add")
+async def panels_add(request: Request):
+    form = await request.form()
+    name = str(form.get("name", "")).strip().lower()
+    room = str(form.get("room", "")).strip().lower() or name
+    ip   = str(form.get("ip", "")).strip()
+    if not name or not ip:
+        return RedirectResponse("/panels", status_code=303)
+    panels = _panels()
+    if any(p.get("name", "").lower() == name for p in panels):
+        return RedirectResponse("/panels", status_code=303)   # ya existe
+    panels.append({"name": name, "room": room, "ip": ip,
+                   "node_id": f"nspanel-{name}", "users": []})
+    _save_panels(panels)
+    return RedirectResponse("/panels", status_code=303)
+
+
+@app.delete("/panels/{name}", response_class=HTMLResponse)
+def panels_delete(name: str):
+    panels = [p for p in _panels() if p.get("name", "").lower() != name.lower()]
+    _save_panels(panels)
+    return HTMLResponse("")
+
+
 _ENROLL_LABELS = {
     "frases_speaker_id":  ("Identificación de voz", 5),
     "muestras_wake_word": ("Muestras de wake word", 30),

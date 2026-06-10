@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Paneles{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-bold">Paneles NSPanel</h1>
+  <a href="/wakeword" class="text-sm text-gray-400 hover:text-gray-200">Wake word →</a>
+</div>
+
+<p class="text-sm text-gray-400 mb-4">
+  Registro de paneles (nodos de voz). Cada panel es un NSPanel Pro con mic+parlante que corre
+  el satellite. El estado en vivo viene del audio_server.
+</p>
+
+{# Lista de paneles #}
+<div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden mb-6">
+  <table class="w-full text-sm">
+    <thead class="bg-gray-800/50 text-gray-400 text-xs uppercase tracking-wider">
+      <tr>
+        <th class="text-left px-4 py-2">Panel</th>
+        <th class="text-left px-4 py-2">Ambiente</th>
+        <th class="text-left px-4 py-2">IP</th>
+        <th class="text-left px-4 py-2">Estado</th>
+        <th class="text-left px-4 py-2">Usuarios</th>
+        <th class="px-4 py-2"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in panels %}
+      {% set node = nodes.get(p.node_id) %}
+      <tr id="panel-{{ p.name }}" class="border-t border-gray-800">
+        <td class="px-4 py-2 font-medium text-gray-200">{{ p.name }}</td>
+        <td class="px-4 py-2 text-gray-400">{{ p.room }}</td>
+        <td class="px-4 py-2 font-mono text-gray-500">{{ p.ip }}</td>
+        <td class="px-4 py-2">
+          {% if node and node.state == 'active' %}
+          <span class="text-emerald-400">● online</span>
+          {% else %}
+          <span class="text-gray-600">○ offline</span>
+          {% endif %}
+        </td>
+        <td class="px-4 py-2 text-gray-400 text-xs">{{ p.users | join(", ") or "—" }}</td>
+        <td class="px-4 py-2 text-right">
+          <button hx-delete="/panels/{{ p.name }}"
+                  hx-target="#panel-{{ p.name }}" hx-swap="outerHTML"
+                  hx-confirm="¿Quitar {{ p.name }} del registro? (no toca el dispositivo)"
+                  class="text-xs text-red-400 hover:text-red-300">quitar</button>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="px-4 py-6 text-center text-gray-600">Sin paneles registrados.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{# Alta de panel en el registro #}
+<div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-4">
+  <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Agregar panel al registro</h2>
+  <form action="/panels/add" method="post" class="flex flex-wrap items-end gap-3">
+    <div>
+      <label class="block text-xs text-gray-500 mb-1">Nombre</label>
+      <input name="name" required placeholder="dormitorio"
+             class="px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-200">
+    </div>
+    <div>
+      <label class="block text-xs text-gray-500 mb-1">Ambiente</label>
+      <input name="room" placeholder="dormitorio"
+             class="px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-200">
+    </div>
+    <div>
+      <label class="block text-xs text-gray-500 mb-1">IP</label>
+      <input name="ip" required placeholder="192.168.68.114"
+             class="px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-200 font-mono">
+    </div>
+    <button type="submit"
+            class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors">
+      + Agregar
+    </button>
+  </form>
+  <p class="text-xs text-gray-600 mt-2">
+    Esto registra el panel. El bootstrap del dispositivo (instalar apps, modelos, satellite)
+    se corre con <code class="text-gray-400">scripts/nspanel.sh</code> / docs/nspanel-setup.md.
+    El provisioning 100% desde el backoffice es la tarea 16.26 (en curso).
+  </p>
+</div>
+{% endblock %}
