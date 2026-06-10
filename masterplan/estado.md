@@ -1564,6 +1564,19 @@ el alta de panel desde la UI y cerrar el flujo como un wizard cohesivo y validad
             una muestra del nodo y devuelve (speaker_id, confidence) contra el perfil del
             usuario — usado por el wizard (16.27) para confirmar el enrollment y por el
             backoffice para mostrar la salud del voice-ID por usuario.
+- [ ] 16.29 **Eliminar el stack legacy de enrollment laptop-ear** (reemplazado por el
+            enrollment por nodo 16.21/16.22). El satellite del NSPanel NO lo usa. Quitar,
+            asegurando que nada se rompa (con tests):
+            - backoffice: rutas `/users/{uid}/onboard`, `/users/{uid}/enroll/start`,
+              `/users/{uid}/enroll/status/{sid}`; helpers `_enroll_fragment`, `_ENROLL_LABELS`,
+              `_NEXT_STEP`; template `user_onboard.html`; links "Agregar muestras"/"Continuar
+              onboarding" en user_detail/user_form; redirect post-creación de usuario.
+            - core: `enrollment_session.py` + endpoints `/enrollment/sessions*`; `onboarding.py`;
+              evaluar si `onboarding_step`/`onboarding_complete` en `users.py` quedan obsoletos
+              (migración de datos si se quitan).
+            - ear: manejo de enrollment/onboarding en `listen.py` (laptop ear deprecado).
+            - El reemplazo es la página del usuario (voice-ID por panel) + página global wake
+              word + el wizard 16.27. Actualizar tests que cubran lo removido.
 
 ---
 
