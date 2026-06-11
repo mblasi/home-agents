@@ -1585,7 +1585,7 @@ el alta de panel desde la UI y cerrar el flujo como un wizard cohesivo y validad
             una muestra del nodo y devuelve (speaker_id, confidence) contra el perfil del
             usuario — usado por el wizard (16.27) para confirmar el enrollment y por el
             backoffice para mostrar la salud del voice-ID por usuario.
-- [ ] 16.29 **Eliminar el stack legacy de enrollment laptop-ear** (reemplazado por el
+- [x] 16.29 **Eliminar el stack legacy de enrollment laptop-ear** (reemplazado por el
             enrollment por nodo 16.21/16.22). El satellite del NSPanel NO lo usa. Quitar,
             asegurando que nada se rompa (con tests):
             - backoffice: rutas `/users/{uid}/onboard`, `/users/{uid}/enroll/start`,
