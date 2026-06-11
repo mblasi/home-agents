@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-Loader/resolver del registro de paneles (FASE 16.23).
+Loader/resolver del registro de paneles.
 
-Fuente de verdad: panels.yaml en la raíz del repo. Resuelve un panel por nombre o ambiente
-(room) a su config (IP, node_id, etc.), para que comandos/scripts/backoffice no hardcodeen IPs.
+Fuente de verdad: la **base de datos** (tabla `panels`), expuesta por el core en `GET /panels`
+(FASE 32 — reemplaza panels.yaml). Resuelve un panel por nombre o ambiente (room) a su config
+(IP, node_id, etc.), para que comandos/scripts no hardcodeen IPs.
 
 Uso CLI:
     python scripts/panels.py list
@@ -12,25 +13,22 @@ Uso CLI:
 """
 from __future__ import annotations
 
+import json
 import os
 import sys
+import urllib.request
 
-try:
-    import yaml
-except ImportError:
-    yaml = None
-
-_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_PANELS_PATH = os.environ.get("PANELS_YAML", os.path.join(_REPO_ROOT, "panels.yaml"))
+# Core que sirve el registro de paneles (DB). Default: SER9.
+_CORE_URL = os.environ.get("CORE_URL", "http://192.168.68.132:8765")
 
 
 def load_panels() -> list[dict]:
-    """Devuelve la lista de paneles del registro. [] si no hay archivo o yaml no está."""
-    if yaml is None or not os.path.isfile(_PANELS_PATH):
+    """Lista de paneles desde el core (DB). [] si el core no responde."""
+    try:
+        with urllib.request.urlopen(f"{_CORE_URL}/panels", timeout=5) as r:
+            return json.load(r) or []
+    except Exception:
         return []
-    with open(_PANELS_PATH, encoding="utf-8") as f:
-        data = yaml.safe_load(f) or {}
-    return data.get("panels", []) or []
 
 
 def resolve(key: str) -> dict | None:

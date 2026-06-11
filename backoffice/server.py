@@ -188,15 +188,8 @@ def _audio(path: str, method: str = "GET", timeout: int = 5, **kwargs):
 
 
 def _panels() -> list[dict]:
-    """Registro de paneles (16.23). Lee panels.yaml de la raíz del repo."""
-    try:
-        import yaml
-        p = Path(__file__).parent.parent / "panels.yaml"
-        if not p.is_file():
-            return []
-        return (yaml.safe_load(p.read_text(encoding="utf-8")) or {}).get("panels", []) or []
-    except Exception:
-        return []
+    """Registro de paneles desde la DB vía el core (FASE 32 — reemplaza panels.yaml)."""
+    return _core("/panels") or []
 
 
 def _llm_ok() -> bool:
@@ -1760,25 +1753,11 @@ def wakeword_train_status_fragment(baseline: float = Query(0)):
     return HTMLResponse(_wakeword_train_fragment(baseline=baseline))
 
 
-# ── Gestión de paneles (16.26 / Etapa H-I) ────────────────────────────────────
-
-def _save_panels(panels: list[dict]) -> bool:
-    """Escribe el registro de paneles (panels.yaml en la raíz del repo)."""
-    try:
-        import yaml
-        p = Path(__file__).parent.parent / "panels.yaml"
-        header = ("# Registro de paneles NSPanel Pro (FASE 16.23) — editado desde el backoffice.\n"
-                  "# Fuente de verdad del provisioning. Resuelto por nombre/ambiente → IP.\n\n")
-        p.write_text(header + yaml.safe_dump({"panels": panels}, allow_unicode=True, sort_keys=False),
-                     encoding="utf-8")
-        return True
-    except Exception:
-        return False
-
+# ── Gestión de paneles (16.26 / Etapa H-I) — registro en la DB vía el core ────
 
 @app.get("/panels", response_class=HTMLResponse)
 def panels_page(request: Request):
-    """Administración de paneles (16.26): lista del registro + estado en vivo del audio_server."""
+    """Administración de paneles (16.26): lista del registro (DB) + estado en vivo del audio_server."""
     panels = _panels()
     nodes = {n["node_id"]: n for n in (_audio("/nodes") or [])}
     return _render(request, "panels.html", "panels", panels=panels, nodes=nodes)
@@ -1786,8 +1765,7 @@ def panels_page(request: Request):
 
 @app.delete("/panels/{name}", response_class=HTMLResponse)
 def panels_delete(name: str):
-    panels = [p for p in _panels() if p.get("name", "").lower() != name.lower()]
-    _save_panels(panels)
+    _core(f"/panels/{name}", method="DELETE")
     return HTMLResponse("")
 
 
@@ -1882,7 +1860,7 @@ async def rbac_roles_save(request: Request):
 
 
 def _ear_merged_nodes() -> list[dict]:
-    """Paneles CONOCIDOS (panels.yaml) cruzados con el estado runtime (/nodes).
+    """Paneles CONOCIDOS (registro en DB) cruzados con el estado runtime (/nodes).
     Un panel registrado pero no visto desde que arrancó el audio_server → offline (no desaparece)."""
     runtime = {n["node_id"]: n for n in (_audio("/nodes") or [])}
     merged, seen = [], set()
@@ -1899,7 +1877,7 @@ def _ear_merged_nodes() -> list[dict]:
             "last_command": rt.get("last_command", ""), "last_latency_ms": rt.get("last_latency_ms", 0),
             "last_command_ts": rt.get("last_command_ts", 0),
         })
-    # nodos vistos en runtime que no están en panels.yaml (no registrados)
+    # nodos vistos en runtime que no están en el registro (no registrados)
     for nid, rt in runtime.items():
         if nid not in seen:
             merged.append({**rt, "room": (rt.get("room") or nid) + " (no registrado)"})
@@ -1919,7 +1897,7 @@ def ear_page(request: Request):
 def _ear_nodes_rows(nodes: list[dict]) -> str:
     if not nodes:
         return ('<tr><td colspan="7" class="px-3 py-4 text-center text-gray-600">'
-                'Sin paneles registrados (panels.yaml)</td></tr>')
+                'Sin paneles registrados</td></tr>')
     import time as _t
     rows = []
     for n in nodes:

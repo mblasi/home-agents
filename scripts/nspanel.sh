@@ -233,25 +233,15 @@ EOF
     adb_cmd shell am start -n "com.termux.boot/.BootActivity" >/dev/null 2>&1
     echo "  ✓ boot script + Termux:Boot registrado"
 
-    echo "\n[9/9] Registrar en panels.yaml"
-    python3 "$REPO/scripts/panels.py" resolve "$name" >/dev/null 2>&1 \
-        && echo "  ✓ ya en el registro" \
-        || { python3 - "$REPO/panels.yaml" "$name" "$room" "$ip" "$NODE_ID" <<'PY'
-import sys, yaml
-path, name, room, ip, node_id = sys.argv[1:6]
-data = {}
-try:
-    data = yaml.safe_load(open(path)) or {}
-except FileNotFoundError:
-    pass
-panels = data.get("panels", []) or []
-if not any(p.get("name")==name for p in panels):
-    panels.append({"name":name,"room":room,"ip":ip,"node_id":node_id,"users":[]})
-data["panels"]=panels
-open(path,"w").write("# Registro de paneles NSPanel Pro (16.23).\n\n"+yaml.safe_dump(data, allow_unicode=True, sort_keys=False))
-print("registrado")
-PY
-        echo "  ✓ registrado en panels.yaml"; }
+    echo "\n[9/9] Registrar el panel en la DB (vía el core)"
+    local CORE="${CORE_URL:-http://192.168.68.132:8765}"
+    if curl -s -X POST "$CORE/panels" -H 'Content-Type: application/json' \
+        -d "{\"name\":\"$name\",\"room\":\"$room\",\"ip\":\"$ip\",\"node_id\":\"$NODE_ID\"}" \
+        -o /dev/null -w '%{http_code}' 2>/dev/null | grep -q '^2'; then
+        echo "  ✓ registrado en la DB"
+    else
+        echo "  ⚠ no se pudo registrar en el core ($CORE/panels) — registralo desde el backoffice /panels"
+    fi
 
     echo "\n=== Provisioning de '$name' completo ==="
     echo "FALTA (manual): crear usuario HA 'nspanel-$name' + dashboard del ambiente, y reiniciar el panel:"

@@ -2826,7 +2826,9 @@ Estado:   COMPLETA (32.1-32.6: esquema + db.py + migración + módulos migrados 
           backup. Validado en producción contra datos reales del SER9: el core lee y escribe
           de capitan.db; los JSON migrados se movieron a un backup (_pre_db_backup_*). Quedan
           como archivos por diseño: embeddings .npy, wakeword_samples, wa-session, traces JSONL,
-          wakeword_metrics. panels.yaml sigue siendo config del repo leída por backoffice/scripts.)
+          wakeword_metrics. Los **paneles** también se completaron a la DB (tabla `panels`, core
+          expone `GET/POST/DELETE /panels`; backoffice/scripts/provisioning lo consumen;
+          `panels.yaml` removido).)
 Deps:     FASE 21 (SER9 estable — COMPLETA)
 Motivación: actualmente los datos (usuarios, intents, conversaciones, portfolios,
             contextos, routines, etc.) son ~30 archivos JSON sin esquema formal,
