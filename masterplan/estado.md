@@ -1755,7 +1755,7 @@ El asistente responderá con:
 Objetivo: Mejorar la experiencia de interacción por voz: feedback sonoro y visual al
           detectar la wake word, distinguiendo cada estado del pipeline. Aplica a los
           nodos NSPanel (FASE 16). Duck de volumen para la laptop/legacy.
-Estado:   EN CURSO (18.1 + 18.3 completas; 18.2 pendiente para laptop)
+Estado:   COMPLETA (18.1 beep + 18.3 indicador visual + 18.2 duck de volumen reformulado para el nodo)
 Deps:     FASE 1 (pipeline base, COMPLETA), FASE 16 (nodos de audio).
 ```
 
