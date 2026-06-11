@@ -1808,6 +1808,51 @@ def panels_delete(name: str):
     return HTMLResponse("")
 
 
+# ── Provisioning de panel desde la UI (16.26) ─────────────────────────────────
+# Corre scripts/nspanel.sh provision en background; el log se streamea por polling.
+
+_REPO_DIR = Path(__file__).parent.parent
+_PROVISION_DIR = Path("/tmp/capitan")
+
+
+def _provision_log_fragment(name: str) -> str:
+    import html as _html
+    log = _PROVISION_DIR / f"provision-{name}.log"
+    txt = log.read_text(encoding="utf-8", errors="replace")[-4000:] if log.exists() else ""
+    done = "completo ===" in txt or "✗" in txt
+    poll = "" if done else (f'<span hx-get="/panels/provision/log?name={name}" hx-trigger="every 2s"'
+                            f' hx-target="#provision-log" hx-swap="innerHTML"></span>')
+    head = ('<p class="text-xs text-emerald-400 mb-1">✓ provisioning terminado</p>' if done
+            else '<p class="text-xs text-amber-300 animate-pulse mb-1">provisionando…</p>')
+    return (f'{head}<pre class="text-xs bg-black/50 text-gray-300 rounded-lg p-3 overflow-x-auto '
+            f'max-h-96 overflow-y-auto whitespace-pre-wrap">{_html.escape(txt) or "iniciando…"}</pre>{poll}')
+
+
+@app.post("/panels/provision", response_class=HTMLResponse)
+async def panels_provision(request: Request):
+    form = await request.form()
+    name = str(form.get("name", "")).strip().lower()
+    room = str(form.get("room", "")).strip().lower() or name
+    ip   = str(form.get("ip", "")).strip()
+    if not name or not ip:
+        return HTMLResponse('<p class="text-red-400 text-xs">Faltan nombre o IP.</p>')
+    _PROVISION_DIR.mkdir(parents=True, exist_ok=True)
+    log = _PROVISION_DIR / f"provision-{name}.log"
+    script = str(_REPO_DIR / "scripts" / "nspanel.sh")
+    try:
+        f = open(log, "wb")
+        subprocess.Popen(["zsh", script, "provision", name, room, ip],
+                         stdout=f, stderr=subprocess.STDOUT, cwd=str(_REPO_DIR))
+    except Exception as e:
+        return HTMLResponse(f'<p class="text-red-400 text-xs">No se pudo lanzar: {e}</p>')
+    return HTMLResponse(_provision_log_fragment(name))
+
+
+@app.get("/panels/provision/log", response_class=HTMLResponse)
+def panels_provision_log(name: str):
+    return HTMLResponse(_provision_log_fragment(name))
+
+
 # Stack legacy de onboarding/enrollment laptop-ear eliminado en 16.29.
 # El enrollment es por nodo (audio_server) + página /wakeword + /panels.
 
