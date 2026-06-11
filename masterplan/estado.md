@@ -2777,7 +2777,7 @@ Deps:     FASE 9 (coordinador), FASE 24 (tracing).
 Objetivo: Explorar palancas de mejora de latencia LLM en el SER9 (Beelink, Radeon 780M gfx1103).
           Baseline actual: 27.5s CPU-only, 13.3s ROCm con HSA_OVERRIDE_GFX_VERSION=11.0.0.
           Target: reducir latencia warm por debajo de 5s sin cambiar el modelo.
-Estado:   EN CURSO (4/5 — solo queda 31.5 benchmark de quantización)
+Estado:   COMPLETA (5/5 — Vulkan/ROCm, keepalive, iGPU, benchmark de quantización: se mantiene q4_k_m)
 Deps:     FASE 21 (SER9 operativo con LXC — COMPLETA)
 Hardware: Beelink SER9 Pro — Ryzen AI 7 HX 255, 32GB DDR5, Radeon 780M (RDNA 3 / gfx1103)
 ```
@@ -2793,8 +2793,15 @@ Hardware: Beelink SER9 Pro — Ryzen AI 7 HX 255, 32GB DDR5, Radeon 780M (RDNA 3
             del core. El índice se construye en background al recibir el primer /process.
 - [x] 31.4  Benchmark warm vs cold: medir latencia warm (modelo ya cargado) vs cold para
             entender el real bottleneck. Si warm < 3s, el problema es solo el cold start.
-- [ ] 31.5  Quantización alternativa: benchmarkar qwen2.5:7b con distintas quantizaciones
+- [x] 31.5  Quantización alternativa: benchmarkar qwen2.5:7b con distintas quantizaciones
             (q4_0 vs q4_k_m vs q5_k_m) en SER9 para encontrar el mejor balance velocidad/calidad.
+            Resultado (warm, prompt domótica, GPU ROCm): q4_k_m 1.68s/12.8 tok/s (actual) ·
+            q4_0 1.35s/16.2 tok/s · q5_k_m 1.41s/15.3 tok/s. q4_0 ~20% más rápido y mantiene el
+            formato ACTION en el caso simple, pero es el quant de menor calidad (riesgo en
+            coordinador multi-paso / respuestas matizadas). **Decisión: seguir en q4_k_m** — el
+            0.33s de q4_0 no justifica el riesgo de calidad; q5_k_m no gana lo suficiente para su
+            tamaño. Nota operativa: cargar 3 modelos de ~5GB a la vez en la iGPU compartida causa
+            ROCm "unspecified launch failure" (transitorio) — benchmarkear uno por vez con keep_alive=0.
 
 ---
 
