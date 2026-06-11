@@ -631,8 +631,13 @@ Foco:     Planificación activa (itinerarios, qué llevar, visa, clima en destin
 ### FASE 8 - Migración a Servidor Dedicado
 ```
 Objetivo: Mover toda la inferencia a hardware dedicado y escalar a modelos más potentes
-Estado:   Pendiente (planificar en paralelo con FASE 3-4, ejecutar cuando el sistema esté estable)
-Laptop:   Pasa a rol de cliente/satélite y entorno de desarrollo
+Estado:   EN CURSO — la MIGRACIÓN de servicios (home-agents + Ollama) de la laptop al SER9
+          está DONE (vía FASE 21: Proxmox + LXC, Ollama con GPU ROCm, laptop como dev/cliente).
+          PENDIENTE: un servidor REALMENTE dedicado (GPU NVIDIA potente) para correr un modelo
+          grande (qwen 14b/32b/72b, Whisper large-v3 GPU) que reemplace al qwen2.5:7b actual.
+Laptop:   Ya es cliente/satélite + entorno de desarrollo.
+Nota:     El SER9 (Beelink, iGPU 780M/ROCm) alcanza para los servicios y el 7b, pero NO para
+          modelos grandes — por eso la Etapa D (escalado de modelos) sigue abierta.
 ```
 
 #### Etapa A - Definición de hardware objetivo
@@ -653,19 +658,19 @@ Laptop:   Pasa a rol de cliente/satélite y entorno de desarrollo
 #### Etapa B - Setup del servidor
 - [ ] 8.8  OS: Debian stable o Ubuntu Server LTS (priorizar estabilidad sobre cutting-edge)
 - [ ] 8.9  Drivers CUDA + cuDNN para GPU NVIDIA
-- [ ] 8.10 Ollama con soporte GPU (inferencia ~10-30x más rápida que CPU)
+- [x] 8.10 Ollama con soporte GPU (inferencia ~10-30x más rápida que CPU)
 - [ ] 8.11 Recompilar faster-whisper con soporte CUDA
 - [ ] 8.12 Docker Compose para todos los servicios (orquestador, agentes, bases de datos)
-- [ ] 8.13 IP estática en LAN, hostname fijo (ej: `agentes.local`)
-- [ ] 8.14 Acceso SSH seguro desde laptop y otros dispositivos de la red
+- [x] 8.13 IP estática en LAN, hostname fijo (ej: `agentes.local`)
+- [x] 8.14 Acceso SSH seguro desde laptop y otros dispositivos de la red
 
 #### Etapa C - Migración de servicios
-- [ ] 8.15 Migrar Ollama + modelos al servidor (servidor nuevo como :11434)
-- [ ] 8.16 Migrar orquestador FastAPI (FASE 3) al servidor
-- [ ] 8.17 Migrar todos los agentes al servidor
-- [ ] 8.18 Laptop queda como: cliente de voz (mic/speaker) + entorno de desarrollo
-- [ ] 8.19 Período de operación paralela: laptop + servidor corriendo juntos para validar
-- [ ] 8.20 Cutover: redirigir laptop al servidor, apagar servicios locales
+- [x] 8.15 Migrar Ollama + modelos al servidor (servidor nuevo como :11434)
+- [x] 8.16 Migrar orquestador FastAPI (FASE 3) al servidor
+- [x] 8.17 Migrar todos los agentes al servidor
+- [x] 8.18 Laptop queda como: cliente de voz (mic/speaker) + entorno de desarrollo
+- [x] 8.19 Período de operación paralela: laptop + servidor corriendo juntos para validar
+- [x] 8.20 Cutover: redirigir laptop al servidor, apagar servicios locales
 
 #### Etapa D - Escalado de modelos
 - [ ] 8.21 Modelos de inferencia con GPU:
@@ -678,7 +683,7 @@ Laptop:   Pasa a rol de cliente/satélite y entorno de desarrollo
 
 #### Etapa E - Operaciones y confiabilidad
 - [ ] 8.25 UPS para el servidor (evitar cortes abruptos con modelos en memoria)
-- [ ] 8.26 Systemd units para auto-restart de todos los servicios
+- [x] 8.26 Systemd units para auto-restart de todos los servicios
 - [ ] 8.27 Monitoreo de recursos: temperatura GPU/CPU, uso de VRAM, latencias por agente
 - [ ] 8.28 Alertas si un servicio cae (notificación por WhatsApp vía FASE 3.5)
 - [ ] 8.29 Backup automático de modelos fine-tuneados y configuraciones
