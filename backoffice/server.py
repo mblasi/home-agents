@@ -1785,23 +1785,6 @@ def panels_page(request: Request):
     return _render(request, "panels.html", "panels", panels=panels, nodes=nodes)
 
 
-@app.post("/panels/add")
-async def panels_add(request: Request):
-    form = await request.form()
-    name = str(form.get("name", "")).strip().lower()
-    room = str(form.get("room", "")).strip().lower() or name
-    ip   = str(form.get("ip", "")).strip()
-    if not name or not ip:
-        return RedirectResponse("/panels", status_code=303)
-    panels = _panels()
-    if any(p.get("name", "").lower() == name for p in panels):
-        return RedirectResponse("/panels", status_code=303)   # ya existe
-    panels.append({"name": name, "room": room, "ip": ip,
-                   "node_id": f"nspanel-{name}", "users": []})
-    _save_panels(panels)
-    return RedirectResponse("/panels", status_code=303)
-
-
 @app.delete("/panels/{name}", response_class=HTMLResponse)
 def panels_delete(name: str):
     panels = [p for p in _panels() if p.get("name", "").lower() != name.lower()]

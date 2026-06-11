@@ -2811,9 +2811,15 @@ Motivación: actualmente los datos (usuarios, intents, conversaciones, portfolio
             sin transacciones, sin índices. Migración costosa pero necesaria para escalar.
 ```
 
-- [ ] 32.1  Inventario y esquema: mapear todos los archivos JSON actuales a tablas SQLite.
-            Identificar relaciones (user → intents, user → conversations, user → portfolio).
-            Definir esquema con migraciones (alembic o schema_version manual).
+- [ ] 32.1  Inventario y esquema: mapear todos los archivos de datos/config actuales a tablas
+            SQLite. Incluye los JSON de `~/.local/share/capitan/` (users, conversations, intents,
+            goals, routines, agents, portfolios, contexts, ml_prices, finance_news, feriados,
+            wakeword_metrics, embeddings) Y los registros/config del repo: **`panels.yaml`**
+            (registro de paneles, 16.23) y la **información de entidades** (entity_index /
+            aliases / mapa de `ha_client`). Identificar relaciones (user → intents/conversations/
+            portfolio; panel → users; entidad → ambiente/alias). Definir esquema con migraciones.
+            > Nota: panels.yaml y las entidades son config "fuente de verdad" — evaluar si van a
+            > la misma DB o a una tabla de config aparte, pero deben dejar de vivir sueltos en files.
 - [ ] 32.2  Capa de acceso unificada: crear `core/db.py` con conexión SQLite y helpers
             CRUD que reemplacen los json read/write actuales. Mantener API idéntica
             para no romper agentes existentes.

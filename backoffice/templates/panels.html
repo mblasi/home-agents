@@ -59,36 +59,9 @@
   </table>
 </div>
 
-{# Alta de panel en el registro #}
-<div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-4">
-  <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Agregar panel al registro</h2>
-  <form action="/panels/add" method="post" class="flex flex-wrap items-end gap-3">
-    <div>
-      <label class="block text-xs text-gray-500 mb-1">Nombre</label>
-      <input name="name" required placeholder="dormitorio"
-             class="px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-200">
-    </div>
-    <div>
-      <label class="block text-xs text-gray-500 mb-1">Ambiente</label>
-      <input name="room" placeholder="dormitorio"
-             class="px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-200">
-    </div>
-    <div>
-      <label class="block text-xs text-gray-500 mb-1">IP</label>
-      <input name="ip" required placeholder="192.168.68.114"
-             class="px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-200 font-mono">
-    </div>
-    <button type="submit"
-            class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors">
-      + Agregar
-    </button>
-  </form>
-  <p class="text-xs text-gray-600 mt-2">Registra el panel sin tocar el dispositivo.</p>
-</div>
-
-{# Provisioning completo del dispositivo (16.26) #}
+{# Provisioning completo del dispositivo (16.26) — única forma de agregar un panel #}
 <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
-  <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Provisionar panel nuevo</h2>
+  <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Agregar panel (provisioning completo)</h2>
   <p class="text-xs text-gray-600 mb-3">
     Bootstrap completo del dispositivo: apps, dependencias, modelos, satellite, boot script y
     registro. <strong>Prerequisitos físicos</strong>: habilitar ADB en el panel (Settings → About →
