@@ -1151,7 +1151,7 @@ Stack elegido:
             sin botón de entrenar. Dispara el mismo POST /wakeword/train; los nodos bajan el
             modelo nuevo solos (16.17).
 
-- [ ] 12.17 **Backoffice mobile-friendly** — el backoffice se usa desde el celular; hoy el
+- [x] 12.17 **Backoffice mobile-friendly** — el backoffice se usa desde el celular; hoy el
             layout (sidebar fijo, tablas anchas, grids de 3 columnas) no es responsive. Hacer
             el layout adaptable: sidebar colapsable/hamburguesa en pantallas chicas, tablas con
             scroll o cards en mobile, grids que bajen a 1 columna, tamaños táctiles. Verificar
@@ -1460,7 +1460,7 @@ Flujo existente: core/wakeword_trainer.py (positivos TTS+reales, negativos está
             (hash/mtime). `satellite.py` chequea la versión al arrancar y cada N minutos;
             si cambió, baja el modelo nuevo y recarga sin reiniciar. Cierra el loop de mejora
             continua: retrain en backoffice → nodos actualizados automáticamente.
-- [ ] 16.30 **Cap de negativos capturados (no crecer al infinito)**: hoy `_save_negative`
+- [x] 16.30 **Cap de negativos capturados (no crecer al infinito)**: hoy `_save_negative`
             guarda un hard negative por cada falso positivo del nodo, sin límite → el directorio
             `negative/` tiende a infinito (disco + dataset desbalanceado). Acotar la colección:
             límite por nodo (FIFO/rotación: al superar N, borrar los más viejos), o muestreo
@@ -1564,8 +1564,8 @@ el alta de panel desde la UI y cerrar el flujo como un wizard cohesivo y validad
             streaming, detección de fin, manejo de error (ADB no disponible). NOTA: el bootstrap
             completo contra un panel NUEVO no se probó end-to-end (no hay segundo dispositivo);
             el mecanismo y los pasos (los mismos que funcionaron para el comedor) están validados
-            por partes. Prereq físico: habilitar ADB + crear usuario HA del ambiente. Pendiente
-            menor: reboot por panel desde la UI.
+            por partes. Prereq físico: habilitar ADB + crear usuario HA del ambiente.
+            Reboot por panel desde la UI: hecho.
 - [x] 16.27 **Wizard de onboarding end-to-end**: flujo guiado en el backoffice que encadena
             crear usuario → enrolar su voz en un panel (16.22b) → **validar el voice-ID**
             (medir la confianza real del usuario contra su perfil y confirmar que supera el
@@ -1760,7 +1760,7 @@ Deps:     FASE 1 (pipeline base, COMPLETA), FASE 16 (nodos de audio).
             En Android se para el input stream durante el playback (OpenSLES no permite
             input+output simultáneos) y se reanuda para grabar el comando.
 
-- [ ] 18.2  **Duck de volumen durante grabación** — al detectar wake word, bajar el
+- [x] 18.2  **Duck de volumen durante grabación** — al detectar wake word, bajar el
             volumen del sistema al mínimo posible (o mutear) antes de grabar el comando,
             y restaurarlo al nivel previo al terminar. Usar `pactl set-sink-volume` para
             control de PulseAudio/PipeWire. Debe detectar el nivel actual, bajar, grabar,
