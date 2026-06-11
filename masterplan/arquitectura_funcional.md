@@ -22,24 +22,45 @@ El sistema combina tres capacidades:
 
 ### ear (home-agents-ear) — capa de audio
 
+Arquitectura distribuida: **nodos** (NSPanel Pro) capturan el wake word y graban el comando;
+el **audio_server** (en el SER9, co-ubicado con el core) hace STT/TTS y resuelve voice-id.
+El nodo es agnóstico al usuario: solo graba y manda audio crudo.
+
 | Archivo | Función |
 |---------|---------|
-| `listen.py` | Loop principal: captura mic → wake word → STT → POST /process → TTS |
-| `tts.py` | Piper TTS + ffplay (voz `es_AR-daniela-high`) |
-| `panel_score.py` | Dashboard: wake word score animado + estado |
-| `panel_history.py` | Dashboard: historial de comandos |
-| `panel_latency.py` | Dashboard: latencias STT/LLM/HAOS |
-| `panel_agents.py` | Dashboard: agente activo y fuente |
-| `wakeword/` | Training data + openWakeWord modelo "Capitán" (ONNX, 848KB) |
+| `satellite.py` | Nodo NSPanel: wake word (openWakeWord) → graba comando → POST /process-audio → reproduce respuesta. Duck de volumen (18.2), pull del modelo (16.17), enrollment inline (16.21). |
+| `satellite_ui.py` | Indicador visual overlay (Termux:GUI): barra de estado del pipeline (18.3). |
+| `audio_server.py` | FastAPI `:8766` en el SER9: STT (faster-whisper) + TTS (Piper) + voice-id (speaker_id) + canal de enrollment + registry de nodos. |
+| `speaker_id.py` | Voice-ID por embeddings (resemblyzer/GE2E). Perfiles en `embeddings/<uid>.npy`. |
+| `tts.py` | Piper TTS (voz `es_AR-daniela-high`). |
+| `listen.py` | Pipeline local de la laptop (DEPRECADO — reemplazado por satellite+audio_server). |
+| `wakeword/` | Training data + modelo openWakeWord "Capitán" (ONNX). |
 
-**Pipeline de audio:**
+**Pipeline de audio (nodo → server):**
 ```
-Mic hw:1,0 → pyaudio (44100Hz) → scipy.resample_poly(up=160, down=441) → 16000Hz
-→ openWakeWord (threshold 0.8) → faster-whisper small int8 (~4.6s)
-→ POST /process → respuesta texto → Piper TTS → ffplay
+[NSPanel] mic → openWakeWord → graba COMMAND_SECS → POST /process-audio (WAV)
+   [audio_server SER9] → normaliza RMS → faster-whisper (vad+confianza) → strip wake word
+       → voice-id: speaker_id.identify → gate REQUIRE_KNOWN_SPEAKER (TV/guest → 204)
+       → POST core /process → respuesta → Piper TTS → WAV
+[NSPanel] reproduce WAV. Falsos positivos (STT vacío / agent unknown+guest) → 204 + hard negative.
 ```
 
-**Latencia warm:** ~8s | **Latencia cold:** ~15.7s
+**Voice-ID (server-side, 16.18-16.20):** identifica quién habló comparando con perfiles enrolados.
+CRÍTICO: el embedding debe enrolarse con el MISMO mic (re-enroll desde el nodo). Gate
+`REQUIRE_KNOWN_SPEAKER` + `SPEAKER_THRESHOLD` descarta el TV. Validación: `/verify-voice` (16.28).
+
+**Canal de enrollment backoffice→nodo (16.21):** el backoffice deja una orden pendiente
+(`POST /nodes/{id}/enroll` type wakeword|voice|verify); el satellite la consume en su loop,
+graba inline (usando el stream del mic, evita conflicto OpenSLES) y reporta progreso.
+
+**Endpoints del audio_server:** `POST /process-audio`, `GET /nodes`, `GET|POST /nodes/{id}/enroll*`,
+`POST /enroll-sample` (wake word), `POST /enroll-voice`, `POST /verify-voice`, `GET /wakeword/negatives`,
+`GET /wakeword/model[/version]` (propagación a nodos, 16.17).
+
+**Registro de paneles:** `panels.yaml` (name/room/ip/node_id/users) — fuente de verdad,
+resuelto por nombre/ambiente. Alta/provisioning: `scripts/nspanel.sh provision` o backoffice `/panels`.
+
+**Latencia warm:** ~5s (STT + LLM con GPU ROCm + TTS).
 
 ---
 

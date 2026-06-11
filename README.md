@@ -27,10 +27,13 @@ Beyond reactive commands, the system also runs **proactively**: each agent perio
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │  INPUT                                                                  │
-│  Microphone (44100Hz) ─── scipy resample → 16kHz                       │
-│  WhatsApp audio (OGG) ─── ffmpeg → WAV 16kHz                          │
-│  WhatsApp text ────────────────────────────────────────────┐           │
-│  Microphone → openWakeWord "Capitán" → faster-whisper STT  │           │
+│  NSPanel node (satellite.py) → openWakeWord "Capitán" → record command │
+│       │ POST /process-audio (WAV)                                       │
+│  ┌────▼──────────────────────────────────────────────────────────┐     │
+│  │ AUDIO SERVER :8766 (SER9) — STT (faster-whisper) + voice-id    │     │
+│  │ speaker_id gate (TV/guest → drop) → core → Piper TTS → WAV     │     │
+│  └────┬──────────────────────────────────────────────────────────┘     │
+│  WhatsApp audio/text ──────────────────────────────────────┐           │
 └───────────────────────────────────────────┬────────────────┘           │
                                             │ POST /process               │
 ┌───────────────────────────────────────────▼────────────────────────────▼┐
@@ -40,7 +43,7 @@ Beyond reactive commands, the system also runs **proactively**: each agent perio
 │               │                                                          │
 │               ├─→ haos_agent       (Home Assistant — lights, A/C, etc.) │
 │               ├─→ clima_agent      (Open-Meteo weather + alerts)        │
-│               ├─→ calendar_agent   (CalDAV / Radicale)                  │
+│               ├─→ calendar_agent   (Google Calendar)                    │
 │               ├─→ finance_agent    (portfolio, BCRA, MercadoLibre)      │
 │               ├─→ travel_agent     (documents, itinerary, alerts)       │
 │               ├─→ maps_agent       (Open-Meteo geocoding + directions)  │
@@ -136,9 +139,11 @@ bash ~/workspace/home-agents/ear/dashboard.sh
 | LLM | qwen2.5:7b via Ollama | 3.5s warm, correct ACTION format |
 | TTS | Piper v1.2.0 | `es_AR-daniela-high` voice, offline |
 | Home automation | Home Assistant OS | REST API only, LAN |
-| Audio capture | PyAudio + scipy resample | ALC256 → 44100→16000Hz |
+| Audio nodes | NSPanel Pro (satellite.py) | wake word + mic/speaker per room |
+| Audio server | FastAPI + uvicorn | :8766, STT/TTS + voice-id + enrollment channel |
+| Voice-ID | resemblyzer (GE2E) | server-side speaker gate (TV/guest → drop) |
 | Agent API | FastAPI + uvicorn | :8765, POST /process |
-| Backoffice | Flask | :8080, conversation explorer + agent admin |
+| Backoffice | FastAPI + HTMX | :8080, users/agents/wake word/panels/provisioning |
 | Coordinator | qwen2.5:7b (multi-step) | generates ExecutionPlan for parallel agent dispatch |
 | Proactive | per-agent scheduler | detects patterns from history, generates intents |
 | Goals | goal_store.py | discovered→planning→in_progress→completed lifecycle |
