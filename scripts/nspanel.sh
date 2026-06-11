@@ -166,14 +166,25 @@ cmd_provision() {
     adb_cmd shell pm grant com.termux.api android.permission.RECORD_AUDIO 2>/dev/null || true
     echo "  ✓ permisos (overlay + mic)"
 
-    echo "\n[4/9] SSH — verificar acceso"
+    echo "\n[4/9] SSH — key auth (bootstrap vía adb, sin password manual)"
+    # Asegurar sshd corriendo
+    adb_cmd shell "am start -n $TERMUX_ACTIVITY" >/dev/null 2>&1; sleep 1
     if ! ssh_panel "echo ok" 2>/dev/null | grep -q ok; then
-        echo "  ✗ SSH no responde. Seteá el password de Termux y arrancá sshd:"
-        echo "    NSPANEL_IP=$ip bash scripts/nspanel.sh passwd <password>   (o /nspanel-passwd)"
-        echo "  Reintentá provision cuando SSH funcione (el resto es idempotente)."
+        # Empujar la pubkey local al authorized_keys del panel usando root (adb su)
+        local PUB; PUB="$(cat "$HOME/.ssh/id_ed25519.pub" 2>/dev/null || cat "$HOME/.ssh/id_rsa.pub" 2>/dev/null || true)"
+        if [[ -z "$PUB" ]]; then ssh-keygen -t ed25519 -N "" -f "$HOME/.ssh/id_ed25519" -q; PUB="$(cat "$HOME/.ssh/id_ed25519.pub")"; fi
+        local HT="/data/data/com.termux/files/home"
+        adb_cmd shell "su -c \"mkdir -p $HT/.ssh && echo '$PUB' >> $HT/.ssh/authorized_keys && chown -R u0_a53:u0_a53 $HT/.ssh && chmod 700 $HT/.ssh && chmod 600 $HT/.ssh/authorized_keys\"" >/dev/null 2>&1
+        # arrancar sshd si no estaba
+        adb_cmd shell "am start -n $TERMUX_ACTIVITY" >/dev/null 2>&1; sleep 1
+        adb_cmd shell input keyboard text "sshd" >/dev/null 2>&1; adb_cmd shell input keyevent KEYCODE_ENTER >/dev/null 2>&1; sleep 2
+    fi
+    if ! ssh_panel "echo ok" 2>/dev/null | grep -q ok; then
+        echo "  ✗ SSH sigue sin responder tras el bootstrap de key."
+        echo "    Verificá que sshd corra en Termux (panel) y reintentá (idempotente)."
         exit 1
     fi
-    echo "  ✓ SSH OK"
+    echo "  ✓ SSH key-auth OK"
 
     echo "\n[5/9] Dependencias (pkg + pip) + patch openwakeword"
     ssh_panel 'export PATH=/data/data/com.termux/files/usr/bin:$PATH
