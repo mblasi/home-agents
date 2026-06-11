@@ -250,8 +250,8 @@ def api_status():
         f'<span>{dot(core_ok)} {"OK" if core_ok else "down"}</span></div>',
         f'<div class="flex justify-between"><span class="text-gray-400">LLM</span>'
         f'<span>{dot(llm_ok)} {"OK" if llm_ok else "down"}</span></div>',
-        f'<div class="flex justify-between"><span class="text-gray-400">Ear</span>'
-        f'<span>{dot(ear_ok)} {ear_state["state"] if ear_ok and ear_state else "off"}</span></div>',
+        f'<div class="flex justify-between"><span class="text-gray-400">Audio (ear)</span>'
+        f'<span>{dot(ear_ok)} {("OK · " + str(ear_state["nodes"]) + " nodos") if ear_ok and ear_state else "down"}</span></div>',
     ]
     return HTMLResponse("\n".join(lines))
 
@@ -331,16 +331,15 @@ def api_chat_user_intents(request: Request, user_id: str):
     return data
 
 
-_EAR_STALE_SECS = 180  # heartbeat cada 60s → 3x es margin seguro
-
-
 def _ear_state() -> dict | None:
-    """Devuelve state.json solo si el heartbeat en devices.json es reciente."""
-    devices = _read_json("devices.json") or {}
-    cutoff = time.time() - _EAR_STALE_SECS
-    if not any(d.get("ts", 0) > cutoff for d in devices.values()):
+    """Estado del audio_server (capitan-audio-server, :8766) + nodos NSPanel activos.
+    Reemplaza el heartbeat del listen.py viejo (deprecado/removido)."""
+    h = _audio("/health")
+    if not h:
         return None
-    return _read_json("state.json") or None
+    nodes = _audio("/nodes") or []
+    active = sum(1 for n in nodes if n.get("state") == "active")
+    return {"state": "ok", "nodes": active}
 
 
 @app.get("/dashboard", response_class=HTMLResponse)
@@ -1884,125 +1883,51 @@ async def rbac_roles_save(request: Request):
 
 @app.get("/ear", response_class=HTMLResponse)
 def ear_page(request: Request):
-    devices = _read_json("devices.json") or {}
-    return _render(request, "ear.html", "ear", devices=devices)
+    """Dashboard de la capa de audio: audio_server + nodos NSPanel + métricas wake word."""
+    health    = _audio("/health")
+    nodes     = _audio("/nodes") or []
+    negatives = _audio("/wakeword/negatives") or {}
+    return _render(request, "ear.html", "ear",
+                   audio_ok=health is not None, nodes=nodes, negatives=negatives)
+
+
+def _ear_nodes_rows(nodes: list[dict]) -> str:
+    if not nodes:
+        return ('<tr><td colspan="7" class="px-3 py-4 text-center text-gray-600">'
+                'Sin nodos registrados</td></tr>')
+    import time as _t
+    rows = []
+    for n in nodes:
+        online = n.get("state") == "active"
+        dot = '<span class="text-emerald-400">● online</span>' if online else '<span class="text-gray-600">○ offline</span>'
+        tp, fp = n.get("tp", 0), n.get("fp", 0)
+        fpr = n.get("fp_rate", 0.0)
+        fp_cls = "text-emerald-400" if fpr < 0.3 else ("text-yellow-400" if fpr < 0.6 else "text-red-400")
+        last_ts = n.get("last_command_ts", 0) or 0
+        ago = f"{int((_t.time()-last_ts)//60)}m" if last_ts else "—"
+        lat = n.get("last_latency_ms", 0)
+        rows.append(
+            f'<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">'
+            f'<td class="px-3 py-2 text-gray-200">{n.get("room") or n.get("node_id","?")}</td>'
+            f'<td class="px-3 py-2 font-mono text-xs text-gray-500">{n.get("ip") or "—"}</td>'
+            f'<td class="px-3 py-2 text-xs">{dot}</td>'
+            f'<td class="px-3 py-2 text-right text-emerald-400 text-xs">{tp}</td>'
+            f'<td class="px-3 py-2 text-right {fp_cls} text-xs">{fp} ({fpr:.0%})</td>'
+            f'<td class="px-3 py-2 text-gray-300 text-xs">{(n.get("last_command") or "—")[:32]}'
+            f'<span class="text-gray-600"> · {lat}ms · {ago}</span></td>'
+            f'</tr>'
+        )
+    return "\n".join(rows)
+
+
+@app.get("/api/ear/nodes", response_class=HTMLResponse)
+def ear_nodes_fragment():
+    return HTMLResponse(_ear_nodes_rows(_audio("/nodes") or []))
 
 
 @app.get("/devices", response_class=HTMLResponse)
 def devices_redirect():
     return RedirectResponse("/ear", status_code=301)
-
-
-@app.get("/ear/stream")
-def ear_stream():
-    """SSE: score + estado del ear a ~5Hz."""
-    def _gen():
-        while True:
-            score_data = _read_json("score.json") or {}
-            score = round(score_data.get("score", 0.0), 4)
-            state_obj = _ear_state()
-            state = state_obj.get("state", "stopped") if state_obj else "stopped"
-            yield f"data: {json.dumps({'score': score, 'state': state})}\n\n"
-            time.sleep(0.2)
-    return StreamingResponse(
-        _gen(),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-    )
-
-
-def _speaker_cell(source: dict) -> tuple[str, str]:
-    """Devuelve (texto, clase CSS) para mostrar el speaker en tablas."""
-    sid  = (source or {}).get("speaker_id") or "?"
-    conf = (source or {}).get("speaker_confidence") or 0.0
-    if sid == "guest":
-        return "guest", "text-gray-600"
-    if conf >= 0.80:
-        return sid[:10], "text-green-400"
-    if conf >= 0.50:
-        return sid[:9] + "?", "text-yellow-400"
-    return sid[:9] + "?", "text-gray-500"
-
-
-@app.get("/api/ear/history", response_class=HTMLResponse)
-def ear_history_fragment():
-    history = _read_json("history.json") or []
-    recent  = list(reversed(history[-15:]))
-    if not recent:
-        return HTMLResponse(
-            '<tr><td colspan="6" class="px-3 py-4 text-center text-gray-600">Sin comandos aún</td></tr>'
-        )
-
-    def lat_color(v: float) -> str:
-        if v <= 0:  return "text-gray-600"
-        if v < 10:  return "text-green-400"
-        if v < 20:  return "text-yellow-400"
-        return "text-red-400"
-
-    rows: list[str] = []
-    prev_conv = None
-    for e in recent:
-        conv_id = e.get("conversation_id") or ""
-        if prev_conv is not None and conv_id != prev_conv:
-            rows.append('<tr><td colspan="6" class="text-center text-gray-700 py-0.5 text-xs">· · ·</td></tr>')
-        accion = e.get("accion") or "—"
-        if accion and "→" in accion:
-            accion = accion.split("→")[-1].strip()
-        lat = e.get("lat_total", 0)
-        sp_text, sp_cls = _speaker_cell(e.get("source") or {})
-        rows.append(
-            f'<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">'
-            f'<td class="px-3 py-1.5 text-gray-500 text-xs whitespace-nowrap">{e.get("ts","")}</td>'
-            f'<td class="px-3 py-1.5 text-blue-500 text-xs font-mono">{conv_id[:6] or "——"}</td>'
-            f'<td class="px-3 py-1.5 {sp_cls} text-xs font-medium">{sp_text}</td>'
-            f'<td class="px-3 py-1.5 text-gray-200 text-xs">{e.get("texto","")}</td>'
-            f'<td class="px-3 py-1.5 text-cyan-400 text-xs">{accion[:45]}</td>'
-            f'<td class="px-3 py-1.5 {lat_color(lat)} text-xs text-right font-mono">{lat:.1f}s</td>'
-            f'</tr>'
-        )
-        prev_conv = conv_id
-    return HTMLResponse("\n".join(rows))
-
-
-@app.get("/api/ear/latency", response_class=HTMLResponse)
-def ear_latency_fragment():
-    history = _read_json("history.json") or []
-    if not history:
-        return HTMLResponse('<p class="text-gray-600 text-sm text-center py-3">Sin datos aún</p>')
-
-    last   = history[-1]
-    valids = [e for e in history if e.get("lat_total", 0) > 0]
-
-    def avg(k: str) -> float:
-        return sum(e.get(k, 0) for e in valids) / len(valids) if valids else 0
-
-    def lat_color(v: float) -> str:
-        if v <= 0:  return "text-gray-600"
-        if v < 5:   return "text-green-400"
-        if v < 10:  return "text-yellow-400"
-        return "text-red-400"
-
-    def fmt(v: float) -> str:
-        return f"{v:.1f}s" if v > 0 else "—"
-
-    rows: list[str] = []
-    for label, key in [("STT (Whisper)", "lat_stt"), ("LLM + HA", "lat_llm"), ("Total", "lat_total")]:
-        lv, av = last.get(key, 0), avg(key)
-        rows.append(
-            f'<div class="flex justify-between items-center py-1.5 border-b border-gray-800/50">'
-            f'<span class="text-gray-400 text-sm">{label}</span>'
-            f'<div class="flex gap-6">'
-            f'<span class="{lat_color(lv)} font-mono text-sm w-12 text-right">{fmt(lv)}</span>'
-            f'<span class="text-gray-600 font-mono text-sm w-12 text-right">{fmt(av)}</span>'
-            f'</div></div>'
-        )
-    rows.append(
-        f'<div class="flex justify-between items-center pt-2">'
-        f'<span class="text-gray-600 text-xs">Comandos (sesión)</span>'
-        f'<span class="text-white font-bold">{len(history)}</span>'
-        f'</div>'
-    )
-    return HTMLResponse("\n".join(rows))
 
 
 @app.get("/logs", response_class=HTMLResponse)

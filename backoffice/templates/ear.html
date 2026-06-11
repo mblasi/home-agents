@@ -1,193 +1,63 @@
 {% extends "base.html" %}
-{% block title %}Ear — Live{% endblock %}
+{% block title %}Capa de audio{% endblock %}
 
 {% block content %}
 <div class="flex items-center justify-between mb-6">
-  <h1 class="text-2xl font-bold">Ear — Live</h1>
-  <div class="flex items-center gap-2 text-xs text-gray-500">
-    <span id="conn-dot" class="w-2 h-2 rounded-full bg-gray-600 transition-colors"></span>
-    <span id="conn-label">conectando…</span>
+  <h1 class="text-2xl font-bold">Capa de audio</h1>
+  <a href="/wakeword" class="text-sm text-gray-400 hover:text-gray-200">Wake word →</a>
+</div>
+
+<p class="text-sm text-gray-400 mb-4">
+  El <strong>audio_server</strong> (servicio <code class="text-gray-500">capitan-audio-server</code>,
+  <code class="text-gray-500">:8766</code>) recibe el audio de los nodos NSPanel, hace STT + voice-id,
+  llama al core y devuelve el TTS. Los nodos son los puntos de captura/reproducción.
+</p>
+
+{# Estado del audio_server #}
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+  <div class="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3">
+    <div class="text-xs text-gray-500 mb-1">audio_server (:8766)</div>
+    <div class="text-lg font-bold {{ 'text-emerald-400' if audio_ok else 'text-red-400' }}">
+      {{ '● activo' if audio_ok else '○ caído' }}
+    </div>
+  </div>
+  <div class="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3">
+    <div class="text-xs text-gray-500 mb-1">Nodos online</div>
+    <div class="text-lg font-bold text-gray-200">
+      {{ nodes | selectattr("state", "equalto", "active") | list | length }} / {{ nodes | length }}
+    </div>
+  </div>
+  <div class="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3">
+    <div class="text-xs text-gray-500 mb-1">Negativos capturados</div>
+    <div class="text-lg font-bold text-blue-400">{{ negatives.node_total | default(0) }}</div>
+    <div class="text-xs text-gray-600">cap {{ negatives.cap_per_node | default("—") }}/nodo</div>
   </div>
 </div>
 
-<div class="grid grid-cols-5 gap-4">
-
-  <!-- Panel izquierdo: estado + score bar -->
-  <div id="state-panel"
-       class="col-span-2 bg-gray-900 border border-gray-800 rounded-xl
-              flex flex-col items-center justify-center gap-6 p-8 transition-colors min-h-72">
-
-    <!-- Icono + texto de estado -->
-    <div class="text-center space-y-2">
-      <div id="state-icon" class="text-6xl leading-none select-none">⏸️</div>
-      <div id="state-label" class="text-xl font-bold text-gray-500 transition-colors">Detenido</div>
-    </div>
-
-    <!-- Score bar -->
-    <div class="w-full max-w-xs space-y-1.5">
-      <div class="flex justify-between text-xs text-gray-500">
-        <span>Wake word score</span>
-        <span id="score-value" class="font-mono text-gray-400">0.000</span>
-      </div>
-      <div class="relative w-full bg-gray-800 rounded-full h-3 overflow-visible">
-        <div id="score-fill"
-             class="h-3 rounded-full bg-gray-600 transition-all duration-100"
-             style="width:0%"></div>
-        <!-- Threshold marker -->
-        <div class="absolute inset-y-0 w-px bg-orange-400/50 pointer-events-none"
-             style="left:80%"></div>
-      </div>
-      <div class="text-right text-xs text-orange-400/50">umbral 0.800</div>
-    </div>
-
+{# Nodos + métricas wake word (16.15) #}
+<div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+  <div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+    <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Nodos NSPanel</h2>
+    <span class="text-xs text-gray-600">TP = comando real · FP = falso positivo (ruido/TV)</span>
   </div>
-
-  <!-- Panel derecho: historial + latencias -->
-  <div class="col-span-3 flex flex-col gap-4">
-
-    <!-- Historial (análogo a panel_history.py) -->
-    <div class="flex-1 bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-      <div class="px-4 py-2.5 border-b border-gray-800 flex items-center justify-between">
-        <span class="text-sm font-semibold text-gray-300">Historial</span>
-        <span class="text-xs text-gray-600">últimos 15 comandos · actualiza cada 2s</span>
-      </div>
-      <div class="overflow-auto" style="max-height:260px">
-        <table class="w-full">
-          <thead class="sticky top-0 bg-gray-900 z-10">
-            <tr class="text-left border-b border-gray-800">
-              <th class="px-3 py-1.5 text-xs text-gray-500 font-medium">Hora</th>
-              <th class="px-3 py-1.5 text-xs text-gray-500 font-medium">Conv</th>
-              <th class="px-3 py-1.5 text-xs text-gray-500 font-medium">Usuario</th>
-              <th class="px-3 py-1.5 text-xs text-gray-500 font-medium">Comando</th>
-              <th class="px-3 py-1.5 text-xs text-gray-500 font-medium">Acción</th>
-              <th class="px-3 py-1.5 text-xs text-gray-500 font-medium text-right">Lat.</th>
-            </tr>
-          </thead>
-          <tbody id="history-body"
-                 hx-get="/api/ear/history"
-                 hx-trigger="load, every 2s"
-                 hx-target="#history-body"
-                 hx-swap="innerHTML">
-            <tr><td colspan="5" class="px-3 py-4 text-center text-gray-600 text-xs">cargando…</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Latencias (análogo a panel_latency.py) -->
-    <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-      <div class="px-4 py-2.5 border-b border-gray-800 flex items-center justify-between">
-        <span class="text-sm font-semibold text-gray-300">Latencias</span>
-        <span class="text-xs text-gray-600">último &nbsp;/&nbsp; promedio sesión</span>
-      </div>
-      <div id="latency-body" class="px-4 py-2"
-           hx-get="/api/ear/latency"
-           hx-trigger="load, every 2s"
-           hx-target="#latency-body"
-           hx-swap="innerHTML">
-        <p class="text-gray-600 text-sm text-center py-3">cargando…</p>
-      </div>
-    </div>
-
-  </div>
+  <table class="w-full text-sm">
+    <thead class="bg-gray-800/40 text-gray-500 text-xs uppercase tracking-wider">
+      <tr>
+        <th class="text-left px-3 py-2">Ambiente</th>
+        <th class="text-left px-3 py-2">IP</th>
+        <th class="text-left px-3 py-2">Estado</th>
+        <th class="text-right px-3 py-2">TP</th>
+        <th class="text-right px-3 py-2">FP (rate)</th>
+        <th class="text-left px-3 py-2">Último comando</th>
+      </tr>
+    </thead>
+    <tbody id="nodes-body" hx-get="/api/ear/nodes" hx-trigger="load, every 5s" hx-swap="innerHTML">
+      <tr><td colspan="6" class="px-3 py-4 text-center text-gray-600">cargando…</td></tr>
+    </tbody>
+  </table>
 </div>
-
-<!-- Dispositivos de audio (instancias ear activas) -->
-<div class="mt-4 bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-  <div class="px-4 py-2.5 border-b border-gray-800">
-    <span class="text-sm font-semibold text-gray-300">Dispositivos</span>
-    <span class="ml-2 text-xs text-gray-600">instancias ear · heartbeat cada 60s</span>
-  </div>
-  {% if devices %}
-  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3">
-    {% for key, d in devices.items() %}
-    {% set age = (now - d.get("ts", now)) | int %}
-    <div class="bg-gray-800/60 border {% if age < 90 %}border-emerald-800/60{% else %}border-gray-700{% endif %} rounded-lg p-3">
-      <div class="flex items-center justify-between mb-2">
-        <div class="flex items-center gap-2">
-          <span class="text-base">📡</span>
-          <span class="text-sm font-medium text-gray-200">{{ d.get("hostname", key) }}</span>
-        </div>
-        <span class="text-xs {% if age < 90 %}text-emerald-400{% else %}text-yellow-400{% endif %}">{{ age }}s</span>
-      </div>
-      <div class="space-y-0.5 text-xs text-gray-400">
-        <div class="flex justify-between">
-          <span>Estado</span><span class="text-gray-300">{{ d.get("state", "—") }}</span>
-        </div>
-        <div class="flex justify-between">
-          <span>PID</span><span class="font-mono text-gray-300">{{ d.get("pid", "—") }}</span>
-        </div>
-      </div>
-    </div>
-    {% endfor %}
-  </div>
-  {% else %}
-  <div class="text-center py-6 text-gray-600 text-sm">
-    📡 Sin dispositivos registrados — arrancá <code class="text-gray-500">listen.py</code> para ver instancias activas.
-  </div>
-  {% endif %}
-</div>
-
-<script>
-(function () {
-  const STATES = {
-    init:       ['⏳', 'Inicializando…', 'text-yellow-400', 'border-yellow-700'],
-    listening:  ['👂', 'Escuchando',     'text-green-400',  'border-green-700'],
-    triggered:  ['🎯', '¡Wake word!',    'text-cyan-400',   'border-cyan-700'],
-    recording:  ['⏺',  'Grabando…',      'text-red-400',    'border-red-700'],
-    processing: ['⚙',  'Procesando…',   'text-yellow-400', 'border-yellow-700'],
-    speaking:   ['🔊', 'Respondiendo…', 'text-blue-400',   'border-blue-700'],
-    stopped:    ['⛔', 'Detenido',       'text-gray-500',   'border-gray-800'],
-  };
-  const ALL_BORDERS = Object.values(STATES).map(s => s[3]);
-
-  const panel      = document.getElementById('state-panel');
-  const icon       = document.getElementById('state-icon');
-  const label      = document.getElementById('state-label');
-  const fill       = document.getElementById('score-fill');
-  const scoreVal   = document.getElementById('score-value');
-  const connDot    = document.getElementById('conn-dot');
-  const connLabel  = document.getElementById('conn-label');
-
-  let currentState = null;
-
-  function scoreBarColor(s) {
-    if (s > 0.80) return 'bg-red-500';
-    if (s > 0.40) return 'bg-yellow-500';
-    if (s > 0.05) return 'bg-green-500';
-    return 'bg-gray-600';
-  }
-
-  function applyState(state) {
-    if (state === currentState) return;
-    currentState = state;
-    const [ic, lb, textCls, borderCls] = STATES[state] || STATES.stopped;
-    icon.textContent  = ic;
-    label.textContent = lb;
-    label.className   = 'text-xl font-bold transition-colors ' + textCls;
-    ALL_BORDERS.forEach(c => panel.classList.remove(c));
-    panel.classList.add(borderCls);
-  }
-
-  const es = new EventSource('/ear/stream');
-
-  es.onopen = () => {
-    connDot.className  = 'w-2 h-2 rounded-full bg-green-500 transition-colors';
-    connLabel.textContent = 'conectado';
-  };
-  es.onerror = () => {
-    connDot.className  = 'w-2 h-2 rounded-full bg-red-500 transition-colors';
-    connLabel.textContent = 'desconectado';
-    applyState('stopped');
-  };
-  es.onmessage = (e) => {
-    const d = JSON.parse(e.data);
-    const pct = (d.score * 100).toFixed(1);
-    fill.style.width = pct + '%';
-    fill.className   = 'h-3 rounded-full transition-all duration-100 ' + scoreBarColor(d.score);
-    scoreVal.textContent = d.score.toFixed(3);
-    applyState(d.state);
-  };
-})();
-</script>
+<p class="text-xs text-gray-600 mt-2">
+  FP rate alto en un nodo → conviene un <a href="/wakeword" class="underline hover:text-gray-400">retrain</a>
+  (el voice-id ya descarta el TV, pero menos falsos positivos = mejor). Métricas en memoria (se reinician con el servicio).
+</p>
 {% endblock %}
