@@ -456,6 +456,13 @@ Estado:   COMPLETA (5.2 postergada, google-free; alarma luces → HAOS nativo)
 - [x] 5.6  Vista de agenda en panel de HAOS
            Radicale expuesto en LAN (0.0.0.0:5232); integración CalDAV en HA via config flow API;
            entidades: calendar.personal + calendar.feriados; tarjeta Calendar en el dashboard de HA
+- [x] 5.7  Eliminar de raíz los warnings de `caldav` — el warning salía de `.principal()`, que
+           sondea `current-user-principal` (que el CalDAV de Google no expone). Fix: apuntar
+           DIRECTO a la URL conocida del calendario primario (`caldav.Calendar(client, url=...)`)
+           en vez de `principal().calendars()` → sin sondeo, sin warning, sin parche de logging.
+           App Password requiere CalDAV (la API REST de Google exige OAuth2), así que se mantiene
+           CalDAV; Google Calendar es el único backend. Validado contra Google real (lee eventos,
+           0 warnings). Nota: ahora se trabaja con el calendario primario (feriados ya en JSON).
 
 ---
 
