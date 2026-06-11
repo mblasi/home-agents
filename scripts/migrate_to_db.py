@@ -84,41 +84,18 @@ class Migrator:
             row["users"] = json.dumps(panel.get("users", []), ensure_ascii=False)
             self._upsert("panels", {k: v for k, v in row.items() if v is not None}, "name")
 
-    def intents(self):
-        for f in glob.glob(str(DATA_DIR / "intents" / "*.json")):
-            for iid, it in (_load(Path(f)) or {}).items():
-                if not isinstance(it, dict):
-                    continue
-                row = {k: it.get(k) for k in (
-                    "intent_id", "user_id", "agent_id", "title", "description", "status",
-                    "intent_type", "created_at", "updated_at", "expires_at",
-                    "last_reminded_at", "remind_after_days")}
-                row["intent_id"] = it.get("intent_id", iid)
-                row["context"] = json.dumps(it.get("context", {}), ensure_ascii=False)
-                self._upsert("intents", {k: v for k, v in row.items() if v is not None}, "intent_id")
-
-    def _id_status_data(self, subdir: str, table: str, id_field: str):
-        for f in glob.glob(str(DATA_DIR / subdir / "*.json")):
-            for oid, obj in (_load(Path(f)) or {}).items():
-                if not isinstance(obj, dict):
-                    continue
-                row = {
-                    id_field: obj.get(id_field, oid),
-                    "user_id": obj.get("user_id"),
-                    "status": obj.get("status"),
-                    "data": json.dumps(obj, ensure_ascii=False),
-                    "created_at": obj.get("created_at"),
-                    "updated_at": obj.get("updated_at"),
-                }
-                if "agent_id" in obj and table == "goals":
-                    row["agent_id"] = obj.get("agent_id")
-                self._upsert(table, {k: v for k, v in row.items() if v is not None}, id_field)
-
-    def goals(self):
-        self._id_status_data("goals", "goals", "goal_id")
-
-    def routines(self):
-        self._id_status_data("routines", "routines", "routine_id")
+    def per_user_docs(self):
+        # intents/goals/routines/plan_events: un archivo por usuario (<user>.json)
+        for subdir in ("intents", "goals", "routines", "plan_events"):
+            for f in glob.glob(str(DATA_DIR / subdir / "*.json")):
+                self._doc(subdir, Path(f).stem, _load(Path(f)))
+        # tools: un archivo por agente (<agent>.json)
+        for f in glob.glob(str(DATA_DIR / "tools" / "*.json")):
+            self._doc("tools", Path(f).stem, _load(Path(f)))
+        # user_context: subdir por usuario, un archivo por agente → key "<user>/<agent>"
+        for f in glob.glob(str(DATA_DIR / "user_context" / "*" / "*.json")):
+            p = Path(f)
+            self._doc("user_context", f"{p.parent.name}/{p.stem}", _load(p))
 
     # ── Document store (lo append-heavy / menos estructurado) ─────────────────
 
@@ -148,25 +125,30 @@ class Migrator:
                 for k, v in data.items():
                     self._doc(kind, k, v)
 
-        # patrones por-usuario → documents
-        patterns = {
-            "history_*.json":   "history",      # history_<agent>_<user>.json
-            "portfolio_*.json": "portfolio",
-            "ml_token_*.json":  "token",
-            "mp_token_*.json":  "token",
-        }
-        for pat, kind in patterns.items():
-            for f in glob.glob(str(DATA_DIR / pat)):
-                key = Path(f).stem  # ej: history_haos_matias, portfolio_matias, ml_token_matias
+        # patrones por-usuario → documents. (prefijo, kind) → key sin prefijo.
+        # portfolio_matias → portfolio/matias ; history_haos_matias → history/haos_matias ;
+        # ml_token_matias → token/ml_matias ; mp_token_matias → token/mp_matias
+        patterns = [
+            ("portfolio_",          "portfolio"),
+            ("finance_templates_",  "finance_templates"),
+            ("history_",            "history"),
+            ("ml_token_",           "token"),
+            ("mp_token_",           "token"),
+        ]
+        for prefix, kind in patterns:
+            for f in glob.glob(str(DATA_DIR / f"{prefix}*.json")):
+                stem = Path(f).stem
+                key = stem[len(prefix):]
+                if kind == "token":
+                    key = prefix[:2] + "_" + key   # ml_/mp_ + user
                 self._doc(kind, key, _load(Path(f)))
-
-        # user_context/<user>.json
-        for f in glob.glob(str(DATA_DIR / "user_context" / "*.json")):
-            self._doc("user_context", Path(f).stem, _load(Path(f)))
+        # ml_prices.json (single)
+        ml = _load(DATA_DIR / "ml_prices.json")
+        if ml is not None:
+            self._doc("misc", "ml_prices", ml)
 
     def run(self):
-        for step in (self.users, self.panels, self.intents, self.goals,
-                     self.routines, self.documents):
+        for step in (self.users, self.panels, self.per_user_docs, self.documents):
             step()
         return self.counts
 
