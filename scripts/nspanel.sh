@@ -125,6 +125,128 @@ cmd_packages() {
         "pkg update -y && pkg install -y python portaudio && pip install sounddevice"
 }
 
+ssh_panel() { ssh -p "$NSPANEL_SSH_PORT" -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa \
+    -o StrictHostKeyChecking=no -o ConnectTimeout=8 "${TERMUX_USER}@${NSPANEL_IP}" "$@"; }
+scp_panel() { scp -P "$NSPANEL_SSH_PORT" -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa \
+    -o StrictHostKeyChecking=no "$@"; }
+pkg_installed() { adb_cmd shell pm list packages 2>/dev/null | grep -q "package:$1"; }
+
+# Provisioning completo de un panel nuevo (16.24). Idempotente: saltea lo ya hecho.
+# Uso: nspanel.sh provision <name> <room> [ip]
+cmd_provision() {
+    local name="${1:-}" room="${2:-}" ip="${3:-$NSPANEL_IP}"
+    if [[ -z "$name" || -z "$room" ]]; then
+        echo "Uso: nspanel.sh provision <name> <room> [ip]"; exit 1
+    fi
+    NSPANEL_IP="$ip"; NSPANEL_ADB="${ip}:5555"
+    local NODE_ID="nspanel-${name}"
+    local REPO="$(cd "$(dirname "$0")/.." && pwd)"
+    local AUDIO_URL="${AUDIO_SERVER_URL:-http://192.168.68.132:8766}"
+    echo "=== Provisioning panel '$name' (room=$room, ip=$ip, node=$NODE_ID) ==="
+
+    echo "\n[1/9] ADB — conectividad"
+    if ! adb connect "$NSPANEL_ADB" 2>/dev/null | grep -qE "connected|already"; then
+        echo "  ✗ no se pudo conectar ADB a $NSPANEL_ADB."
+        echo "  PREREQUISITO FÍSICO: habilitá ADB en el panel (Settings → About → tapear build)."
+        exit 1
+    fi
+    echo "  ✓ ADB conectado"
+
+    echo "\n[2/9] Apps base (Termux, Termux:Boot, HA Companion)"
+    pkg_installed com.termux           && echo "  ✓ Termux ya" || { cmd_install_base; }
+    echo "\n[3/9] Termux:API + Termux:GUI (mic + overlay)"
+    if pkg_installed com.termux.api; then echo "  ✓ Termux:API ya"; else
+        wget -qO /tmp/termux-api.apk "https://github.com/termux/termux-api/releases/download/v0.53.0/termux-api-app_v0.53.0%2Bgithub.debug.apk"
+        adb_cmd install /tmp/termux-api.apk && echo "  ✓ Termux:API"; fi
+    if pkg_installed com.termux.gui; then echo "  ✓ Termux:GUI ya"; else
+        wget -qO /tmp/termux-gui.apk "https://github.com/termux/termux-gui/releases/download/0.1.6/app-release.apk"
+        adb_cmd install /tmp/termux-gui.apk && echo "  ✓ Termux:GUI"; fi
+    adb_cmd shell "monkey -p com.termux.gui -c android.intent.category.LAUNCHER 1" >/dev/null 2>&1
+    adb_cmd shell appops set com.termux.gui SYSTEM_ALERT_WINDOW allow 2>/dev/null || true
+    adb_cmd shell pm grant com.termux.api android.permission.RECORD_AUDIO 2>/dev/null || true
+    echo "  ✓ permisos (overlay + mic)"
+
+    echo "\n[4/9] SSH — verificar acceso"
+    if ! ssh_panel "echo ok" 2>/dev/null | grep -q ok; then
+        echo "  ✗ SSH no responde. Seteá el password de Termux y arrancá sshd:"
+        echo "    NSPANEL_IP=$ip bash scripts/nspanel.sh passwd <password>   (o /nspanel-passwd)"
+        echo "  Reintentá provision cuando SSH funcione (el resto es idempotente)."
+        exit 1
+    fi
+    echo "  ✓ SSH OK"
+
+    echo "\n[5/9] Dependencias (pkg + pip) + patch openwakeword"
+    ssh_panel 'export PATH=/data/data/com.termux/files/usr/bin:$PATH
+        pkg install -y python portaudio onnxruntime termux-api openssh >/dev/null 2>&1
+        pip install -q sounddevice requests numpy tqdm termuxgui >/dev/null 2>&1
+        pip install -q --no-deps openwakeword >/dev/null 2>&1
+        OWW=$(python3.13 -c "import openwakeword,os;print(os.path.dirname(openwakeword.__file__))" 2>/dev/null)
+        if [ -n "$OWW" ]; then sed -i "s/^from openwakeword.custom_verifier_model import train_custom_verifier/try:\n    from openwakeword.custom_verifier_model import train_custom_verifier\nexcept ImportError:\n    train_custom_verifier = None/" "$OWW/__init__.py" 2>/dev/null; fi
+        echo deps-ok' 2>&1 | grep -q deps-ok && echo "  ✓ dependencias" || echo "  ⚠ revisar deps manualmente"
+
+    echo "\n[6/9] Modelos + satellite.py"
+    ssh_panel "mkdir -p ~/wakeword ~/.config ~/assets ~/.termux/boot" 2>/dev/null
+    # modelos estáticos (melspec/embedding) desde el venv del laptop; capitan.onnx lo baja el satellite (16.17)
+    local OWW_RES="$HOME/home-agents-env/lib/python3.13/site-packages/openwakeword/resources/models"
+    [[ -f "$OWW_RES/melspectrogram.onnx" ]] && scp_panel "$OWW_RES/melspectrogram.onnx" "$OWW_RES/embedding_model.onnx" "${TERMUX_USER}@${ip}:~/wakeword/" 2>/dev/null && echo "  ✓ modelos de features"
+    [[ -f "$HOME/.local/share/wakeword/capitan.onnx" ]] && scp_panel "$HOME/.local/share/wakeword/capitan.onnx" "${TERMUX_USER}@${ip}:~/wakeword/" 2>/dev/null && echo "  ✓ capitan.onnx (semilla)"
+    scp_panel "$REPO/ear/satellite.py" "$REPO/ear/satellite_ui.py" "${TERMUX_USER}@${ip}:~/" 2>/dev/null && echo "  ✓ satellite.py + ui"
+    [[ -f "$REPO/ear/assets/wakeword_ack.wav" ]] && scp_panel "$REPO/ear/assets/wakeword_ack.wav" "${TERMUX_USER}@${ip}:~/assets/" 2>/dev/null
+
+    echo "\n[7/9] satellite.env (node=$NODE_ID room=$room)"
+    ssh_panel "cat > ~/.config/satellite.env" <<EOF
+AUDIO_SERVER_URL=$AUDIO_URL
+NODE_ID=$NODE_ID
+ROOM=$room
+WAKEWORD_MODEL=/data/data/com.termux/files/home/wakeword/capitan.onnx
+MELSPEC_MODEL=/data/data/com.termux/files/home/wakeword/melspectrogram.onnx
+EMBEDDING_MODEL=/data/data/com.termux/files/home/wakeword/embedding_model.onnx
+WAKEWORD_THRESH=0.7
+COMMAND_SECS=5
+SAMPLE_RATE=16000
+EOF
+    echo "  ✓ satellite.env"
+
+    echo "\n[8/9] Boot script"
+    ssh_panel "cat > ~/.termux/boot/start-ha.sh" <<'EOF'
+#!/data/data/com.termux/files/usr/bin/bash
+export PATH=/data/data/com.termux/files/usr/bin:$PATH
+sshd
+sleep 10
+monkey -p com.termux.gui -c android.intent.category.LAUNCHER 1
+am start -n io.homeassistant.companion.android.minimal/io.homeassistant.companion.android.launch.LaunchActivity
+sleep 15
+nohup python3.13 ~/satellite.py >> ~/.satellite.log 2>&1 &
+EOF
+    ssh_panel "chmod +x ~/.termux/boot/start-ha.sh" 2>/dev/null
+    adb_cmd shell am start -n "com.termux.boot/.BootActivity" >/dev/null 2>&1
+    echo "  ✓ boot script + Termux:Boot registrado"
+
+    echo "\n[9/9] Registrar en panels.yaml"
+    python3 "$REPO/scripts/panels.py" resolve "$name" >/dev/null 2>&1 \
+        && echo "  ✓ ya en el registro" \
+        || { python3 - "$REPO/panels.yaml" "$name" "$room" "$ip" "$NODE_ID" <<'PY'
+import sys, yaml
+path, name, room, ip, node_id = sys.argv[1:6]
+data = {}
+try:
+    data = yaml.safe_load(open(path)) or {}
+except FileNotFoundError:
+    pass
+panels = data.get("panels", []) or []
+if not any(p.get("name")==name for p in panels):
+    panels.append({"name":name,"room":room,"ip":ip,"node_id":node_id,"users":[]})
+data["panels"]=panels
+open(path,"w").write("# Registro de paneles NSPanel Pro (16.23).\n\n"+yaml.safe_dump(data, allow_unicode=True, sort_keys=False))
+print("registrado")
+PY
+        echo "  ✓ registrado en panels.yaml"; }
+
+    echo "\n=== Provisioning de '$name' completo ==="
+    echo "FALTA (manual): crear usuario HA 'nspanel-$name' + dashboard del ambiente, y reiniciar el panel:"
+    echo "  NSPANEL_IP=$ip bash scripts/nspanel.sh reboot"
+}
+
 cmd_help() {
     cat << 'EOF'
 Uso: scripts/nspanel.sh <comando> [args]
@@ -145,9 +267,13 @@ Comandos:
   update-boot <url> Actualizar dashboard de arranque (via SSH)
   install-base     Setup completo desde cero (Termux + Boot + HA Companion)
   packages         Instalar Python + sounddevice en Termux (via SSH)
+  provision <name> <room> [ip]  Bootstrap COMPLETO de un panel nuevo (idempotente):
+                   apps, deps, modelos, satellite, boot script, registro en panels.yaml.
+                   Prereqs físicos: habilitar ADB + setear password SSH (passwd).
   help             Mostrar esta ayuda
 
 Ejemplos:
+  scripts/nspanel.sh provision dormitorio dormitorio 192.168.68.114
   NSPANEL_IP=192.168.68.114 scripts/nspanel.sh connect
   scripts/nspanel.sh update-boot http://192.168.68.101:8123/dashboard-dormitorio/0
   scripts/nspanel.sh ssh
@@ -167,6 +293,7 @@ case "${1:-help}" in
     update-boot)   cmd_update_boot "${2:-}" ;;
     install-base)  cmd_install_base ;;
     packages)      cmd_packages ;;
+    provision)     cmd_provision "${2:-}" "${3:-}" "${4:-}" ;;
     help|--help|-h) cmd_help ;;
     *)
         echo "Comando desconocido: $1"
