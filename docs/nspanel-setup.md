@@ -6,6 +6,15 @@ Guía completa y probada para dar de alta un NSPanel Pro como:
 
 Replica exactamente el panel del comedor (192.168.68.113) que quedó funcionando.
 
+> **Atajo (FASE 16.24/16.26):** la mayoría de estos pasos están automatizados.
+> - CLI: `scripts/nspanel.sh provision <name> <room> <ip>` — idempotente, bootstrappea
+>   el SSH key vía ADB (sin password manual) y registra el panel en `panels.yaml`.
+> - Backoffice: página **Paneles** → "Provisionar panel nuevo" (corre lo mismo con progreso en vivo).
+>
+> Prerequisitos físicos no automatizables: **habilitar ADB** en el panel (taps) y crear el
+> **usuario HA + dashboard** del ambiente. El resto (apps, deps, modelos, satellite, boot) es automático.
+> Esta guía queda como referencia detallada / troubleshooting.
+
 ---
 
 ## Resumen de arquitectura

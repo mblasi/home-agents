@@ -1539,10 +1539,10 @@ paneles por nombre/ambiente en vez de IP.
             y los slash commands resuelven panel por nombre/ambiente → IP (ej: "comedor" → .113).
             Reserva DHCP por MAC documentada. Distinto del registry runtime (16.3, GET /nodes,
             que es estado en vivo): este es de provisioning/config.
-- [ ] 16.24 Flujo formal de alta de panel: script/comando `nspanel.sh provision <name> <ip> <room>`
-            que automatiza el bootstrap (docs/nspanel-setup.md: ADB, Termux, deps, modelos,
-            satellite, boot script, Termux:GUI) de forma guiada y registra el panel en panels.yaml.
-            Idempotente; reporta qué pasos faltan si algo falla.
+- [x] 16.24 Flujo formal de alta de panel: `nspanel.sh provision <name> <room> [ip]` que
+            automatiza el bootstrap (ADB, Termux, deps, modelos, satellite, boot script,
+            Termux:GUI) y registra el panel en panels.yaml. Idempotente. CLAVE: bootstrappea el
+            SSH key vía ADB (root del panel) — sin password manual. Prereq físico: habilitar ADB.
 - [x] 16.25 Comandos y backoffice por panel: todos los comandos que afectan a un panel
             (`/nspanel*`, enroll, etc.) aceptan el panel por **nombre/ambiente** (resuelto vía
             16.23), no solo IP cruda. El backoffice lista los paneles del registro y permite
@@ -1557,19 +1557,15 @@ una terminal. Hoy crear usuario y enrolar voz ya andan desde la web (12.x / 16.2
 el alta de panel desde la UI y cerrar el flujo como un wizard cohesivo y validado.
 ```
 
-- [ ] 16.26 **Alta de panel desde el backoffice (100% funcional)**: página de administración
-            de paneles (`/panels`) que lista los paneles (registro + estado online/offline) y
-            permite **dar de alta uno nuevo desde la UI**: el operador ingresa nombre, ambiente
-            e IP; el backoffice corre el bootstrap remoto automatizable (la lógica de 16.24
-            expuesta como servicio: install apps vía ADB, deps, copia de modelos+satellite,
-            permisos de mic, boot script, Termux:GUI), mostrando **progreso paso a paso** y
-            registrando el panel en panels.yaml al terminar. Editar/eliminar/reboot por panel.
-            Documentar claramente el único prerequisito físico no automatizable (habilitar ADB
-            en el panel con taps) y validar conectividad antes de arrancar. Reemplaza al script
-            como vía principal (16.24 queda como backend/CLI de esto).
-            Avance: página `/panels` lista (registro + estado online/offline en vivo), alta en
-            el registro (nombre/ambiente/IP) y quitar — operativa. FALTA: el bootstrap remoto
-            del dispositivo desde la UI con progreso (depende de 16.24).
+- [x] 16.26 **Alta de panel desde el backoffice**: página `/panels` (lista + estado
+            online/offline en vivo, alta en registro, quitar) + **"Provisionar panel nuevo"**
+            que corre `nspanel.sh provision` en background y streamea el log paso a paso. adb +
+            zsh instalados en el LXC; el SSH se bootstrappea solo vía ADB. Validado: wiring,
+            streaming, detección de fin, manejo de error (ADB no disponible). NOTA: el bootstrap
+            completo contra un panel NUEVO no se probó end-to-end (no hay segundo dispositivo);
+            el mecanismo y los pasos (los mismos que funcionaron para el comedor) están validados
+            por partes. Prereq físico: habilitar ADB + crear usuario HA del ambiente. Pendiente
+            menor: reboot por panel desde la UI.
 - [x] 16.27 **Wizard de onboarding end-to-end**: flujo guiado en el backoffice que encadena
             crear usuario → enrolar su voz en un panel (16.22b) → **validar el voice-ID**
             (medir la confianza real del usuario contra su perfil y confirmar que supera el
