@@ -959,7 +959,7 @@ Extensiones futuras: cron expressions, triggers por evento HAOS.
 Objetivo: Agente conversacional con quien charlar libremente, pedir consejos o consultar
           a un asesor especializado. Sin intención de acción — respuestas en lenguaje
           natural, tono informal, memoria entre sesiones.
-Estado:   Pendiente
+Estado:   EN CURSO (1/8 — arrancada; faltan asesores personales)
 Deps:     FASE 1 (stack base) — puede implementarse en cualquier momento.
           FASE 2.5 (usuarios) deseable para asociar perfiles por persona.
           FASE 3 (orquestador) necesario para coexistir con múltiples agentes.
@@ -1309,7 +1309,7 @@ Objetivo: Distribuir la interfaz de voz por toda la casa. Los NSPanel Pro (Andro
           como servidor de audio puro (sin hardware local): recibe audio de los NSPanels,
           corre STT+TTS, delega al core, devuelve el WAV de respuesta.
           La laptop queda 100% desarrollo sin servicios.
-Estado:   Pendiente
+Estado:   EN CURSO (19/30 — pipeline nodo+voice-id+enrollment+paneles operativo; quedan extras)
 Deps:     FASE 1 (STT, TTS, Piper), FASE 3 (core/server.py, /process),
           FASE 21 (SER9 operativo — COMPLETA), FASE 2.5 (speaker_id), FASE 12 (backoffice)
 Hardware: NSPanel Pro — Android 8.1, sounddevice/PortAudio, mic (pcmC0D0c) + speaker (pcmC0D0p).
@@ -1966,7 +1966,7 @@ Objetivo: Mover toda la infraestructura de producción a la Beelink SER9 Pro.
           La laptop queda como entorno de desarrollo puro (sin servicios corriendo).
           Misma restricción de modelo 7B que la configuración actual.
           HAOS migra desde el PC viejo dedicado al SER9.
-Estado:   Pendiente
+Estado:   EN CURSO (22/23 — consolidación hecha; solo queda 21.21)
 Hardware: Beelink SER9 Pro — AMD Ryzen AI 7 HX 255, 32GB DDR5, Radeon 780M (RDNA 3)
 Stack:    Proxmox VE → VM HAOS + LXC Ubuntu privilegiado (core + backoffice + wa + Ollama)
 Nota:     Stepping stone a FASE 8 (servidor con GPU discreta). No escala modelos: sigue en 7B.
@@ -2777,7 +2777,7 @@ Deps:     FASE 9 (coordinador), FASE 24 (tracing).
 Objetivo: Explorar palancas de mejora de latencia LLM en el SER9 (Beelink, Radeon 780M gfx1103).
           Baseline actual: 27.5s CPU-only, 13.3s ROCm con HSA_OVERRIDE_GFX_VERSION=11.0.0.
           Target: reducir latencia warm por debajo de 5s sin cambiar el modelo.
-Estado:   Pendiente
+Estado:   EN CURSO (4/5 — solo queda 31.5 benchmark de quantización)
 Deps:     FASE 21 (SER9 operativo con LXC — COMPLETA)
 Hardware: Beelink SER9 Pro — Ryzen AI 7 HX 255, 32GB DDR5, Radeon 780M (RDNA 3 / gfx1103)
 ```
