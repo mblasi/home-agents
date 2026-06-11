@@ -2804,8 +2804,11 @@ Hardware: Beelink SER9 Pro — Ryzen AI 7 HX 255, 32GB DDR5, Radeon 780M (RDNA 3
 Objetivo: Reemplazar los JSON files en ~/.local/share/capitan/ por una base de datos
           estructurada (SQLite). Elimina problemas de concurrencia, mejora queries,
           facilita backup y migración entre servidores.
-Estado:   EN CURSO (32.1-32.3 + 32.5: esquema + db.py + migración validada contra datos
-          reales del SER9 + backup. Falta 32.4 migrar módulos y 32.6 borrar JSON.)
+Estado:   COMPLETA (32.1-32.6: esquema + db.py + migración + módulos migrados a SQLite +
+          backup. Validado en producción contra datos reales del SER9: el core lee y escribe
+          de capitan.db; los JSON migrados se movieron a un backup (_pre_db_backup_*). Quedan
+          como archivos por diseño: embeddings .npy, wakeword_samples, wa-session, traces JSONL,
+          wakeword_metrics. panels.yaml sigue siendo config del repo leída por backoffice/scripts.)
 Deps:     FASE 21 (SER9 estable — COMPLETA)
 Motivación: actualmente los datos (usuarios, intents, conversaciones, portfolios,
             contextos, routines, etc.) son ~30 archivos JSON sin esquema formal,
@@ -2826,10 +2829,10 @@ Motivación: actualmente los datos (usuarios, intents, conversaciones, portfolio
             para no romper agentes existentes.
 - [x] 32.3  Migración de datos existentes: script `scripts/migrate_to_db.py` que lee los
             JSON actuales y los inserta en la DB. Idempotente y con dry-run.
-- [ ] 32.4  Migrar módulos críticos: users.py, conversations.py, intents.py, portfolios.
+- [x] 32.4  Migrar módulos críticos: users.py, conversations.py, intents.py, portfolios.
             Un módulo a la vez con tests. Los JSON se mantienen como fallback hasta
             que todos los módulos estén migrados.
 - [x] 32.5  Backup automático: script diario que hace `sqlite3 capitan.db .dump > backup.sql`
             y lo guarda en un directorio de backups rotados (7 días).
-- [ ] 32.6  Eliminar JSON files: una vez todos los módulos migrados y backup operativo,
+- [x] 32.6  Eliminar JSON files: una vez todos los módulos migrados y backup operativo,
             borrar los archivos JSON y el código de lectura legacy.
