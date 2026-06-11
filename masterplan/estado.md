@@ -1966,7 +1966,7 @@ Objetivo: Mover toda la infraestructura de producción a la Beelink SER9 Pro.
           La laptop queda como entorno de desarrollo puro (sin servicios corriendo).
           Misma restricción de modelo 7B que la configuración actual.
           HAOS migra desde el PC viejo dedicado al SER9.
-Estado:   EN CURSO (22/23 — consolidación hecha; solo queda 21.21)
+Estado:   COMPLETA (23/23 — consolidación en SER9 realizada: audio_server en LXC, NSPanels como I/O de audio, laptop dev-only; decisión 21.21 implementada vía FASE 16)
 Hardware: Beelink SER9 Pro — AMD Ryzen AI 7 HX 255, 32GB DDR5, Radeon 780M (RDNA 3)
 Stack:    Proxmox VE → VM HAOS + LXC Ubuntu privilegiado (core + backoffice + wa + Ollama)
 Nota:     Stepping stone a FASE 8 (servidor con GPU discreta). No escala modelos: sigue en 7B.
@@ -2068,7 +2068,7 @@ y /dev/snd (audio ALSA, si corre el ear) sea directo y sin complejidad de IOMMU 
 
 #### Etapa F — Ear (decisión tomada)
 
-- [ ] 21.21 **Decisión**: el ear corre en el LXC del SER9 como servidor de audio — SIN hardware
+- [x] 21.21 **Decisión**: el ear corre en el LXC del SER9 como servidor de audio — SIN hardware
             de audio local (no mic, no speaker, no /dev/snd). Es un proceso servidor que:
             - Recibe audio (WAV/chunks) desde los NSPanel Pro vía WebSocket o HTTP
             - Corre STT (faster-whisper) sobre ese audio
