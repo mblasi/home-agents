@@ -61,8 +61,11 @@ Al completar cualquier ítem del plan, **siempre** hacer estas dos cosas antes d
    ```zsh
    python scripts/lint_estado.py
    ```
-   Detecta tareas `[x]` bajo `#### Pendiente` y otras inconsistencias. Debe pasar sin errores
-   antes de continuar. Si falla, corregir antes del sync de issues.
+   Detecta: (a) tareas `[x]` bajo `#### Pendiente` y viceversa; (b) **el `Estado:` de cada FASE
+   desincronizado con sus checkboxes** — todo `[x]` pero no COMPLETA, o avance parcial pero
+   `Estado: Pendiente` (debería ser EN CURSO). COMPLETA con algún `[ ]` se permite (convención
+   "COMPLETA (X postergada)"). Debe pasar sin errores antes de continuar. Si falla, corregir
+   antes del sync de issues. Esto evita la deriva de marcar tareas sin actualizar el Estado de fase.
 
 4. **Correr el sync de issues**:
    ```zsh
