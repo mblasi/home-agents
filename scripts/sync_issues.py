@@ -54,7 +54,7 @@ def load_mapping():
 def fetch_issue_states(repo):
     result = subprocess.run(
         ["gh", "issue", "list", "--repo", repo, "--state", "all",
-         "--json", "number,state", "--limit", "300"],
+         "--json", "number,state", "--limit", "2000"],
         capture_output=True, text=True, check=True,
     )
     return {str(i["number"]): i["state"] for i in json.loads(result.stdout)}
