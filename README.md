@@ -73,7 +73,7 @@ Beyond reactive commands, the system also runs **proactively**: each agent perio
 |-------|----|--------|--------|
 | Domótica | `haos` | Home Assistant REST | Active |
 | Clima | `clima` | Open-Meteo API | Active |
-| Agenda | `calendar` | CalDAV (Radicale) | Active |
+| Agenda | `calendar` | Google Calendar (CalDAV, App Password) | Active |
 | Inversiones | `finance` | BCRA + Yahoo Finance + news RAG (nomic-embed-text) | Active |
 | Viajes | `travel` | Documents RAG + weather | Active |
 | Mapas | `maps` | Open-Meteo geocoding | Active |

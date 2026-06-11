@@ -2,13 +2,13 @@
 
 Documento de referencia funcional del sistema. Se actualiza con cada cambio de funcionalidad.
 
-_Última actualización: 2026-05-14_
+_Última actualización: 2026-06-11_
 
 ---
 
 ## Visión general
 
-home-agents es una red de agentes de IA que corre completamente en una laptop (Gentoo Linux, Ryzen 9 5900HX, 64GB RAM). No hay dependencias de servicios externos de pago ni telemetría. El único perímetro de red es la LAN local con Home Assistant OS.
+home-agents es una red de agentes de IA que corre en el **SER9** (Beelink SER9 Pro — Ryzen AI 7, Proxmox VE; core + backoffice + WA + audio_server en un LXC, HAOS en una VM, Ollama con GPU ROCm). La laptop quedó como entorno de desarrollo. No hay dependencias de servicios externos de pago ni telemetría; el perímetro de red es la LAN local. Los nodos de voz son NSPanel Pro.
 
 El sistema combina tres capacidades:
 
@@ -94,6 +94,17 @@ POST /process {text, source, conversation_id?}
 6. Actualizar conversación y trazas
 ```
 
+#### Persistencia de datos (SQLite — FASE 32)
+
+Toda la data del sistema vive en **`~/.local/share/capitan/capitan.db`** (SQLite) vía
+`core/db.py`. Tablas normalizadas para `users` y `panels`; el resto (conversations, intents,
+goals, routines, plan_events, portfolios, finance_templates, user_context, agent_history,
+tokens, agent_config, finance_news, ml_prices, feriados) en una tabla genérica `documents(kind,
+key, data)`. Migración con `scripts/migrate_to_db.py` (idempotente). Las menciones por-módulo a
+archivos `.json` más abajo describen el **modelo lógico**; físicamente son filas/documentos en
+la DB. Quedan como archivos por diseño: embeddings `.npy`, traces JSONL, sesión de WhatsApp,
+samples de audio, y `panels.yaml` (config del repo leída por backoffice/scripts).
+
 ---
 
 ## Agentes
@@ -116,7 +127,8 @@ POST /process {text, source, conversation_id?}
 ### calendar — Agenda
 
 - **Archivo:** `calendar_agent.py`
-- **Fuente:** CalDAV local (Radicale)
+- **Fuente:** Google Calendar (único backend) vía protocolo CalDAV con App Password. Se apunta
+  directo a la URL del calendario primario del usuario (sin `.principal()`). Radicale removido.
 - **Funciones:** consultar eventos, crear recordatorios, alerta de eventos próximos
 - **Proactivo:** detecta eventos del día siguiente, feriados (sync desde FERIADOS_COUNTRY=UY)
 
@@ -134,7 +146,7 @@ POST /process {text, source, conversation_id?}
 - **Todas las alertas por usuario:** `finance_alerts._get_user_alert_config(uid)` reemplaza `_get_user_pnl_config` y devuelve los 7 umbrales: `dollar_gap_pct`, `btc_move_pct`, `stock_move_pct`, `briefing_hour`, `plan_pnl_up_pct`, `plan_pnl_down_pct`, `plan_pnl_hours`. `check()` itera por usuario en todas las reglas; cooldown keys incluyen `uid`. Los 7 campos son editables desde backoffice (sección Contexto de finanzas). Defaults globales configurables en `.env`.
 - **Histograma P&L planes:** `portfolio.get_plan_pnl_history(plan)` → `(series, trend)`. `series`: lista `{date, pnl_pct}` con P&L ponderada diaria desde `created_at` hasta hoy (precios vía `finance_client.get_history_range()`, cacheado 1h). `trend`: regresión lineal con `slope_per_day`, `projection_30d`, `r2` y `points` (histórico ajustado + 30d proyección). Endpoint `GET /finance/plans/{uid}/history?plan=NAME`. Backoffice: sección "Evolución P&L" en `/users/{uid}` con Chart.js 4 (línea por plan, toggle individual, línea punteada tendencia/proyección).
 - **Templates de planes:** `portfolio.py` mantiene un CRUD de templates persistentes (`finance_templates.json`). Cada template tiene `name`, `positions` (ticker:pct) y `review_threshold`. Al primer `proactive_check` sin planes, `create_plans_from_templates()` crea uno por template faltante (silencioso, sin intents). CRUD en backoffice `/finance/templates`. REST: `GET/POST /finance/templates`, `DELETE /finance/templates/{name}`.
-- **RAG de noticias:** `finance_news.py` — scraping RSS Yahoo Finance por ticker, embeddings con `nomic-embed-text` (Ollama), búsqueda semántica cosine (numpy), fallback keyword si Ollama no responde. Índice persistido en `~/.local/share/capitan/finance_news_index.json` (TTL 30min). Las noticias más relevantes a la query del usuario se inyectan al system prompt del LLM. El refresh corre en background thread tanto en `process()` como en `alerts()`, por lo que el índice se mantiene fresco independientemente de la interacción del usuario.
+- **RAG de noticias:** `finance_news.py` — scraping RSS Yahoo Finance por ticker, embeddings con `nomic-embed-text` (Ollama), búsqueda semántica cosine (numpy), fallback keyword si Ollama no responde. Índice persistido en `~/.local/share/capitan/finance_news_index.json` (TTL 30min). Las noticias más relevantes a la query del usuario se inyectan al system prompt del LLM. El refresh corre en background thread tanto en `process()` como en `alerts()`, por lo que el índice se mantiene fresco independientemente de la interacción del usuario. — físicamente en SQLite (`capitan.db`, FASE 32).
 - **Companion:** `finance_alerts.py` para alertas reactivas de precio y P&L horario, `portfolio.py` para portfolio + templates, `finance_news.py` para RAG de noticias
 
 ### travel — Viajes
@@ -317,7 +329,7 @@ necesita ejecutar una acción (no solo almacenar) en respuesta al reply.
 
 ### Persistencia
 
-`intent_state.py` — almacena en `~/.local/share/capitan/intents_{user_id}.json`.
+`intent_state.py` — almacena en `~/.local/share/capitan/intents_{user_id}.json`. — físicamente en SQLite (`capitan.db`, FASE 32).
 
 ---
 
@@ -357,7 +369,7 @@ El **Goal Engine** (en `ProactiveScheduler._review_goals()`) revisa goals pendie
 
 ### Persistencia
 
-`goal_store.py` — almacena en `~/.local/share/capitan/goals/{user_id}.json`.
+`goal_store.py` — almacena en `~/.local/share/capitan/goals/{user_id}.json`. — físicamente en SQLite (`capitan.db`, FASE 32).
 
 ---
 
@@ -444,13 +456,13 @@ con detección inmediata y liviana durante la conversación.
 
 ### Persistencia
 
-`routine_store.py` — almacena en `~/.local/share/capitan/routines/{user_id}.json`.
+`routine_store.py` — almacena en `~/.local/share/capitan/routines/{user_id}.json`. — físicamente en SQLite (`capitan.db`, FASE 32).
 
 ---
 
 ## Historial de agentes
 
-`agent_history.py` — almacena los últimos 40 turnos por par (agent_id, user_id) en `~/.local/share/capitan/history_{agent_id}_{user_id}.json`.
+`agent_history.py` — almacena los últimos 40 turnos por par (agent_id, user_id) en `~/.local/share/capitan/history_{agent_id}_{user_id}.json`. — físicamente en SQLite (`capitan.db`, FASE 32).
 
 El historial se escribe desde `server.py` (`_record_history()`) después de cada `agent.process()` exitoso, tanto en path single-step como multi-step. Las revisiones de goals (source `goal_review`) no se registran.
 
@@ -458,7 +470,7 @@ El historial se escribe desde `server.py` (`_record_history()`) después de cada
 
 ## Contexto de usuario por agente
 
-`user_context.py` — cada agente puede almacenar y leer un dict arbitrario por usuario. Persiste en `~/.local/share/capitan/context_{user_id}.json`.
+`user_context.py` — cada agente puede almacenar y leer un dict arbitrario por usuario. Persiste en `~/.local/share/capitan/context_{user_id}.json`. — físicamente en SQLite (`capitan.db`, FASE 32).
 
 Ejemplo: `clima_agent` almacena `preferred_location: "Montevideo"`. En cada `proactive_check()` y `process()` recibe este contexto y resuelve coordenadas vía `geocoding.py`.
 
