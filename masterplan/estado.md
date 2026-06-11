@@ -2804,26 +2804,27 @@ Hardware: Beelink SER9 Pro — Ryzen AI 7 HX 255, 32GB DDR5, Radeon 780M (RDNA 3
 Objetivo: Reemplazar los JSON files en ~/.local/share/capitan/ por una base de datos
           estructurada (SQLite). Elimina problemas de concurrencia, mejora queries,
           facilita backup y migración entre servidores.
-Estado:   Pendiente
+Estado:   EN CURSO (32.1-32.3 + 32.5: esquema + db.py + migración validada contra datos
+          reales del SER9 + backup. Falta 32.4 migrar módulos y 32.6 borrar JSON.)
 Deps:     FASE 21 (SER9 estable — COMPLETA)
 Motivación: actualmente los datos (usuarios, intents, conversaciones, portfolios,
             contextos, routines, etc.) son ~30 archivos JSON sin esquema formal,
             sin transacciones, sin índices. Migración costosa pero necesaria para escalar.
 ```
 
-- [ ] 32.1  Inventario y esquema: mapear todos los archivos de datos/config actuales a tablas
-            SQLite. Incluye los JSON de `~/.local/share/capitan/` (users, conversations, intents,
-            goals, routines, agents, portfolios, contexts, ml_prices, finance_news, feriados,
-            wakeword_metrics, embeddings) Y los registros/config del repo: **`panels.yaml`**
-            (registro de paneles, 16.23) y la **información de entidades** (entity_index /
-            aliases / mapa de `ha_client`). Identificar relaciones (user → intents/conversations/
-            portfolio; panel → users; entidad → ambiente/alias). Definir esquema con migraciones.
-            > Nota: panels.yaml y las entidades son config "fuente de verdad" — evaluar si van a
-            > la misma DB o a una tabla de config aparte, pero deben dejar de vivir sueltos en files.
-- [ ] 32.2  Capa de acceso unificada: crear `core/db.py` con conexión SQLite y helpers
+- [x] 32.1  Inventario y esquema: mapear todos los archivos de datos/config actuales a tablas
+            SQLite. **Entidades del sistema** (objetos de dominio propios) que hoy viven en files:
+            usuarios, paneles (`panels.yaml`), conversaciones, intents, goals, routines, agents,
+            portfolios, contexts, ml_prices, finance_news, feriados, wakeword_metrics, embeddings.
+            Identificar relaciones (user → intents/conversations/portfolio; panel → users).
+            Definir esquema con migraciones (alembic o schema_version manual).
+            > Las entidades de **HAOS** (entity_index / aliases / mapa de `ha_client`) son otra cosa
+            > (catálogo externo de Home Assistant) — opcional moverlas a una tabla de config; no es
+            > el foco. El foco son los objetos del sistema (usuarios, paneles, etc.).
+- [x] 32.2  Capa de acceso unificada: crear `core/db.py` con conexión SQLite y helpers
             CRUD que reemplacen los json read/write actuales. Mantener API idéntica
             para no romper agentes existentes.
-- [ ] 32.3  Migración de datos existentes: script `scripts/migrate_to_db.py` que lee los
+- [x] 32.3  Migración de datos existentes: script `scripts/migrate_to_db.py` que lee los
             JSON actuales y los inserta en la DB. Idempotente y con dry-run.
 - [ ] 32.4  Migrar módulos críticos: users.py, conversations.py, intents.py, portfolios.
             Un módulo a la vez con tests. Los JSON se mantienen como fallback hasta
