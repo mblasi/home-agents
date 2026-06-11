@@ -10,7 +10,7 @@
 {% set tot_vals  = history | selectattr("lat_total") | map(attribute="lat_total") | list %}
 
 <!-- Resumen de latencias -->
-<div class="grid grid-cols-3 gap-4 mb-6">
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
   {% for label, vals, color in [
       ("STT",   stt_vals,  "blue"),
       ("LLM",   llm_vals,  "purple"),

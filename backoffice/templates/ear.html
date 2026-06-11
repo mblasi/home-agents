@@ -99,7 +99,7 @@
     <span class="ml-2 text-xs text-gray-600">instancias ear · heartbeat cada 60s</span>
   </div>
   {% if devices %}
-  <div class="grid grid-cols-3 gap-3 p-3">
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3">
     {% for key, d in devices.items() %}
     {% set age = (now - d.get("ts", now)) | int %}
     <div class="bg-gray-800/60 border {% if age < 90 %}border-emerald-800/60{% else %}border-gray-700{% endif %} rounded-lg p-3">

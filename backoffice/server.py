@@ -1724,9 +1724,10 @@ def wakeword_page(request: Request):
         breakdown.append({"uid": uid, "count": s.get("count", 0)})
     panels = _panels()
     nodes = {n["node_id"]: n for n in (_audio("/nodes") or [])}
+    negatives = _audio("/wakeword/negatives") or {}
     return _render(request, "wakeword.html", "wakeword",
                    train_status=train_status, breakdown=breakdown,
-                   panels=panels, nodes=nodes)
+                   panels=panels, nodes=nodes, negatives=negatives)
 
 
 @app.post("/wakeword/train", response_class=HTMLResponse)
@@ -1851,6 +1852,21 @@ async def panels_provision(request: Request):
 @app.get("/panels/provision/log", response_class=HTMLResponse)
 def panels_provision_log(name: str):
     return HTMLResponse(_provision_log_fragment(name))
+
+
+@app.post("/panels/{name}/reboot", response_class=HTMLResponse)
+def panels_reboot(name: str):
+    """Reinicia un panel vía ADB (16.26)."""
+    p = next((x for x in _panels() if str(x.get("name", "")).lower() == name.lower()), None)
+    if not p:
+        return HTMLResponse('<span class="text-xs text-red-400">panel desconocido</span>')
+    ip = p.get("ip", "")
+    try:
+        subprocess.run(["adb", "connect", f"{ip}:5555"], capture_output=True, timeout=10)
+        subprocess.run(["adb", "-s", f"{ip}:5555", "shell", "reboot"], capture_output=True, timeout=10)
+        return HTMLResponse('<span class="text-xs text-amber-300">reiniciando… (~30s)</span>')
+    except Exception as e:
+        return HTMLResponse(f'<span class="text-xs text-red-400">error: {e}</span>')
 
 
 # Stack legacy de onboarding/enrollment laptop-ear eliminado en 16.29.

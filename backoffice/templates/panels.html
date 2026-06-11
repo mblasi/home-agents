@@ -40,7 +40,12 @@
           {% endif %}
         </td>
         <td class="px-4 py-2 text-gray-400 text-xs">{{ p.users | join(", ") or "—" }}</td>
-        <td class="px-4 py-2 text-right">
+        <td class="px-4 py-2 text-right whitespace-nowrap">
+          <span id="reboot-{{ p.name }}" class="mr-2"></span>
+          <button hx-post="/panels/{{ p.name }}/reboot"
+                  hx-target="#reboot-{{ p.name }}" hx-swap="innerHTML"
+                  hx-confirm="¿Reiniciar {{ p.name }}?"
+                  class="text-xs text-amber-400 hover:text-amber-300 mr-3">reiniciar</button>
           <button hx-delete="/panels/{{ p.name }}"
                   hx-target="#panel-{{ p.name }}" hx-swap="outerHTML"
                   hx-confirm="¿Quitar {{ p.name }} del registro? (no toca el dispositivo)"

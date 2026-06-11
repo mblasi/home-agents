@@ -16,7 +16,7 @@
 {# Estado del dataset (último entrenamiento) #}
 <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-4">
   <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Dataset</h2>
-  <div class="grid grid-cols-3 gap-3 mb-4">
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
     <div class="bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-2 text-center">
       <div class="text-xs text-gray-500 mb-1">Positivos (último train)</div>
       <div class="text-lg font-bold text-emerald-400">{{ train_status.n_positive | default("—") }}</div>
@@ -24,8 +24,11 @@
     </div>
     <div class="bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-2 text-center">
       <div class="text-xs text-gray-500 mb-1">Negativos</div>
-      <div class="text-lg font-bold text-blue-400">{{ train_status.n_negative | default("—") }}</div>
-      <div class="text-xs text-gray-600">genéricos + nodos</div>
+      <div class="text-lg font-bold text-blue-400">{{ negatives.total | default(train_status.n_negative) | default("—") }}</div>
+      <div class="text-xs text-gray-600">
+        {{ negatives.node_total | default(0) }} de nodos
+        {% if negatives.cap_per_node %}<span class="text-gray-700">· cap {{ negatives.cap_per_node }}/nodo</span>{% endif %}
+      </div>
     </div>
     <div class="bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-2 text-center">
       <div class="text-xs text-gray-500 mb-1">Estado</div>

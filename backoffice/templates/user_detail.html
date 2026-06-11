@@ -249,7 +249,7 @@
   {% set required = ww_samples.required | default(30) | int %}
 
 
-  <div class="grid grid-cols-3 gap-3 mb-4">
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
     <div class="bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-2 text-center">
       <div class="text-xs text-gray-500 mb-1">Muestras</div>
       <div class="text-lg font-bold {{ 'text-emerald-400' if count >= required else 'text-yellow-400' }}">{{ count }}</div>
