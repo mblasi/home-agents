@@ -695,6 +695,10 @@ Nota:     El SER9 (Beelink, iGPU 780M/ROCm) alcanza para los servicios y el 7b, 
 - [ ] 8.28 Alertas si un servicio cae (notificación por WhatsApp vía FASE 3.5)
 - [ ] 8.29 Backup automático de modelos fine-tuneados y configuraciones
 - [ ] 8.30 Wake-on-LAN desde laptop (servidor puede estar en suspend fuera de horario)
+- [ ] 8.31 Auto power-on del SER9 tras corte de luz: setear en BIOS "Restore AC Power Loss"
+           = Power On (no Last State) para que Proxmox levante solo. Verificar que VM 100
+           (HAOS) y LXC 101 (capitan-lxc) tengan onboot=1. Complementa 8.25 (UPS): sin BIOS,
+           un corte largo deja todo caído hasta volver físicamente.
 
 #### Latencias objetivo post-migración (con GPU)
 ```
