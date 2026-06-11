@@ -1881,11 +1881,36 @@ async def rbac_roles_save(request: Request):
     return RedirectResponse("/users", status_code=303)
 
 
+def _ear_merged_nodes() -> list[dict]:
+    """Paneles CONOCIDOS (panels.yaml) cruzados con el estado runtime (/nodes).
+    Un panel registrado pero no visto desde que arrancó el audio_server → offline (no desaparece)."""
+    runtime = {n["node_id"]: n for n in (_audio("/nodes") or [])}
+    merged, seen = [], set()
+    for p in _panels():
+        nid = p.get("node_id", "")
+        rt = runtime.get(nid, {})
+        seen.add(nid)
+        merged.append({
+            "room": p.get("room") or p.get("name") or nid,
+            "node_id": nid,
+            "ip": p.get("ip") or rt.get("ip") or "",
+            "state": rt.get("state", "offline"),
+            "tp": rt.get("tp", 0), "fp": rt.get("fp", 0), "fp_rate": rt.get("fp_rate", 0.0),
+            "last_command": rt.get("last_command", ""), "last_latency_ms": rt.get("last_latency_ms", 0),
+            "last_command_ts": rt.get("last_command_ts", 0),
+        })
+    # nodos vistos en runtime que no están en panels.yaml (no registrados)
+    for nid, rt in runtime.items():
+        if nid not in seen:
+            merged.append({**rt, "room": (rt.get("room") or nid) + " (no registrado)"})
+    return merged
+
+
 @app.get("/ear", response_class=HTMLResponse)
 def ear_page(request: Request):
     """Dashboard de la capa de audio: audio_server + nodos NSPanel + métricas wake word."""
     health    = _audio("/health")
-    nodes     = _audio("/nodes") or []
+    nodes     = _ear_merged_nodes()
     negatives = _audio("/wakeword/negatives") or {}
     return _render(request, "ear.html", "ear",
                    audio_ok=health is not None, nodes=nodes, negatives=negatives)
@@ -1894,7 +1919,7 @@ def ear_page(request: Request):
 def _ear_nodes_rows(nodes: list[dict]) -> str:
     if not nodes:
         return ('<tr><td colspan="7" class="px-3 py-4 text-center text-gray-600">'
-                'Sin nodos registrados</td></tr>')
+                'Sin paneles registrados (panels.yaml)</td></tr>')
     import time as _t
     rows = []
     for n in nodes:
@@ -1922,7 +1947,7 @@ def _ear_nodes_rows(nodes: list[dict]) -> str:
 
 @app.get("/api/ear/nodes", response_class=HTMLResponse)
 def ear_nodes_fragment():
-    return HTMLResponse(_ear_nodes_rows(_audio("/nodes") or []))
+    return HTMLResponse(_ear_nodes_rows(_ear_merged_nodes()))
 
 
 @app.get("/devices", response_class=HTMLResponse)

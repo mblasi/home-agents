@@ -1459,7 +1459,7 @@ Flujo existente: core/wakeword_trainer.py (positivos TTS+reales, negativos está
           /wakeword/train (supervisado), /users/{uid}/wakeword/samples, wakeword_metrics.json.
 ```
 
-- [ ] 16.15 Métricas TP/FP orgánicas desde nodos: `audio_server.py` registra TP cuando el STT
+- [x] 16.15 Métricas TP/FP orgánicas desde nodos: `audio_server.py` registra TP cuando el STT
             produce texto válido y FP cuando devuelve vacío/ruido tras un comando de nodo.
             Escribe en el mismo `wakeword_metrics.json` que lee el backoffice (audio_server
             corre en el SER9, co-ubicado con el core). Coherente con `_update_wakeword_metrics`
@@ -2854,3 +2854,76 @@ Motivación: actualmente los datos (usuarios, intents, conversaciones, portfolio
             y lo guarda en un directorio de backups rotados (7 días).
 - [x] 32.6  Eliminar JSON files: una vez todos los módulos migrados y backup operativo,
             borrar los archivos JSON y el código de lectura legacy.
+
+---
+
+### FASE 33 - Backoffice en la nube (acceso remoto seguro, egress-only)
+
+```
+Objetivo: Tener un backoffice accesible desde internet SIN exponer el SER9 ni HAOS.
+          La nube nunca inicia conexiones hacia la casa: el SER9 empuja estado para
+          dibujar el dashboard y POLEA una cola de comandos para ejecutar acciones de
+          administración (patrón command / executor). Plataforma: Google Cloud.
+Estado:   Pendiente
+Deps:     FASE 12 (backoffice local — COMPLETA, fuente de datos y UI a reusar),
+          FASE 21 (SER9 estable — COMPLETA), FASE 32 (datos en SQLite — COMPLETA).
+Principio de seguridad: el SER9 sólo hace conexiones SALIENTES (HTTPS) a la nube.
+          Cero port-forwarding, cero inbound, HAOS/core nunca tocan internet. La
+          superficie de ataque en la casa es nula; si la nube cae, el sistema local
+          sigue operando y el backoffice local (LAN) sigue disponible.
+Arquitectura:
+          [SER9 LXC] --push estado-->  [Cloud Run + Firestore]  <--dashboard-- [navegador]
+          [SER9 LXC] --poll comandos->  (cola en Firestore)     <--emite cmd-- [navegador]
+          [SER9 LXC] --post resultado-> (estado del comando)
+Stack GCP elegido: Cloud Run (web + API, scale-to-zero), Firestore (snapshot de
+          estado + cola de comandos), Identity Platform/Firebase Auth (login del
+          dashboard, restringido al email del usuario), Secret Manager (credenciales),
+          Service Account con permiso mínimo para el bridge. Alternativa evaluada:
+          Pub/Sub pull para comandos — se prefiere Firestore por unificar estado+cola
+          y dar histórico/auditoría con TTL.
+```
+
+#### Etapa A - Diseño y contrato
+- [ ] 33.1  Documentar el modelo egress-only y el modelo de amenazas: qué datos salen de
+            la red local, qué NO sale nunca (tokens HAOS, .env, PII sensible), y por qué la
+            nube no puede iniciar conexiones hacia la casa.
+- [ ] 33.2  Definir el contrato del snapshot de estado (server→nube): servicios up/down,
+            latencias STT/LLM/HAOS, agentes activos, últimos comandos, métricas de wake word,
+            usuarios (sin datos sensibles). Minimizar el subconjunto que sale de la LAN.
+- [ ] 33.3  Definir el catálogo TIPADO de comandos admin permitidos (allowlist): restart de
+            servicio, redeploy, ver logs, recargar config, reentrenar wake word, re-enrolar voz,
+            etc. Cada comando es un tipo cerrado con parámetros validados. NUNCA shell arbitrario.
+- [ ] 33.4  Definir autenticación en ambas direcciones: dashboard vía Identity Platform
+            restringido al email del usuario; bridge del SER9 vía token OIDC de Service Account
+            (sin API keys embebidas si se puede). Definir rotación de credenciales.
+
+#### Etapa B - Servicio en la nube (Cloud Run + Firestore)
+- [ ] 33.5  Servicio Cloud Run (FastAPI) en `cloud/`: endpoints `POST /ingest/state`,
+            `GET /commands/pending`, `POST /commands/{id}/result`, y la API que consume el
+            dashboard. HTTPS gestionado, scale-to-zero.
+- [ ] 33.6  Firestore: colección `state` (snapshot actual + histórico corto) y `commands`
+            (estados pending/running/done/error con TTL). Reglas de seguridad por colección.
+- [ ] 33.7  Frontend del dashboard servido por Cloud Run: reusar lo posible del backoffice
+            local (FASE 12). Vistas: estado de servicios, latencias, historial, y panel de
+            acciones que emite comandos a la cola.
+- [ ] 33.8  Login del dashboard con Identity Platform/Firebase Auth, allowlist por email.
+- [ ] 33.9  IaC reproducible (Terraform o script gcloud) para provisionar Cloud Run,
+            Firestore, Identity Platform y Secret Manager. Credenciales en Secret Manager.
+
+#### Etapa C - Bridge / executor en el SER9
+- [ ] 33.10 Daemon `cloud_bridge.py` (systemd unit en el LXC): push periódico del snapshot
+            de estado a `/ingest/state`, reusando datos que ya escriben core/backoffice.
+- [ ] 33.11 Loop de polling: `GET /commands/pending` con backoff/reconexión; ejecuta cada
+            comando contra el allowlist tipado; postea el resultado a `/commands/{id}/result`.
+- [ ] 33.12 Executor seguro: cada tipo de comando mapeado a una función concreta (sin eval).
+            Auditoría: log de cada comando ejecutado, parámetros y resultado.
+- [ ] 33.13 Credenciales del bridge: Service Account con permiso mínimo (sólo los endpoints
+            necesarios), almacenadas fuera del repo. Rotación documentada.
+
+#### Etapa D - Seguridad, costo y operación
+- [ ] 33.14 Rate limiting y validación de payloads en ingest/commands; firma/verificación.
+- [ ] 33.15 Auditoría visible en el dashboard: quién emitió cada comando, cuándo y resultado.
+- [ ] 33.16 Mantener dentro del free tier de GCP (Cloud Run scale-to-zero, cuota de Firestore);
+            alerta de presupuesto.
+- [ ] 33.17 Failover: si la nube cae, el SER9 sigue operando local y el bridge reintenta; si el
+            bridge cae, el backoffice local en LAN (FASE 12) sigue disponible.
