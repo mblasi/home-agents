@@ -79,3 +79,17 @@ Idempotente. El acceso queda restringido por `ALLOWED_EMAILS` (validado en el ba
 - Comandos **tipados y cerrados**; un tipo fuera del catálogo se rechaza sin ejecutar.
 - Reglas Firestore deny-all de cliente: el dashboard sólo accede vía la API server-side.
 - Bridge SA sin roles de proyecto: sólo su identidad OIDC; permiso mínimo absoluto.
+
+## Seguridad, costo y operación (Etapa D)
+
+- **Rate limiting** (33.14): token bucket in-memory por identidad — ingest/pending 120/min,
+  emisión de comandos 60/min (`app/ratelimit.py`). Middleware `BodySizeLimit` rechaza
+  payloads > 512 KB con 413. La firma/verificación es el propio ID token OIDC (Google-signed);
+  los payloads se validan con Pydantic.
+- **Auditoría** (33.15): el dashboard muestra cada comando con estado, tipo, params, quién lo
+  emitió, cuándo y el resultado (ok/output o error).
+- **Costo / free tier** (33.16): Cloud Run `min-instances=0` (scale-to-zero), Firestore native
+  con TTL para acotar almacenamiento. Budget de USD 5 con alertas a 50/90/100% del billing.
+- **Failover** (33.17): si la nube cae, el `core` ni se entera (el bridge es un proceso
+  aparte); el bridge reintenta con backoff exponencial (10→300s) y se recupera solo. Si el
+  bridge cae, el backoffice local en LAN (`:8080`, FASE 12) sigue operando. Verificado e2e.

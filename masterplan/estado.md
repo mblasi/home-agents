@@ -2866,7 +2866,8 @@ Objetivo: Tener un backoffice accesible desde internet SIN exponer el SER9 ni HA
           La nube nunca inicia conexiones hacia la casa: el SER9 empuja estado para
           dibujar el dashboard y POLEA una cola de comandos para ejecutar acciones de
           administración (patrón command / executor). Plataforma: Google Cloud.
-Estado:   EN CURSO (13/17 — Etapas A, B y C completas; bridge desplegado y empujando estado)
+Estado:   COMPLETA — servicio en la nube desplegado (capitan-495518/southamerica-east1),
+          bridge en capitan-lxc empujando estado y ejecutando comandos, verificado e2e.
 Deps:     FASE 12 (backoffice local — COMPLETA, fuente de datos y UI a reusar),
           FASE 21 (SER9 estable — COMPLETA), FASE 32 (datos en SQLite — COMPLETA).
 Principio de seguridad: el SER9 sólo hace conexiones SALIENTES (HTTPS) a la nube.
@@ -2925,9 +2926,10 @@ Stack GCP elegido: Cloud Run (web + API, scale-to-zero), Firestore (snapshot de
             necesarios), almacenadas fuera del repo. Rotación documentada.
 
 #### Etapa D - Seguridad, costo y operación
-- [ ] 33.14 Rate limiting y validación de payloads en ingest/commands; firma/verificación.
-- [ ] 33.15 Auditoría visible en el dashboard: quién emitió cada comando, cuándo y resultado.
-- [ ] 33.16 Mantener dentro del free tier de GCP (Cloud Run scale-to-zero, cuota de Firestore);
-            alerta de presupuesto.
-- [ ] 33.17 Failover: si la nube cae, el SER9 sigue operando local y el bridge reintenta; si el
-            bridge cae, el backoffice local en LAN (FASE 12) sigue disponible.
+- [x] 33.14 Rate limiting y validación de payloads en ingest/commands; firma/verificación.
+            (token bucket por identidad + middleware de tamaño 512KB; OIDC = firma; Pydantic)
+- [x] 33.15 Auditoría visible en el dashboard: quién emitió cada comando, cuándo y resultado.
+- [x] 33.16 Mantener dentro del free tier de GCP (Cloud Run scale-to-zero, cuota de Firestore);
+            alerta de presupuesto. (budget USD 5, alertas 50/90/100%)
+- [x] 33.17 Failover: si la nube cae, el SER9 sigue operando local y el bridge reintenta; si el
+            bridge cae, el backoffice local en LAN (FASE 12) sigue disponible. (verificado e2e)

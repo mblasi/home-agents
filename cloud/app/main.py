@@ -13,15 +13,32 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from starlette.middleware.base import BaseHTTPMiddleware
+
 from . import firestore_db as fdb
+from . import ratelimit
 from .auth import ALLOWED_EMAILS, FIREBASE_PROJECT_ID, require_bridge, require_dashboard_user
 from .commands import CommandError, catalog_summary, validate_command
 from .models import SCHEMA_VERSION, CommandRequest, CommandResult, StateSnapshot
 
 HERE = os.path.dirname(__file__)
+MAX_BODY = int(os.environ.get("MAX_BODY_BYTES", str(512 * 1024)))  # 512 KB
+
 app = FastAPI(title="home-agents cloud backoffice", docs_url=None, redoc_url=None)
 app.mount("/static", StaticFiles(directory=os.path.join(HERE, "static")), name="static")
 templates = Jinja2Templates(directory=os.path.join(HERE, "templates"))
+
+
+class BodySizeLimit(BaseHTTPMiddleware):
+    """Rechaza payloads grandes antes de parsearlos (33.14)."""
+    async def dispatch(self, request: Request, call_next):
+        cl = request.headers.get("content-length")
+        if cl and cl.isdigit() and int(cl) > MAX_BODY:
+            return JSONResponse({"detail": "payload demasiado grande"}, status_code=413)
+        return await call_next(request)
+
+
+app.add_middleware(BodySizeLimit)
 
 
 @app.get("/_health")
@@ -34,6 +51,7 @@ def health():
 
 @app.post("/ingest/state")
 def ingest_state(snapshot: StateSnapshot, sa: str = Depends(require_bridge)):
+    ratelimit.limit_ingest(sa)
     if snapshot.schema_version != SCHEMA_VERSION:
         raise HTTPException(status_code=422, detail="schema_version no soportada")
     fdb.store_state(snapshot.model_dump())
@@ -42,6 +60,7 @@ def ingest_state(snapshot: StateSnapshot, sa: str = Depends(require_bridge)):
 
 @app.get("/commands/pending")
 def commands_pending(sa: str = Depends(require_bridge)):
+    ratelimit.limit_ingest(sa)
     return {"commands": fdb.claim_pending()}
 
 
@@ -74,6 +93,7 @@ def api_catalog(user: str = Depends(require_dashboard_user)):
 
 @app.post("/api/commands")
 def api_emit_command(req: CommandRequest, user: str = Depends(require_dashboard_user)):
+    ratelimit.limit_command(user)
     try:
         params = validate_command(req.type, req.params)
     except CommandError as exc:
