@@ -11,17 +11,19 @@ import os
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from google.cloud import firestore
+# google.cloud.firestore se importa de forma lazy (dentro de las funciones) para no
+# forzar esa dependencia pesada en tests de unidad de otros módulos.
 
 HISTORY_TTL_HOURS = int(os.environ.get("STATE_HISTORY_TTL_HOURS", "24"))
 COMMAND_TTL_HOURS = int(os.environ.get("COMMAND_TTL_HOURS", "24"))
 
-_client: firestore.Client | None = None
+_client = None
 
 
-def db() -> firestore.Client:
+def db():
     global _client
     if _client is None:
+        from google.cloud import firestore
         _client = firestore.Client()
     return _client
 
@@ -45,6 +47,28 @@ def get_state() -> dict | None:
     return snap.to_dict() if snap.exists else None
 
 
+# ── Roster de autorización (email→rol), materializado desde el snapshot ─────────
+
+def store_roster(users_summary: list[dict]) -> None:
+    """Materializa el roster email→rol para autorizar el login del dashboard.
+    Se guarda como lista (las field keys de Firestore no admiten '.' del email)."""
+    entries = [
+        {"email": u["email"].strip().lower(), "role": u.get("role", "")}
+        for u in users_summary
+        if u.get("email")
+    ]
+    db().collection("auth").document("roster").set(
+        {"entries": entries, "updated_at": _now()}
+    )
+
+
+def get_roster() -> dict[str, str]:
+    snap = db().collection("auth").document("roster").get()
+    if not snap.exists:
+        return {}
+    return {e["email"]: e.get("role", "") for e in snap.to_dict().get("entries", [])}
+
+
 # ── Comandos ──────────────────────────────────────────────────────────────────
 
 def enqueue_command(cmd_type: str, params: dict, issued_by: str) -> dict:
@@ -66,6 +90,7 @@ def enqueue_command(cmd_type: str, params: dict, issued_by: str) -> dict:
 def claim_pending(limit: int = 20) -> list[dict]:
     """Devuelve comandos pending y los pasa a running atómicamente (evita doble
     ejecución entre ciclos de polling del bridge)."""
+    from google.cloud import firestore
     col = db().collection("commands")
     q = col.where("status", "==", "pending").limit(limit)
     claimed: list[dict] = []
@@ -102,6 +127,7 @@ def set_result(cmd_id: str, ok: bool, output: str, error: str) -> bool:
 
 
 def recent_commands(limit: int = 50) -> list[dict]:
+    from google.cloud import firestore
     col = db().collection("commands")
     q = col.order_by("issued_at", direction=firestore.Query.DESCENDING).limit(limit)
     return [snap.to_dict() for snap in q.stream()]

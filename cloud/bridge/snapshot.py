@@ -146,11 +146,14 @@ def _users() -> list[dict]:
         if not isinstance(u, dict):
             continue
         uid = u.get("id", "?")
+        # login_email: email dedicado o, en su defecto, gcal_email (FASE 33.19).
+        login_email = u.get("email") or u.get("gcal_email")
         out.append({
             "id": uid,
             "name": u.get("name", uid),
             "role": u.get("role", "user"),
             "intents_pending": pending.get(uid, 0),
+            "email": login_email,
         })
     return out
 

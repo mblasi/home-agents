@@ -8,9 +8,14 @@ from __future__ import annotations
 
 import os
 
+from dataclasses import dataclass
+
 from fastapi import Header, HTTPException
 from google.auth.transport import requests as ga_requests
 from google.oauth2 import id_token as ga_id_token
+
+from . import firestore_db as fdb
+from . import rbac
 
 PROJECT_ID = os.environ.get("GCP_PROJECT", "")
 FIREBASE_PROJECT_ID = os.environ.get("FIREBASE_PROJECT_ID", PROJECT_ID)
@@ -29,8 +34,18 @@ def _bearer(authorization: str | None) -> str:
     return authorization.split(" ", 1)[1].strip()
 
 
-def require_dashboard_user(authorization: str | None = Header(default=None)) -> str:
-    """Valida el Firebase ID token y la allow-list de email. Devuelve el email."""
+@dataclass
+class Principal:
+    email: str
+    role: str
+    caps: dict
+
+
+def require_dashboard_user(authorization: str | None = Header(default=None)) -> Principal:
+    """Valida el Firebase ID token y autoriza contra el roster de usuarios (email→rol)
+    pusheado por el SER9. `ALLOWED_EMAILS` queda sólo como bootstrap de emergencia
+    (→ admin) para no quedar bloqueado si el roster está vacío. Devuelve el Principal
+    con rol y capacidades RBAC (33.20/33.21)."""
     token = _bearer(authorization)
     try:
         claims = ga_id_token.verify_firebase_token(
@@ -39,9 +54,16 @@ def require_dashboard_user(authorization: str | None = Header(default=None)) -> 
     except Exception as exc:  # noqa: BLE001 — token inválido
         raise HTTPException(status_code=401, detail="ID token inválido") from exc
     email = (claims.get("email") or "").lower()
-    if not claims.get("email_verified") or email not in ALLOWED_EMAILS:
+    if not claims.get("email_verified") or not email:
+        raise HTTPException(status_code=401, detail="email no verificado")
+
+    role = fdb.get_roster().get(email)
+    if role is None and email in ALLOWED_EMAILS:
+        role = "admin"  # bootstrap de emergencia
+    caps = rbac.caps_for(role)
+    if not caps["access"]:
         raise HTTPException(status_code=403, detail="email no autorizado")
-    return email
+    return Principal(email=email, role=role or "", caps=caps)
 
 
 def require_bridge(authorization: str | None = Header(default=None)) -> str:

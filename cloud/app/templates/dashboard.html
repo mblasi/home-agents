@@ -45,7 +45,7 @@
       <table id="recent"><tbody></tbody></table>
     </section>
 
-    <section class="card">
+    <section class="card hidden" id="actions-card">
       <h2>Acciones admin</h2>
       <form id="emit">
         <select id="cmd-type"></select>
@@ -55,7 +55,7 @@
       <p id="emit-msg" class="muted"></p>
     </section>
 
-    <section class="card">
+    <section class="card hidden" id="audit-card">
       <h2>Auditoría de comandos admin</h2>
       <table id="audit"><tbody></tbody></table>
     </section>
@@ -95,6 +95,8 @@ async function api(path, opts = {}) {
 
 function dot(ok) { return ok ? "🟢" : "🔴"; }
 
+let CAPS = {};
+
 async function refresh() {
   try {
     const { state } = await api("/api/state");
@@ -110,6 +112,7 @@ async function refresh() {
     $("recent").querySelector("tbody").innerHTML = (state.recent_commands || [])
       .map(c => `<tr><td>${dot(c.ok)}</td><td>${c.text}</td><td class="muted">${c.agent}</td><td class="muted">${c.latency_ms ?? "—"}ms</td></tr>`).join("");
   } catch (e) { $("updated").textContent = "error: " + e.message; }
+  if (!CAPS.view_full) return;  // adolescente: sin auditoría
   try {
     const { commands } = await api("/api/commands");
     const st = (s) => s === "done" ? "🟢" : s === "error" ? "🔴" : s === "running" ? "🟡" : "⚪";
@@ -158,10 +161,21 @@ auth.onAuthStateChanged(async (user) => {
   }
   idToken = await user.getIdToken();
   $("useremail").textContent = user.email;
-  hide("login"); show("app"); show("userbox");
-  try { await loadCatalog(); } catch (e) {
-    $("login-error").textContent = e.message; show("login"); hide("app"); return;
+  // Autorización + capacidades RBAC (rol resuelto contra el roster del SER9).
+  let me;
+  try { me = await api("/api/me"); }
+  catch (e) {
+    $("login-error").textContent = e.message + " — tu cuenta no tiene acceso";
+    show("login"); hide("app"); hide("userbox"); auth.signOut(); return;
   }
+  CAPS = me.caps || {};
+  $("useremail").textContent = user.email + " · " + me.role;
+  hide("login"); show("app"); show("userbox");
+  if (CAPS.view_full) show("audit-card"); else hide("audit-card");
+  if (CAPS.emit) {
+    show("actions-card");
+    try { await loadCatalog(); } catch (e) { hide("actions-card"); }
+  } else { hide("actions-card"); }
   refresh();
   timer = setInterval(async () => { idToken = await user.getIdToken(); refresh(); }, 10000);
 });
