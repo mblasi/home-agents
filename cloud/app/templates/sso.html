@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Capitán · acceso al backoffice local</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<main>
+  <section class="card" style="max-width:480px;margin:60px auto;">
+    <h1>Capitán <span class="muted">· acceso local</span></h1>
+    <p class="muted">Ingresá con Google para autenticarte en el backoffice local.</p>
+    <p id="status" class="muted">Esperando login…</p>
+    <button id="signin">Ingresar con Google</button>
+    <p id="err" class="error hidden"></p>
+  </section>
+</main>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script>
+const CFG = {
+  apiKey: "{{ firebase_api_key }}",
+  authDomain: "{{ firebase_auth_domain }}",
+  projectId: "{{ firebase_project_id }}",
+};
+const REDIRECT_URI = {{ redirect_uri | tojson }};
+firebase.initializeApp(CFG);
+const auth = firebase.auth();
+const provider = new firebase.auth.GoogleAuthProvider();
+const $ = (id) => document.getElementById(id);
+
+$("signin").onclick = () => auth.signInWithPopup(provider).catch(e => {
+  $("err").textContent = e.message; $("err").classList.remove("hidden");
+});
+
+async function handoff(user) {
+  $("status").textContent = "Generando acceso…";
+  const idToken = await user.getIdToken();
+  try {
+    const r = await fetch("/sso/mint", {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + idToken, "Content-Type": "application/json" },
+      body: JSON.stringify({ redirect_uri: REDIRECT_URI }),
+    });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.status);
+    const { redirect } = await r.json();
+    $("status").textContent = "Redirigiendo al backoffice local…";
+    window.location = redirect;
+  } catch (e) {
+    $("err").textContent = "No autorizado: " + e.message;
+    $("err").classList.remove("hidden");
+    $("status").textContent = "";
+    auth.signOut();
+  }
+}
+
+auth.onAuthStateChanged((user) => { if (user) handoff(user); });
+</script>
+</body>
+</html>
