@@ -24,8 +24,9 @@ app.mount("/static", StaticFiles(directory=os.path.join(HERE, "static")), name="
 templates = Jinja2Templates(directory=os.path.join(HERE, "templates"))
 
 
-@app.get("/healthz")
-def healthz():
+@app.get("/_health")
+def health():
+    # /healthz lo reserva el Google Front End en Cloud Run; usar /_health.
     return {"ok": True}
 
 
