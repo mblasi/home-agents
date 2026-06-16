@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Capitán · backoffice en la nube</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <h1>Capitán <span class="muted">· nube</span></h1>
+  <div id="userbox" class="hidden">
+    <span id="useremail" class="muted"></span>
+    <button id="signout">salir</button>
+  </div>
+</header>
+
+<main>
+  <section id="login" class="card">
+    <p>Backoffice remoto. Acceso restringido a: <code>{{ allowed_emails }}</code></p>
+    <button id="signin">Ingresar con Google</button>
+    <p id="login-error" class="error hidden"></p>
+  </section>
+
+  <div id="app" class="hidden">
+    <p class="muted" id="updated"></p>
+
+    <section class="card">
+      <h2>Servicios</h2>
+      <div id="services" class="grid"></div>
+    </section>
+
+    <section class="card">
+      <h2>Latencias (ms)</h2>
+      <div id="latency" class="grid"></div>
+    </section>
+
+    <section class="card">
+      <h2>Agentes</h2>
+      <div id="agents" class="grid"></div>
+    </section>
+
+    <section class="card">
+      <h2>Últimos comandos de voz</h2>
+      <table id="recent"><tbody></tbody></table>
+    </section>
+
+    <section class="card">
+      <h2>Acciones admin</h2>
+      <form id="emit">
+        <select id="cmd-type"></select>
+        <input id="cmd-params" placeholder='params JSON, ej {"service":"capitan-core"}'>
+        <button type="submit">Emitir</button>
+      </form>
+      <p id="emit-msg" class="muted"></p>
+    </section>
+
+    <section class="card">
+      <h2>Auditoría de comandos admin</h2>
+      <table id="audit"><tbody></tbody></table>
+    </section>
+  </div>
+</main>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script>
+const CFG = {
+  apiKey: "{{ firebase_api_key }}",
+  authDomain: "{{ firebase_auth_domain }}",
+  projectId: "{{ firebase_project_id }}",
+};
+firebase.initializeApp(CFG);
+const auth = firebase.auth();
+const provider = new firebase.auth.GoogleAuthProvider();
+let idToken = null;
+
+const $ = (id) => document.getElementById(id);
+const show = (id) => $(id).classList.remove("hidden");
+const hide = (id) => $(id).classList.add("hidden");
+
+$("signin").onclick = () => auth.signInWithPopup(provider).catch(e => {
+  $("login-error").textContent = e.message; show("login-error");
+});
+$("signout").onclick = () => auth.signOut();
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, {
+    ...opts,
+    headers: { ...(opts.headers || {}), "Authorization": "Bearer " + idToken },
+  });
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.status);
+  return r.json();
+}
+
+function dot(ok) { return ok ? "🟢" : "🔴"; }
+
+async function refresh() {
+  try {
+    const { state } = await api("/api/state");
+    if (!state) { $("updated").textContent = "sin datos del SER9 todavía"; return; }
+    $("updated").textContent = "snapshot: " + (state.ts || "?");
+    $("services").innerHTML = Object.entries(state.services || {})
+      .map(([k, v]) => `<div>${dot(v.up)} <b>${k}</b> <span class="muted">${v.detail || ""}</span></div>`).join("");
+    const L = state.latency || {};
+    $("latency").innerHTML = ["stt_ms", "llm_ms", "haos_ms"]
+      .map(k => `<div><b>${k.replace("_ms","").toUpperCase()}</b> ${L[k] ?? "—"}</div>`).join("");
+    $("agents").innerHTML = (state.agents || [])
+      .map(a => `<div>${dot(a.active)} <b>${a.id}</b>${a.proactive ? " ⚡" : ""}</div>`).join("");
+    $("recent").querySelector("tbody").innerHTML = (state.recent_commands || [])
+      .map(c => `<tr><td>${dot(c.ok)}</td><td>${c.text}</td><td class="muted">${c.agent}</td><td class="muted">${c.latency_ms ?? "—"}ms</td></tr>`).join("");
+  } catch (e) { $("updated").textContent = "error: " + e.message; }
+  try {
+    const { commands } = await api("/api/commands");
+    $("audit").querySelector("tbody").innerHTML = commands
+      .map(c => `<tr><td>${c.status}</td><td><b>${c.type}</b></td><td class="muted">${JSON.stringify(c.params)}</td><td class="muted">${c.issued_by}</td><td class="muted">${c.issued_at}</td></tr>`).join("");
+  } catch (e) {}
+}
+
+async function loadCatalog() {
+  const { catalog } = await api("/api/catalog");
+  $("cmd-type").innerHTML = catalog.map(c => `<option value="${c.type}">${c.type}</option>`).join("");
+}
+
+$("emit").onsubmit = async (e) => {
+  e.preventDefault();
+  let params = {};
+  try { params = $("cmd-params").value ? JSON.parse($("cmd-params").value) : {}; }
+  catch { $("emit-msg").textContent = "params JSON inválido"; return; }
+  try {
+    await api("/api/commands", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: $("cmd-type").value, params }),
+    });
+    $("emit-msg").textContent = "comando encolado";
+    $("cmd-params").value = "";
+    refresh();
+  } catch (e) { $("emit-msg").textContent = "error: " + e.message; }
+};
+
+let timer = null;
+auth.onAuthStateChanged(async (user) => {
+  if (!user) {
+    idToken = null; clearInterval(timer);
+    hide("app"); hide("userbox"); show("login");
+    return;
+  }
+  idToken = await user.getIdToken();
+  $("useremail").textContent = user.email;
+  hide("login"); show("app"); show("userbox");
+  try { await loadCatalog(); } catch (e) {
+    $("login-error").textContent = e.message; show("login"); hide("app"); return;
+  }
+  refresh();
+  timer = setInterval(async () => { idToken = await user.getIdToken(); refresh(); }, 10000);
+});
+</script>
+</body>
+</html>
