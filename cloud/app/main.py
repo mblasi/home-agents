@@ -18,6 +18,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from . import firestore_db as fdb
 from . import ratelimit
 from . import rbac
+from . import sso
 from .auth import (
     ALLOWED_EMAILS,
     FIREBASE_PROJECT_ID,
@@ -128,6 +129,46 @@ def api_emit_command(req: CommandRequest, p: Principal = Depends(require_dashboa
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     cmd = fdb.enqueue_command(req.type, params, issued_by=p.email)
     return {"command": cmd}
+
+
+# ── SSO broker para el backoffice local (33.22) ─────────────────────────────────
+
+LOCAL_SSO_ORIGINS = {
+    o.strip().rstrip("/")
+    for o in os.environ.get("LOCAL_SSO_ORIGINS", "").split(",") if o.strip()
+}
+
+
+def _valid_redirect(redirect_uri: str) -> bool:
+    """El redirect_uri debe ser /sso/callback de un origen LAN permitido."""
+    try:
+        from urllib.parse import urlparse
+        u = urlparse(redirect_uri)
+        origin = f"{u.scheme}://{u.netloc}"
+        return origin in LOCAL_SSO_ORIGINS and u.path == "/sso/callback"
+    except Exception:  # noqa: BLE001
+        return False
+
+
+@app.get("/sso/start", response_class=HTMLResponse)
+def sso_start(request: Request, redirect_uri: str = ""):
+    if not _valid_redirect(redirect_uri):
+        raise HTTPException(status_code=400, detail="redirect_uri no permitido")
+    return templates.TemplateResponse(request, "sso.html", {
+        "firebase_api_key": os.environ.get("FIREBASE_API_KEY", ""),
+        "firebase_auth_domain": os.environ.get("FIREBASE_AUTH_DOMAIN", ""),
+        "firebase_project_id": FIREBASE_PROJECT_ID,
+        "redirect_uri": redirect_uri,
+    })
+
+
+@app.post("/sso/mint")
+def sso_mint(body: dict, p: Principal = Depends(require_dashboard_user)):
+    redirect_uri = (body or {}).get("redirect_uri", "")
+    if not _valid_redirect(redirect_uri):
+        raise HTTPException(status_code=400, detail="redirect_uri no permitido")
+    token = sso.mint(p.email, p.role)
+    return {"redirect": f"{redirect_uri}?sso={token}"}
 
 
 # ── Frontend ────────────────────────────────────────────────────────────────────

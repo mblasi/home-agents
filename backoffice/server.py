@@ -39,6 +39,13 @@ OAUTH_APP_URL = os.environ.get("OAUTH_APP_URL", "").rstrip("/")
 METRICS_DIR   = Path("/tmp/capitan")
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
+# ── SSO con la nube (FASE 33.23): login por usuario reusando el Google sign-in ──
+SSO_SECRET   = os.environ.get("SSO_SECRET", "").encode()
+CLOUD_SSO_URL = os.environ.get("CLOUD_SSO_URL", "").rstrip("/")  # …/sso/start
+LOCAL_ACCESS_ROLES = {"admin", "familiar", "adolescente"}
+WRITE_ROLES = {"admin"}
+_MUTATING = {"POST", "PUT", "PATCH", "DELETE"}
+
 app = FastAPI(title="capitan-backoffice", version="1.0")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
@@ -65,20 +72,24 @@ templates.env.filters["tojson"]      = _tojson_filter
 # ── Auth ───────────────────────────────────────────────────────────────────────
 
 _SESSION_COOKIE = "capitan_session"
-_SESSIONS: set[str] = set()
+# session_id → principal {user_id, name, role, email}
+_SESSIONS: dict[str, dict] = {}
 
 
-def _new_session() -> str:
+def _new_session(principal: dict) -> str:
     tok = secrets.token_urlsafe(32)
-    _SESSIONS.add(tok)
+    _SESSIONS[tok] = principal
     return tok
 
 
+def _principal(request: Request) -> dict | None:
+    return _SESSIONS.get(request.cookies.get(_SESSION_COOKIE, ""))
+
+
 def _check_auth(request: Request) -> bool:
-    if not BACKOFFICE_TOKEN:
-        return True  # sin token configurado, acceso libre (solo LAN)
-    session = request.cookies.get(_SESSION_COOKIE, "")
-    return session in _SESSIONS
+    if not BACKOFFICE_TOKEN and not SSO_SECRET:
+        return True  # sin auth configurada, acceso libre (solo LAN)
+    return _principal(request) is not None
 
 
 def _require_auth(request: Request):
@@ -86,25 +97,93 @@ def _require_auth(request: Request):
         raise HTTPException(status_code=303, headers={"Location": "/login"})
 
 
+# ── SSO token (codec espejo de cloud/app/sso.py) ────────────────────────────────
+import base64 as _b64mod
+import hashlib as _hashlib
+import hmac as _hmac
+import time as _time
+
+
+def _sso_verify(token: str) -> dict | None:
+    if not SSO_SECRET or not token:
+        return None
+    try:
+        body, sig = token.split(".", 1)
+        expected = _b64mod.urlsafe_b64encode(
+            _hmac.new(SSO_SECRET, body.encode(), _hashlib.sha256).digest()
+        ).decode().rstrip("=")
+        if not _hmac.compare_digest(sig, expected):
+            return None
+        pad = _b64mod.urlsafe_b64decode(body + "=" * (-len(body) % 4))
+        payload = json.loads(pad)
+        if payload.get("exp", 0) < _time.time():
+            return None
+        return payload
+    except Exception:
+        return None
+
+
+def _user_role_by_email(email: str) -> tuple[str, str, str] | None:
+    """(user_id, name, role) del usuario cuyo login_email == email, o None."""
+    if not email:
+        return None
+    e = email.strip().lower()
+    data = _core("/users") or {}
+    users = data.values() if isinstance(data, dict) else (data if isinstance(data, list) else [])
+    for u in users:
+        login_email = (u.get("email") or u.get("gcal_email") or "").strip().lower()
+        if login_email and login_email == e:
+            return u.get("id"), u.get("name", u.get("id")), u.get("role", "")
+    return None
+
+
 @app.get("/login", response_class=HTMLResponse)
 def login_page(request: Request, error: str = ""):
-    return templates.TemplateResponse(request, "login.html", {"error": error})
+    sso_link = ""
+    if CLOUD_SSO_URL and SSO_SECRET:
+        from urllib.parse import quote
+        redirect_uri = str(request.base_url).rstrip("/") + "/sso/callback"
+        sso_link = f"{CLOUD_SSO_URL}?redirect_uri={quote(redirect_uri, safe='')}"
+    return templates.TemplateResponse(request, "login.html",
+                                      {"error": error, "sso_link": sso_link})
 
 
 @app.post("/login")
 async def do_login(response: Response, token: str = Form(...)):
-    if not BACKOFFICE_TOKEN or secrets.compare_digest(token, BACKOFFICE_TOKEN):
-        session = _new_session()
+    # BACKOFFICE_TOKEN: bootstrap de emergencia offline → sesión admin sin usuario.
+    if BACKOFFICE_TOKEN and secrets.compare_digest(token, BACKOFFICE_TOKEN):
+        session = _new_session({"user_id": None, "name": "emergencia",
+                                "role": "admin", "email": None})
         resp = RedirectResponse("/dashboard", status_code=303)
         resp.set_cookie(_SESSION_COOKIE, session, httponly=True, samesite="lax")
         return resp
     return RedirectResponse("/login?error=Token+incorrecto", status_code=303)
 
 
+@app.get("/sso/callback")
+def sso_callback(request: Request, sso: str = ""):
+    """Recibe el token firmado emitido por la nube tras el Google sign-in (33.23).
+    Verifica firma+exp, resuelve email→usuario→rol (DB local) y abre sesión."""
+    payload = _sso_verify(sso)
+    if not payload:
+        return RedirectResponse("/login?error=SSO+inválido+o+expirado", status_code=303)
+    info = _user_role_by_email(payload.get("email", ""))
+    if not info:
+        return RedirectResponse("/login?error=Email+sin+usuario+registrado", status_code=303)
+    user_id, name, role = info
+    if role not in LOCAL_ACCESS_ROLES:
+        return RedirectResponse("/login?error=Tu+rol+no+tiene+acceso", status_code=303)
+    session = _new_session({"user_id": user_id, "name": name,
+                            "role": role, "email": payload.get("email")})
+    resp = RedirectResponse("/dashboard", status_code=303)
+    resp.set_cookie(_SESSION_COOKIE, session, httponly=True, samesite="lax")
+    return resp
+
+
 @app.get("/logout")
 def logout(request: Request, response: Response):
     session = request.cookies.get(_SESSION_COOKIE, "")
-    _SESSIONS.discard(session)
+    _SESSIONS.pop(session, None)
     resp = RedirectResponse("/login", status_code=303)
     resp.delete_cookie(_SESSION_COOKIE)
     return resp
@@ -115,10 +194,19 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        public = {"/login", "/api/status"}
-        if request.url.path not in public and not request.url.path.startswith("/login"):
+        path = request.url.path
+        request.state.principal = _principal(request)
+        public = {"/login", "/api/status", "/sso/callback"}
+        if path not in public and not path.startswith("/login"):
             if not _check_auth(request):
                 return RedirectResponse("/login", status_code=303)
+            # RBAC (33.24): solo admin puede mutar; el resto es read-only.
+            if request.method in _MUTATING:
+                p = _principal(request)
+                role = (p or {}).get("role")
+                if role is not None and role not in WRITE_ROLES:
+                    return JSONResponse(
+                        {"detail": "tu rol es de solo lectura"}, status_code=403)
         return await call_next(request)
 
 app.add_middleware(AuthMiddleware)
