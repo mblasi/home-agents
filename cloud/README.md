@@ -79,6 +79,17 @@ restringido por `ALLOWED_EMAILS` (validado en el backend).
 | `BRIDGE_SA_EMAIL` | email de la SA del bridge autorizada a ingest/commands |
 | `SERVICE_URL` | audiencia esperada del OIDC del bridge |
 | `FIREBASE_API_KEY` / `FIREBASE_AUTH_DOMAIN` | config web de Firebase Auth |
+| `SSO_SECRET` | secreto HMAC compartido con el backoffice local (firma el token SSO) |
+| `LOCAL_SSO_ORIGINS` | allow-list de orígenes LAN del backoffice local para el redirect SSO |
+
+## SSO con el backoffice local (33.22–33.24)
+
+El backoffice local (LAN, `:8080`) reusa este login en vez de un token compartido. La nube
+actúa de broker: `/sso/start?redirect_uri=<local>/sso/callback` hace el Google sign-in y
+`/sso/mint` emite un token HMAC firmado (exp corto) que redirige al backoffice local, el cual
+lo verifica, resuelve email→usuario→rol contra su DB y abre sesión con RBAC (admin escribe;
+familiar/adolescente read-only). El `redirect_uri` se valida contra `LOCAL_SSO_ORIGINS`. El
+codec del token está espejado en `cloud/app/sso.py` y en el backoffice.
 
 ## Seguridad
 
