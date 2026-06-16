@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Inicio{% endblock %}
+
+{% block content %}
+{% set _p = request.state.principal if request and request.state else None %}
+
+<div class="mb-8">
+  <h1 class="text-2xl font-bold">
+    Hola{% if _p and _p.name %}, {{ _p.name }}{% endif %} 👋
+  </h1>
+  <p class="text-gray-500 text-sm mt-1">
+    Backoffice de Capitán
+    {% if _p %}
+      · <span class="text-gray-400">{{ _p.role }}</span>
+      {% if _p.role not in ["admin"] %}<span class="text-amber-500"> · solo lectura</span>{% endif %}
+    {% endif %}
+  </p>
+</div>
+
+<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+  {% set cards = [
+    ("/dashboard", "📊", "Dashboard", "Estado, latencias y actividad"),
+    ("/agents", "🤖", "Agentes", "Agentes activos y configuración"),
+    ("/conversations", "💬", "Conversaciones", "Historial de conversaciones"),
+    ("/intents", "🎯", "Intenciones", "Intents pendientes y capturas"),
+    ("/goals", "🏆", "Goals", "Objetivos en curso"),
+    ("/routines", "🔄", "Rutinas", "Rutinas detectadas"),
+    ("/users", "👥", "Usuarios", "Gestión de usuarios y roles"),
+    ("/panels", "🖥️", "Paneles", "NSPanel y nodos de voz"),
+    ("/wakeword", "🎙️", "Wake word", "Métricas y reentrenamiento"),
+    ("/integrations", "🔌", "Integraciones", "Servicios conectados"),
+    ("/plan", "🗺️", "Plan", "Estado del masterplan"),
+    ("/config", "⚙️", "Config", "Variables de entorno"),
+  ] %}
+  {% for href, icon, title, desc in cards %}
+  <a href="{{ href }}"
+     class="bg-gray-900 border border-gray-800 rounded-xl p-4 hover:border-blue-600 hover:bg-gray-800/60 transition-colors">
+    <div class="text-2xl mb-2">{{ icon }}</div>
+    <div class="font-medium text-sm">{{ title }}</div>
+    <div class="text-xs text-gray-500 mt-1">{{ desc }}</div>
+  </a>
+  {% endfor %}
+</div>
+{% endblock %}

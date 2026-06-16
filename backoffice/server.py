@@ -154,7 +154,7 @@ async def do_login(response: Response, token: str = Form(...)):
     if BACKOFFICE_TOKEN and secrets.compare_digest(token, BACKOFFICE_TOKEN):
         session = _new_session({"user_id": None, "name": "emergencia",
                                 "role": "admin", "email": None})
-        resp = RedirectResponse("/dashboard", status_code=303)
+        resp = RedirectResponse("/home", status_code=303)
         resp.set_cookie(_SESSION_COOKIE, session, httponly=True, samesite="lax")
         return resp
     return RedirectResponse("/login?error=Token+incorrecto", status_code=303)
@@ -175,7 +175,7 @@ def sso_callback(request: Request, sso: str = ""):
         return RedirectResponse("/login?error=Tu+rol+no+tiene+acceso", status_code=303)
     session = _new_session({"user_id": user_id, "name": name,
                             "role": role, "email": payload.get("email")})
-    resp = RedirectResponse("/dashboard", status_code=303)
+    resp = RedirectResponse("/home", status_code=303)
     resp.set_cookie(_SESSION_COOKIE, session, httponly=True, samesite="lax")
     return resp
 
@@ -341,7 +341,12 @@ def api_status():
 
 @app.get("/", response_class=HTMLResponse)
 def root():
-    return RedirectResponse("/chat")
+    return RedirectResponse("/home")
+
+
+@app.get("/home", response_class=HTMLResponse)
+def home(request: Request):
+    return _render(request, "home.html", "home")
 
 
 # ── Chat (17.2–17.4) ───────────────────────────────────────────────────────────
