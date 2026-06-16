@@ -78,10 +78,7 @@ Servicio:    $URL
 Runtime SA:  $RUNTIME_SA_EMAIL  (roles/datastore.user)
 Bridge SA:   $BRIDGE_SA_EMAIL   (sin roles — identidad OIDC para el bridge)
 
-Pasos manuales restantes (Identity Platform, una sola vez):
-  1. Habilitar el proveedor Google en Identity Platform (consola).
-  2. Crear/obtener la API key web y el authDomain.
-  3. gcloud run services update $SERVICE --region $REGION \\
-       --update-env-vars=FIREBASE_API_KEY=...,FIREBASE_AUTH_DOMAIN=...
-  4. Generar key del bridge SA (fuera del repo) para el cloud_bridge.py (Etapa C).
+Pasos restantes:
+  1. Login del dashboard:  bash infra/setup_firebase.sh   (Firebase + Google sign-in)
+  2. Generar key del bridge SA (fuera del repo) para el cloud_bridge.py (Etapa C).
 EOF

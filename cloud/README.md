@@ -51,12 +51,16 @@ PROJECT=capitan-495518 REGION=southamerica-east1 \
   ALLOWED_EMAILS=matias@blasi.ar bash infra/provision.sh
 ```
 
-Pasos manuales de Identity Platform (una sola vez):
-1. Consola → Identity Platform → habilitar proveedor **Google**.
-2. Agregar el dominio de Cloud Run a *Authorized domains*.
-3. Obtener la **Web API key** y `authDomain` (`<project>.firebaseapp.com`).
-4. `gcloud run services update capitan-cloud --region southamerica-east1 \
-     --update-env-vars=FIREBASE_API_KEY=...,FIREBASE_AUTH_DOMAIN=...`
+Login del dashboard (Firebase Auth + Google sign-in), automatizado:
+
+```bash
+PROJECT=capitan-495518 REGION=southamerica-east1 bash infra/setup_firebase.sh
+```
+
+`setup_firebase.sh` hace: addFirebase → crea la web app → habilita el proveedor Google
+(OAuth Google-managed, sin client manual) → agrega el dominio de Cloud Run a
+*authorized domains* → fija `FIREBASE_API_KEY`/`FIREBASE_AUTH_DOMAIN` en el servicio.
+Idempotente. El acceso queda restringido por `ALLOWED_EMAILS` (validado en el backend).
 
 ## Variables de entorno del servicio
 
