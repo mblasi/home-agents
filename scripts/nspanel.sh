@@ -155,6 +155,16 @@ cmd_provision() {
 
     echo "\n[2/9] Apps base (Termux, Termux:Boot, HA Companion)"
     pkg_installed com.termux           && echo "  ✓ Termux ya" || { cmd_install_base; }
+    # Termux:Boot y HA Companion se chequean por separado: que Termux ya esté
+    # instalado NO implica que estos estén (cmd_install_base solo corre si falta Termux).
+    if pkg_installed com.termux.boot; then echo "  ✓ Termux:Boot ya"; else
+        local boot_apk="termux-boot-app_v0.8.1+github.debug.apk"
+        [[ -f "/tmp/$boot_apk" ]] || wget -qO "/tmp/$boot_apk" "https://github.com/termux/termux-boot/releases/download/v0.8.1/$boot_apk"
+        adb_cmd install "/tmp/$boot_apk" && echo "  ✓ Termux:Boot"; fi
+    if pkg_installed io.homeassistant.companion.android.minimal; then echo "  ✓ HA Companion ya"; else
+        local ha_apk="app-minimal-release.apk"
+        [[ -f "/tmp/$ha_apk" ]] || wget -qO "/tmp/$ha_apk" "https://github.com/home-assistant/android/releases/latest/download/$ha_apk"
+        adb_cmd install "/tmp/$ha_apk" && echo "  ✓ HA Companion"; fi
     echo "\n[3/9] Termux:API + Termux:GUI (mic + overlay)"
     if pkg_installed com.termux.api; then echo "  ✓ Termux:API ya"; else
         wget -qO /tmp/termux-api.apk "https://github.com/termux/termux-api/releases/download/v0.53.0/termux-api-app_v0.53.0%2Bgithub.debug.apk"
