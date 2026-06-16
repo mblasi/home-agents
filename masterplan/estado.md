@@ -2866,7 +2866,7 @@ Objetivo: Tener un backoffice accesible desde internet SIN exponer el SER9 ni HA
           La nube nunca inicia conexiones hacia la casa: el SER9 empuja estado para
           dibujar el dashboard y POLEA una cola de comandos para ejecutar acciones de
           administración (patrón command / executor). Plataforma: Google Cloud.
-Estado:   Pendiente
+Estado:   EN CURSO (4/17 — Etapa A diseño/contrato completa; ver fase33_cloud_backoffice.md)
 Deps:     FASE 12 (backoffice local — COMPLETA, fuente de datos y UI a reusar),
           FASE 21 (SER9 estable — COMPLETA), FASE 32 (datos en SQLite — COMPLETA).
 Principio de seguridad: el SER9 sólo hace conexiones SALIENTES (HTTPS) a la nube.
@@ -2886,16 +2886,17 @@ Stack GCP elegido: Cloud Run (web + API, scale-to-zero), Firestore (snapshot de
 ```
 
 #### Etapa A - Diseño y contrato
-- [ ] 33.1  Documentar el modelo egress-only y el modelo de amenazas: qué datos salen de
+> Diseño completo en `masterplan/fase33_cloud_backoffice.md`.
+- [x] 33.1  Documentar el modelo egress-only y el modelo de amenazas: qué datos salen de
             la red local, qué NO sale nunca (tokens HAOS, .env, PII sensible), y por qué la
             nube no puede iniciar conexiones hacia la casa.
-- [ ] 33.2  Definir el contrato del snapshot de estado (server→nube): servicios up/down,
+- [x] 33.2  Definir el contrato del snapshot de estado (server→nube): servicios up/down,
             latencias STT/LLM/HAOS, agentes activos, últimos comandos, métricas de wake word,
             usuarios (sin datos sensibles). Minimizar el subconjunto que sale de la LAN.
-- [ ] 33.3  Definir el catálogo TIPADO de comandos admin permitidos (allowlist): restart de
+- [x] 33.3  Definir el catálogo TIPADO de comandos admin permitidos (allowlist): restart de
             servicio, redeploy, ver logs, recargar config, reentrenar wake word, re-enrolar voz,
             etc. Cada comando es un tipo cerrado con parámetros validados. NUNCA shell arbitrario.
-- [ ] 33.4  Definir autenticación en ambas direcciones: dashboard vía Identity Platform
+- [x] 33.4  Definir autenticación en ambas direcciones: dashboard vía Identity Platform
             restringido al email del usuario; bridge del SER9 vía token OIDC de Service Account
             (sin API keys embebidas si se puede). Definir rotación de credenciales.
 
