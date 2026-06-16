@@ -44,6 +44,8 @@
           <span title="{{ c.source_key }}">💬 WA</span>
           {% elif c.channel == "chat" %}
           <span>🖥 web</span>
+          {% elif c.room %}
+          <span title="{{ c.source_key }}">🎙 {{ c.room }}</span>   {# 16.5: ambiente de origen #}
           {% elif c.channel %}
           <span>{{ c.channel }}</span>
           {% else %}

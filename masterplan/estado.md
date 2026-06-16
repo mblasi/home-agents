@@ -1356,7 +1356,7 @@ Nota:     Completa también 21.21 (decisión ear). Ver Anexo A.2 (origen).
 - [x] 16.4  `core/ws_audio.py` — servidor WebSocket `/ws/audio` en el core: recibe chunks
             del nodo, acumula y pasa al STT local (faster-whisper), llama internamente a
             `process()` con `source.room` del nodo, devuelve el texto de respuesta al nodo.
-- [ ] 16.5  Propagación de `source.room` en el pipeline completo: historial,
+- [x] 16.5  Propagación de `source.room` en el pipeline completo: historial,
             backoffice y dashboard muestran el ambiente de origen de cada comando.
             El campo ya existe en `source`; esta tarea lo hace obligatorio para nodos.
             Progreso: `audio_server.py` ya envía `source={room, channel:"ear"}` al core en
@@ -1400,7 +1400,7 @@ sabe cuándo hablar y el STT captura ruido. Es el bloqueante de UX principal.
             node_id del satélite si hay uno conectado. Tabla editable con estado en tiempo real.
 
 #### Etapa C — Observabilidad y robustez
-- [ ] 16.8  Health check periódico por nodo de audio: ping cada 30s desde el core,
+- [x] 16.8  Health check periódico por nodo de audio: ping cada 30s desde el core,
             marcar offline si no responde en 3 intentos. Backoffice muestra estado en tiempo real.
 - [ ] 16.9  Panel en dashboard zellij (`panel_nodes.py`): nodos de audio activos, ambiente
             del último comando, latencia STT+LLM por nodo, estado online/offline.
