@@ -410,3 +410,15 @@ Pipeline anterior (hasta FASE 21): laptop con mic/speaker local. Ya reemplazado.
   por RMS antes del STT + vad_filter sobre el audio normalizado. Falsos positivos del wake
   word con TV/radio se resuelven con: retrain (negativos del TV capturados orgánicamente en
   204) + voice-id gate (el TV no matchea ningún perfil enrolado).
+- Deps Python del satélite en Termux (NSPanel) — `pip install` NO sirve para todo:
+  `numpy` → `pkg install python-numpy`; `onnxruntime` (módulo Python) → `pkg install tur-repo`
+  + `python-onnxruntime` (el pkg base `onnxruntime` es solo la lib C, no el binding). `scipy`
+  se evita con el patch scipy-opcional en `openwakeword/__init__.py` (el path se deriva con
+  `sysconfig.get_path("purelib")`, no importando openwakeword que justo falla por ese import).
+  Antes de compilar nada por pip (cffi→sounddevice) correr `pkg upgrade` para alinear
+  libicu/clang — un `pkg update` sin upgrade deja `clang` roto (`libicuuc.so.78 not found`).
+  La instalación se corre DETACHED con `termux-wake-lock` (una sesión SSH directa la mata a
+  mitad porque Android suspende el proceso) y se verifica importando cada módulo, no por rc.
+  El boot script sostiene `termux-wake-lock` y reinicia satellite en loop si crashea (audio
+  HAL puede no estar listo justo tras boot). `nspanel.sh reboot` necesita `su -c reboot` (el
+  firmware eWeLink ignora el reboot sin root). Todo esto ya está en `scripts/nspanel.sh`.

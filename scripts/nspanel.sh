@@ -39,7 +39,8 @@ cmd_status() {
 
 cmd_reboot() {
     echo "Reiniciando $NSPANEL_IP..."
-    adb_cmd shell reboot
+    # el firmware eWeLink ignora 'adb shell reboot' sin root
+    adb_cmd shell "su -c reboot" 2>/dev/null || adb_cmd shell reboot
 }
 
 cmd_open_ha() {
@@ -143,6 +144,13 @@ cmd_provision() {
     local HA_USER="nspanel${name}"
     local REPO="$(cd "$(dirname "$0")/.." && pwd)"
     local AUDIO_URL="${AUDIO_SERVER_URL:-http://192.168.68.132:8766}"
+    # el panel es un satélite: debe apuntar al audio server del SER9, nunca a su propio localhost
+    case "$AUDIO_URL" in
+        *127.0.0.1*|*localhost*)
+            echo "✗ AUDIO_SERVER_URL apunta a localhost ($AUDIO_URL) — debe ser la IP del SER9."
+            echo "  Desseteá AUDIO_SERVER_URL del entorno o usá http://192.168.68.132:8766"
+            exit 1;;
+    esac
     echo "=== Provisioning panel '$name' (room=$room, ip=$ip, node=$NODE_ID) ==="
 
     echo "\n[1/9] ADB — conectividad"
@@ -177,17 +185,17 @@ cmd_provision() {
     adb_cmd shell pm grant com.termux.api android.permission.RECORD_AUDIO 2>/dev/null || true
     echo "  ✓ permisos (overlay + mic)"
 
-    echo "\n[4/9] SSH — key auth (bootstrap vía adb, sin password manual)"
-    # Asegurar sshd corriendo
+    echo "\n[4/9] SSH — key auth (bootstrap vía adb root, idempotente)"
+    local HT="/data/data/com.termux/files/home"
+    # Empujar SIEMPRE la pubkey local al authorized_keys (append si falta). No condicionar al
+    # test de SSH: un panel reimagenado puede traer otra key, el test fallaría y la nuestra
+    # nunca se agregaría → password prompt. Preferir ed25519, caer a rsa.
+    local PUB; PUB="$(cat "$HOME/.ssh/id_ed25519.pub" 2>/dev/null || cat "$HOME/.ssh/id_rsa.pub" 2>/dev/null || true)"
+    if [[ -z "$PUB" ]]; then ssh-keygen -t ed25519 -N "" -f "$HOME/.ssh/id_ed25519" -q; PUB="$(cat "$HOME/.ssh/id_ed25519.pub")"; fi
+    adb_cmd shell "su -c \"mkdir -p $HT/.ssh && (grep -qF '$PUB' $HT/.ssh/authorized_keys 2>/dev/null || echo '$PUB' >> $HT/.ssh/authorized_keys) && chown -R $TERMUX_USER:$TERMUX_USER $HT/.ssh && chmod 700 $HT/.ssh && chmod 600 $HT/.ssh/authorized_keys\"" >/dev/null 2>&1 || true
+    # arrancar sshd
     adb_cmd shell "am start -n $TERMUX_ACTIVITY" >/dev/null 2>&1; sleep 1
     if ! ssh_panel "echo ok" 2>/dev/null | grep -q ok; then
-        # Empujar la pubkey local al authorized_keys del panel usando root (adb su)
-        local PUB; PUB="$(cat "$HOME/.ssh/id_ed25519.pub" 2>/dev/null || cat "$HOME/.ssh/id_rsa.pub" 2>/dev/null || true)"
-        if [[ -z "$PUB" ]]; then ssh-keygen -t ed25519 -N "" -f "$HOME/.ssh/id_ed25519" -q; PUB="$(cat "$HOME/.ssh/id_ed25519.pub")"; fi
-        local HT="/data/data/com.termux/files/home"
-        adb_cmd shell "su -c \"mkdir -p $HT/.ssh && echo '$PUB' >> $HT/.ssh/authorized_keys && chown -R u0_a53:u0_a53 $HT/.ssh && chmod 700 $HT/.ssh && chmod 600 $HT/.ssh/authorized_keys\"" >/dev/null 2>&1
-        # arrancar sshd si no estaba
-        adb_cmd shell "am start -n $TERMUX_ACTIVITY" >/dev/null 2>&1; sleep 1
         adb_cmd shell input keyboard text "sshd" >/dev/null 2>&1; adb_cmd shell input keyevent KEYCODE_ENTER >/dev/null 2>&1; sleep 2
     fi
     if ! ssh_panel "echo ok" 2>/dev/null | grep -q ok; then
@@ -198,22 +206,73 @@ cmd_provision() {
     echo "  ✓ SSH key-auth OK"
 
     echo "\n[5/9] Dependencias (pkg + pip) + patch openwakeword"
+    # Se corre DETACHED en el panel con wake-lock: instalar deps por una sola sesión SSH
+    # la mata a mitad (Android suspende el proceso). Escribimos un script y poleamos su log.
+    # Claves aprendidas: numpy/onnxruntime NO andan por pip en Termux → pkg python-numpy y
+    # python-onnxruntime (tur-repo). pkg upgrade alinea libicu/clang (si quedó a medias rompe
+    # toda compilación pip, ej. cffi→sounddevice). scipy se evita con el patch de openwakeword.
     ssh_panel 'export PATH=/data/data/com.termux/files/usr/bin:$PATH
-        pkg install -y python portaudio onnxruntime termux-api openssh >/dev/null 2>&1
-        pip install -q sounddevice requests numpy tqdm termuxgui >/dev/null 2>&1
-        pip install -q --no-deps openwakeword >/dev/null 2>&1
-        OWW=$(python3.13 -c "import openwakeword,os;print(os.path.dirname(openwakeword.__file__))" 2>/dev/null)
-        if [ -n "$OWW" ]; then sed -i "s/^from openwakeword.custom_verifier_model import train_custom_verifier/try:\n    from openwakeword.custom_verifier_model import train_custom_verifier\nexcept ImportError:\n    train_custom_verifier = None/" "$OWW/__init__.py" 2>/dev/null; fi
-        echo deps-ok' 2>&1 | grep -q deps-ok && echo "  ✓ dependencias" || echo "  ⚠ revisar deps manualmente"
+        termux-wake-lock 2>/dev/null
+        cat > ~/.provision_deps.sh <<"SCRIPT"
+#!/data/data/com.termux/files/usr/bin/bash
+export PATH=/data/data/com.termux/files/usr/bin:$PATH
+echo "DEPS-START $(date)"
+yes | pkg update 2>&1 | tail -2
+yes | pkg upgrade -y 2>&1 | tail -2
+yes | pkg install -y tur-repo 2>&1 | tail -2
+yes | pkg install -y python python-numpy onnxruntime python-onnxruntime portaudio termux-api openssh 2>&1 | tail -3
+pip install --no-input sounddevice requests tqdm termuxgui 2>&1 | tail -3
+pip install --no-input --no-deps openwakeword 2>&1 | tail -3
+# patch scipy-opcional: el path se resuelve por sysconfig porque "import openwakeword"
+# falla justo por este import (no se puede derivar el path importándolo).
+SP=$(python3.13 -c "import sysconfig; print(sysconfig.get_path(\"purelib\"))" 2>/dev/null)
+INIT="$SP/openwakeword/__init__.py"
+[ -f "$INIT" ] && sed -i "s/^from openwakeword.custom_verifier_model import train_custom_verifier/try:\n    from openwakeword.custom_verifier_model import train_custom_verifier\nexcept ImportError:\n    train_custom_verifier = None/" "$INIT"
+echo "DEPS-DONE $(date)"
+SCRIPT
+        chmod +x ~/.provision_deps.sh
+        rm -f ~/.provision_deps.log
+        nohup ~/.provision_deps.sh > ~/.provision_deps.log 2>&1 &
+        echo "deps lanzado"' >/dev/null 2>&1
+    echo "  … instalando deps en el panel (pkg upgrade + builds, puede tardar varios minutos)…"
+    local _ok=""
+    for _i in $(seq 1 50); do
+        sleep 12
+        if ssh_panel 'grep -q DEPS-DONE ~/.provision_deps.log 2>/dev/null'; then _ok=1; break; fi
+    done
+    [[ -n "$_ok" ]] || { echo "  ✗ deps no terminaron (timeout). Ver ~/.provision_deps.log en el panel"; exit 1; }
+    # Verificar imports REALES (no confiar en rc de pkg/pip)
+    local _missing
+    _missing="$(ssh_panel 'export PATH=/data/data/com.termux/files/usr/bin:$PATH
+        for m in numpy sounddevice requests onnxruntime openwakeword tqdm termuxgui; do
+            python3.13 -c "import $m" 2>/dev/null || echo $m
+        done' 2>/dev/null)"
+    if [[ -n "${_missing//[[:space:]]/}" ]]; then
+        echo "  ✗ faltan módulos tras la instalación: $(echo $_missing) — ver ~/.provision_deps.log"
+        exit 1
+    fi
+    echo "  ✓ dependencias verificadas (numpy sounddevice requests onnxruntime openwakeword tqdm termuxgui)"
 
     echo "\n[6/9] Modelos + satellite.py"
-    ssh_panel "mkdir -p ~/wakeword ~/.config ~/assets ~/.termux/boot" 2>/dev/null
+    ssh_panel "mkdir -p ~/wakeword ~/.config ~/assets ~/.termux/boot"
     # modelos estáticos (melspec/embedding) desde el venv del laptop; capitan.onnx lo baja el satellite (16.17)
     local OWW_RES="$HOME/home-agents-env/lib/python3.13/site-packages/openwakeword/resources/models"
-    [[ -f "$OWW_RES/melspectrogram.onnx" ]] && scp_panel "$OWW_RES/melspectrogram.onnx" "$OWW_RES/embedding_model.onnx" "${TERMUX_USER}@${ip}:~/wakeword/" 2>/dev/null && echo "  ✓ modelos de features"
-    [[ -f "$HOME/.local/share/wakeword/capitan.onnx" ]] && scp_panel "$HOME/.local/share/wakeword/capitan.onnx" "${TERMUX_USER}@${ip}:~/wakeword/" 2>/dev/null && echo "  ✓ capitan.onnx (semilla)"
-    scp_panel "$REPO/ear/satellite.py" "$REPO/ear/satellite_ui.py" "${TERMUX_USER}@${ip}:~/" 2>/dev/null && echo "  ✓ satellite.py + ui"
-    [[ -f "$REPO/ear/assets/wakeword_ack.wav" ]] && scp_panel "$REPO/ear/assets/wakeword_ack.wav" "${TERMUX_USER}@${ip}:~/assets/" 2>/dev/null
+    if [[ -f "$OWW_RES/melspectrogram.onnx" ]]; then
+        scp_panel "$OWW_RES/melspectrogram.onnx" "$OWW_RES/embedding_model.onnx" "${TERMUX_USER}@${ip}:~/wakeword/" \
+            && echo "  ✓ modelos de features" || { echo "  ✗ falló la copia de melspec/embedding"; exit 1; }
+    else
+        echo "  ✗ no encuentro melspectrogram.onnx en el venv del laptop ($OWW_RES)"; exit 1
+    fi
+    if [[ -f "$HOME/.local/share/wakeword/capitan.onnx" ]]; then
+        scp_panel "$HOME/.local/share/wakeword/capitan.onnx" "${TERMUX_USER}@${ip}:~/wakeword/" \
+            && echo "  ✓ capitan.onnx (semilla)" || echo "  · capitan.onnx falló — lo baja el satellite (16.17)"
+    else
+        echo "  · capitan.onnx no está en el laptop — lo baja el satellite (16.17)"
+    fi
+    # satellite.py es CRÍTICO: si falla, el panel arranca sin nada. Abortar.
+    scp_panel "$REPO/ear/satellite.py" "$REPO/ear/satellite_ui.py" "${TERMUX_USER}@${ip}:~/" \
+        && echo "  ✓ satellite.py + ui" || { echo "  ✗ falló la copia de satellite.py — abortando"; exit 1; }
+    [[ -f "$REPO/ear/assets/wakeword_ack.wav" ]] && { scp_panel "$REPO/ear/assets/wakeword_ack.wav" "${TERMUX_USER}@${ip}:~/assets/" && echo "  ✓ ack wav"; } || true
 
     echo "\n[7/9] satellite.env (node=$NODE_ID room=$room)"
     ssh_panel "cat > ~/.config/satellite.env" <<EOF
@@ -233,12 +292,14 @@ EOF
     ssh_panel "cat > ~/.termux/boot/start-ha.sh" <<'EOF'
 #!/data/data/com.termux/files/usr/bin/bash
 export PATH=/data/data/com.termux/files/usr/bin:$PATH
+termux-wake-lock
 sshd
 sleep 10
 monkey -p com.termux.gui -c android.intent.category.LAUNCHER 1
 am start -n io.homeassistant.companion.android.minimal/io.homeassistant.companion.android.launch.LaunchActivity
 sleep 15
-nohup python3.13 ~/satellite.py >> ~/.satellite.log 2>&1 &
+# auto-reinicio: si satellite crashea (ej. audio HAL no listo aún tras boot), reintenta
+nohup bash -c 'while true; do echo "[boot] arrancando satellite $(date)" >> ~/.satellite.log; python3.13 ~/satellite.py >> ~/.satellite.log 2>&1; echo "[boot] satellite salió rc=$? — reintento en 5s" >> ~/.satellite.log; sleep 5; done' >/dev/null 2>&1 &
 EOF
     ssh_panel "chmod +x ~/.termux/boot/start-ha.sh" 2>/dev/null
     adb_cmd shell am start -n "com.termux.boot/.BootActivity" >/dev/null 2>&1
@@ -255,7 +316,8 @@ EOF
     fi
 
     echo "\n=== Provisioning de '$name' completo ==="
-    echo "FALTA (manual): crear usuario HA '$HA_USER' (sin guion) + dashboard del ambiente, y reiniciar el panel:"
+    echo "FALTA (manual, en HA): crear usuario '$HA_USER' (sin guion) + asignarle el dashboard del ambiente."
+    echo "Después reiniciá el panel — satellite + overlay arrancan solos por Termux:Boot:"
     echo "  NSPANEL_IP=$ip bash scripts/nspanel.sh reboot"
 }
 
