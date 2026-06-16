@@ -76,6 +76,7 @@
       <!-- Monitoreo -->
       <div class="flex flex-col gap-0.5">
         <p class="sb-section px-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-gray-600">Monitoreo</p>
+        <a href="/home"         title="Inicio"       class="{{ link_active if section == 'home'         else link_base }}"><span>🏠</span><span class="sb-text">Inicio</span></a>
         <a href="/dashboard"    title="Dashboard"    class="{{ link_active if section == 'dashboard'    else link_base }}"><span>📊</span><span class="sb-text">Dashboard</span></a>
         <a href="/stats"        title="Estadísticas" class="{{ link_active if section == 'stats'        else link_base }}"><span>📈</span><span class="sb-text">Estadísticas</span></a>
         <a href="/alerts"       title="Alertas"      class="{{ link_active if section == 'alerts'       else link_base }}"><span>🔔</span><span class="sb-text">Alertas</span></a>
