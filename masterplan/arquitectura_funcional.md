@@ -48,6 +48,8 @@ El nodo es agnóstico al usuario: solo graba y manda audio crudo.
 **Voice-ID (server-side, 16.18-16.20):** identifica quién habló comparando con perfiles enrolados.
 CRÍTICO: el embedding debe enrolarse con el MISMO mic (re-enroll desde el nodo). Gate
 `REQUIRE_KNOWN_SPEAKER` + `SPEAKER_THRESHOLD` descarta el TV. Validación: `/verify-voice` (16.28).
+Ante una voz no enrolada, el gate sintetiza `UNKNOWN_VOICE_REPLY` (default `"Voz desconocida."`)
+en vez de un `204` mudo, para dar feedback; vacío conserva el `204` silencioso.
 
 **Canal de enrollment backoffice→nodo (16.21):** el backoffice deja una orden pendiente
 (`POST /nodes/{id}/enroll` type wakeword|voice|verify); el satellite la consume en su loop,
