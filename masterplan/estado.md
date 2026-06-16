@@ -2866,8 +2866,8 @@ Objetivo: Tener un backoffice accesible desde internet SIN exponer el SER9 ni HA
           La nube nunca inicia conexiones hacia la casa: el SER9 empuja estado para
           dibujar el dashboard y POLEA una cola de comandos para ejecutar acciones de
           administración (patrón command / executor). Plataforma: Google Cloud.
-Estado:   COMPLETA — servicio en la nube desplegado (capitan-495518/southamerica-east1),
-          bridge en capitan-lxc empujando estado y ejecutando comandos, verificado e2e.
+Estado:   EN CURSO (17/21 — Etapas A–D completas y desplegadas; Etapa E: login
+          consistente con gestión de usuarios + RBAC, pendiente).
 Deps:     FASE 12 (backoffice local — COMPLETA, fuente de datos y UI a reusar),
           FASE 21 (SER9 estable — COMPLETA), FASE 32 (datos en SQLite — COMPLETA).
 Principio de seguridad: el SER9 sólo hace conexiones SALIENTES (HTTPS) a la nube.
@@ -2933,3 +2933,19 @@ Stack GCP elegido: Cloud Run (web + API, scale-to-zero), Firestore (snapshot de
             alerta de presupuesto. (budget USD 5, alertas 50/90/100%)
 - [x] 33.17 Failover: si la nube cae, el SER9 sigue operando local y el bridge reintenta; si el
             bridge cae, el backoffice local en LAN (FASE 12) sigue disponible. (verificado e2e)
+
+#### Etapa E - Login consistente con gestión de usuarios + RBAC
+> Decisión: email de login dedicado en User; RBAC cloud = admin full / familiar read-only /
+> adolescente restringido (read-only, vista básica) / niño·invitado·guest sin acceso.
+- [ ] 33.18 Identidad de login: agregar campo `email` a User (core/users.py + db_schema +
+            migración idempotente ALTER TABLE), default a gcal_email; editable en el backoffice
+            local; tests. El email es la identidad contra la que se valida el login de Google.
+- [ ] 33.19 Contrato + bridge: incluir `email` en `users_summary` del snapshot; el cloud, al
+            ingestar el snapshot, materializa un roster email→rol en Firestore para autorizar.
+- [ ] 33.20 Cloud auth consistente: `require_dashboard_user` autoriza contra el roster (reemplaza
+            el `ALLOWED_EMAILS` estático, que queda sólo como bootstrap de emergencia → admin);
+            email no registrado → 403; la dependencia devuelve (email, rol).
+- [ ] 33.21 RBAC del cloud backoffice: capacidades por rol (admin: ver todo + emitir comandos;
+            familiar: read-only completo; adolescente: read-only vista básica sin PII/auditoría;
+            resto: sin acceso). Gate de `/api/commands` y filtrado de datos sensibles por
+            capacidad; el frontend oculta acciones sin permiso; tests.
