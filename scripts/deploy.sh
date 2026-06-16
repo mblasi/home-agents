@@ -19,12 +19,11 @@ ssh capitan-lxc "
   echo 'Servicios reiniciados.'
 "
 
-# WA siempre se reinicia después del core — no reintenta conexiones caídas
-echo "Reiniciando WA..."
-ssh capitan-lxc "systemctl --user restart capitan-wa"
-
-if [[ $RESTART_WA -eq 0 ]]; then
-  : # WA ya reiniciado arriba
+# WA solo se reinicia con --restart-wa (reconectar el cliente WhatsApp es caro:
+# puede requerir re-escanear el QR). El core no depende de WA para arrancar.
+if [[ $RESTART_WA -eq 1 ]]; then
+  echo "Reiniciando WA..."
+  ssh capitan-lxc "systemctl --user restart capitan-wa"
 fi
 
 echo "=== Smoke test (esperando 5s) ==="
