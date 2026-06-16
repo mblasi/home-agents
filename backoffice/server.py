@@ -1343,6 +1343,7 @@ async def create_user_submit(request: Request):
         "role":           role,
         "relationship":   str(form.get("relationship", "invitado")),
         "wa_phone":       str(form.get("wa_phone", "")).strip() or None,
+        "email":          str(form.get("email", "")).strip() or None,
         "agent_ids":      agent_ids,
         "revoked_agents": revoked_agents,
     }
@@ -1422,6 +1423,7 @@ async def update_user_submit(request: Request, uid: str):
         "role":           role,
         "relationship":   str(form.get("relationship", "invitado")),
         "wa_phone":       str(form.get("wa_phone", "")).strip() or None,
+        "email":          str(form.get("email", "")).strip() or None,
         "agent_ids":      agent_ids,
         "revoked_agents": revoked_agents,
     }
