@@ -17,7 +17,14 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from . import firestore_db as fdb
 from . import ratelimit
-from .auth import ALLOWED_EMAILS, FIREBASE_PROJECT_ID, require_bridge, require_dashboard_user
+from . import rbac
+from .auth import (
+    ALLOWED_EMAILS,
+    FIREBASE_PROJECT_ID,
+    Principal,
+    require_bridge,
+    require_dashboard_user,
+)
 from .commands import CommandError, catalog_summary, validate_command
 from .models import SCHEMA_VERSION, CommandRequest, CommandResult, StateSnapshot
 
@@ -54,7 +61,10 @@ def ingest_state(snapshot: StateSnapshot, sa: str = Depends(require_bridge)):
     ratelimit.limit_ingest(sa)
     if snapshot.schema_version != SCHEMA_VERSION:
         raise HTTPException(status_code=422, detail="schema_version no soportada")
-    fdb.store_state(snapshot.model_dump())
+    data = snapshot.model_dump()
+    fdb.store_state(data)
+    # Materializa el roster email→rol para autorizar el login del dashboard (33.19).
+    fdb.store_roster(data.get("users_summary", []))
     return {"ok": True}
 
 
@@ -71,34 +81,52 @@ def command_result(cmd_id: str, result: CommandResult, sa: str = Depends(require
     return {"ok": True}
 
 
-# ── Dashboard API (navegador → nube): auth Firebase + allow-list de email ───────
+# ── Dashboard API (navegador → nube): auth Firebase + roster + RBAC ─────────────
+
+def _require_emit(p: Principal) -> None:
+    if not p.caps.get("emit"):
+        raise HTTPException(status_code=403, detail="tu rol no puede emitir comandos")
+
+
+def _require_view_full(p: Principal) -> None:
+    if not p.caps.get("view_full"):
+        raise HTTPException(status_code=403, detail="tu rol no tiene acceso a esta vista")
+
+
+@app.get("/api/me")
+def api_me(p: Principal = Depends(require_dashboard_user)):
+    return {"email": p.email, "role": p.role, "caps": p.caps}
+
 
 @app.get("/api/state")
-def api_state(user: str = Depends(require_dashboard_user)):
+def api_state(p: Principal = Depends(require_dashboard_user)):
     state = fdb.get_state()
     if state is None:
         return JSONResponse({"state": None}, status_code=200)
-    return {"state": state}
+    return {"state": rbac.filter_state(state, p.caps)}
 
 
 @app.get("/api/commands")
-def api_commands(user: str = Depends(require_dashboard_user)):
+def api_commands(p: Principal = Depends(require_dashboard_user)):
+    _require_view_full(p)  # la auditoría sólo para roles con view_full
     return {"commands": fdb.recent_commands()}
 
 
 @app.get("/api/catalog")
-def api_catalog(user: str = Depends(require_dashboard_user)):
+def api_catalog(p: Principal = Depends(require_dashboard_user)):
+    _require_emit(p)
     return {"catalog": catalog_summary()}
 
 
 @app.post("/api/commands")
-def api_emit_command(req: CommandRequest, user: str = Depends(require_dashboard_user)):
-    ratelimit.limit_command(user)
+def api_emit_command(req: CommandRequest, p: Principal = Depends(require_dashboard_user)):
+    _require_emit(p)
+    ratelimit.limit_command(p.email)
     try:
         params = validate_command(req.type, req.params)
     except CommandError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    cmd = fdb.enqueue_command(req.type, params, issued_by=user)
+    cmd = fdb.enqueue_command(req.type, params, issued_by=p.email)
     return {"command": cmd}
 
 

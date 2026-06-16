@@ -59,6 +59,7 @@ class UserSummary(BaseModel):
     name: str
     role: str
     intents_pending: int = 0
+    email: str | None = None   # login_email (identidad de acceso al dashboard), FASE 33.19
 
 
 class StateSnapshot(BaseModel):
