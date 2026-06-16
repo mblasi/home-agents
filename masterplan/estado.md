@@ -2575,11 +2575,11 @@ Objetivo: Formalizar las capacidades de input/output de cada canal de interacci�
           (wa, mic/ear, web) y hacer que el agente respete esas restricciones al
           elegir el modo de respuesta. Revisar el campo `notification_mode` del usuario
           para que tenga sentido en un contexto multi-canal.
-Estado:   Pendiente
+Estado:   COMPLETA (28.1 CHANNEL_CAPS + 28.2 reconciliación con downgrade+log + 28.3 response_type [ya existía] + 28.4 wa_notify_format [opción b])
 Deps:     FASE 3.5 (WA), FASE 18 (UX audio), FASE 12 (backoffice).
 ```
 
-- [ ] 28.1  **Mapa de capacidades por canal** — definir en `core/` un diccionario o clase
+- [x] 28.1  **Mapa de capacidades por canal** — definir en `core/` un diccionario o clase
             `CHANNEL_CAPS` que declare para cada canal (`"wa"`, `"ear"`, `"web"`) qué modos
             de input y output soporta:
             ```
@@ -2590,20 +2590,26 @@ Deps:     FASE 3.5 (WA), FASE 18 (UX audio), FASE 12 (backoffice).
             El campo `source` que ya llega en `/process` se usa para lookupear las caps.
             Estas capacidades deben ser consultables desde el agente y desde el coordinador.
 
-- [ ] 28.2  **Restricción de modo en el coordinador** — al construir el contexto de respuesta,
+- [x] 28.2  **Restricción de modo en el coordinador** — al construir el contexto de respuesta,
             el coordinador (o el dispatch en `agent_registry.py`) debe filtrar el modo elegido
             por el agente contra `CHANNEL_CAPS[source].output`. Si el agente pidió `audio` pero
             el canal es `web` (solo texto), degradar a `text` automáticamente y loguear el
             downgrade. Si el canal tiene múltiples opciones de output (ej. WA), respetar la
             elección del agente o la preferencia del usuario.
 
-- [ ] 28.3  **Campo `response_mode` en la respuesta del agente** — el agente puede incluir en
+- [x] 28.3  **Campo `response_type` en la respuesta del agente** — YA EXISTÍA
+            (`response_type: text|audio|auto`, default auto=mirror del input; los agentes lo
+            setean vía `updates`). Implementado como — el agente puede incluir en
             su respuesta un campo opcional `response_mode: "text" | "audio" | "auto"` para
             señalizar preferencia. `"auto"` (default) delega la decisión al canal/preferencia
             del usuario. El adaptador de cada canal (WA, ear, web) aplica la lógica:
             modo solicitado ∩ caps del canal, con fallback a text.
 
-- [ ] 28.4  **Revisión de `notification_mode` del usuario** — el campo actual
+- [x] 28.4  **Revisión del campo del usuario** — el campo ya es `wa_notify_format`
+            (específico de WA, NO el `notification_mode` ambiguo). Opción (b) ya realizada: es la
+            preferencia de output de WA, y `channel_caps.resolve_output_mode` la usa como desempate
+            cuando el modo es 'auto' y el input es ambiguo. Backoffice ya lo muestra (toggle).
+            Original: — el campo actual
             (`notification_mode: text | audio`) fue diseñado para WA pero su semántica es
             ambigua en multi-canal. Decidir e implementar una de estas opciones:
             a) Reemplazarlo por preferencias por canal: `channel_prefs.wa.output_mode`,
