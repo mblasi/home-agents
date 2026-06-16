@@ -1,0 +1,15 @@
+[Unit]
+Description=Capitán cloud bridge (push estado + poll comandos hacia la nube)
+After=network-online.target capitan-core.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/workspace/home-agents/cloud/bridge
+EnvironmentFile=%h/.config/capitan/bridge.env
+ExecStart=%h/home-agents-env/bin/python %h/workspace/home-agents/cloud/bridge/cloud_bridge.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target
