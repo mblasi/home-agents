@@ -123,6 +123,13 @@ inversión de control.
   comandos tipados y cerrados; reglas Firestore deny-all de cliente.
 - **Failover**: si la nube cae, el core sigue local y el bridge reintenta con backoff; si el
   bridge cae, el backoffice local en LAN (`:8080`, FASE 12) sigue operando.
+- **Login consistente + RBAC** (Etapa E): el login del dashboard se valida contra los usuarios
+  reales (roster email→rol que el bridge materializa desde la DB). RBAC por rol: admin ve todo y
+  emite comandos; familiar read-only; adolescente read-only vista básica (sin PII/auditoría);
+  resto sin acceso. El backoffice **local** reusa este mismo login vía SSO (la nube emite un
+  token HMAC firmado tras el Google sign-in y redirige al `:8080`), con sesión por usuario y
+  RBAC (admin escribe; familiar/adolescente read-only). `BACKOFFICE_TOKEN` queda como
+  bootstrap de emergencia offline. Identidad de login = `User.email` (o `gcal_email`).
 
 Contrato y modelo de amenazas: `masterplan/fase33_cloud_backoffice.md`.
 

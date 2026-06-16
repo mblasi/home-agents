@@ -2866,8 +2866,8 @@ Objetivo: Tener un backoffice accesible desde internet SIN exponer el SER9 ni HA
           La nube nunca inicia conexiones hacia la casa: el SER9 empuja estado para
           dibujar el dashboard y POLEA una cola de comandos para ejecutar acciones de
           administración (patrón command / executor). Plataforma: Google Cloud.
-Estado:   EN CURSO (21/24 — A–D + cloud login/RBAC desplegados; falta SSO del backoffice
-          local (reusar el login de la nube) + RBAC local, 33.22–33.24).
+Estado:   COMPLETA — cloud + bridge + login consistente (roster email→rol) + RBAC, y SSO
+          del backoffice local (reusa el Google sign-in de la nube) + RBAC local. Verificado e2e.
 Deps:     FASE 12 (backoffice local — COMPLETA, fuente de datos y UI a reusar),
           FASE 21 (SER9 estable — COMPLETA), FASE 32 (datos en SQLite — COMPLETA).
 Principio de seguridad: el SER9 sólo hace conexiones SALIENTES (HTTPS) a la nube.
@@ -2949,11 +2949,11 @@ Stack GCP elegido: Cloud Run (web + API, scale-to-zero), Firestore (snapshot de
             familiar: read-only completo; adolescente: read-only vista básica sin PII/auditoría;
             resto: sin acceso). Gate de `/api/commands` y filtrado de datos sensibles por
             capacidad; el frontend oculta acciones sin permiso; tests.
-- [ ] 33.22 SSO broker en la nube: endpoint `/sso/start?redirect_uri=...` que, tras el Google
+- [x] 33.22 SSO broker en la nube: endpoint `/sso/start?redirect_uri=...` que, tras el Google
             sign-in ya existente, emite un token firmado (HMAC, exp corto) y redirige al
             backoffice local. Allow-list de redirect_uri (orígenes LAN permitidos).
-- [ ] 33.23 Backoffice local: aceptar el SSO token (verificar firma+exp), mapear email→usuario→rol
+- [x] 33.23 Backoffice local: aceptar el SSO token (verificar firma+exp), mapear email→usuario→rol
             (DB local), sesión atada al usuario; el header muestra usuario·rol; `BACKOFFICE_TOKEN`
             queda como bootstrap de emergencia offline (→admin). Acceso por IP de la LAN.
-- [ ] 33.24 RBAC en el backoffice local: admin escribe; familiar/adolescente read-only (bloqueo
+- [x] 33.24 RBAC en el backoffice local: admin escribe; familiar/adolescente read-only (bloqueo
             de POST/PATCH/DELETE/PUT por middleware); roles sin acceso rechazados. Tests.
