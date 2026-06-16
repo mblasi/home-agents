@@ -140,6 +140,7 @@ cmd_provision() {
     fi
     NSPANEL_IP="$ip"; NSPANEL_ADB="${ip}:5555"
     local NODE_ID="nspanel-${name}"
+    local HA_USER="nspanel${name}"
     local REPO="$(cd "$(dirname "$0")/.." && pwd)"
     local AUDIO_URL="${AUDIO_SERVER_URL:-http://192.168.68.132:8766}"
     echo "=== Provisioning panel '$name' (room=$room, ip=$ip, node=$NODE_ID) ==="
@@ -236,7 +237,7 @@ EOF
     echo "\n[9/9] Registrar el panel en la DB (vía el core)"
     local CORE="${CORE_URL:-http://192.168.68.132:8765}"
     if curl -s -X POST "$CORE/panels" -H 'Content-Type: application/json' \
-        -d "{\"name\":\"$name\",\"room\":\"$room\",\"ip\":\"$ip\",\"node_id\":\"$NODE_ID\"}" \
+        -d "{\"name\":\"$name\",\"room\":\"$room\",\"ip\":\"$ip\",\"node_id\":\"$NODE_ID\",\"ha_user\":\"$HA_USER\"}" \
         -o /dev/null -w '%{http_code}' 2>/dev/null | grep -q '^2'; then
         echo "  ✓ registrado en la DB"
     else
@@ -244,7 +245,7 @@ EOF
     fi
 
     echo "\n=== Provisioning de '$name' completo ==="
-    echo "FALTA (manual): crear usuario HA 'nspanel-$name' + dashboard del ambiente, y reiniciar el panel:"
+    echo "FALTA (manual): crear usuario HA '$HA_USER' (sin guion) + dashboard del ambiente, y reiniciar el panel:"
     echo "  NSPANEL_IP=$ip bash scripts/nspanel.sh reboot"
 }
 
