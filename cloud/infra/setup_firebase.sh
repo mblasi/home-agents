@@ -39,12 +39,25 @@ API_KEY="$(echo "$CFG" | python3 -c 'import sys,json; print(json.load(sys.stdin)
 AUTH_DOMAIN="$(echo "$CFG" | python3 -c 'import sys,json; print(json.load(sys.stdin)["authDomain"])')"
 echo "   apiKey: ${API_KEY:0:12}...  authDomain: $AUTH_DOMAIN"
 
-echo "== Habilitar proveedor Google (OAuth Google-managed) =="
-curl -s -X POST "${IT}/projects/${PROJECT}/defaultSupportedIdpConfigs?idpId=google.com" \
-  -H "$(H_AUTH)" -H "$QP" -H "Content-Type: application/json" \
-  -d '{"enabled": true}' >/dev/null 2>&1 || \
-curl -s -X PATCH "${IT}/projects/${PROJECT}/defaultSupportedIdpConfigs/google.com?updateMask=enabled" \
-  -H "$(H_AUTH)" -H "$QP" -H "Content-Type: application/json" -d '{"enabled": true}' >/dev/null
+echo "== Inicializar Identity Platform (idempotente) =="
+curl -s -X POST "https://identitytoolkit.googleapis.com/v2/projects/${PROJECT}/identityPlatform:initializeAuth" \
+  -H "$(H_AUTH)" -H "$QP" -H "Content-Type: application/json" -d '{}' >/dev/null || true
+
+echo "== Habilitar proveedor Google =="
+# Identity Platform exige un OAuth client (Web) creado a mano en la consola:
+#   consent screen + Credentials → OAuth client ID (Web), redirect:
+#   https://${PROJECT}.firebaseapp.com/__/auth/handler
+# Exportar GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET antes de correr.
+if [ -n "${GOOGLE_CLIENT_ID:-}" ] && [ -n "${GOOGLE_CLIENT_SECRET:-}" ]; then
+  BODY="{\"enabled\": true, \"clientId\": \"${GOOGLE_CLIENT_ID}\", \"clientSecret\": \"${GOOGLE_CLIENT_SECRET}\"}"
+  curl -s -X POST "${IT}/projects/${PROJECT}/defaultSupportedIdpConfigs?idpId=google.com" \
+    -H "$(H_AUTH)" -H "$QP" -H "Content-Type: application/json" -d "$BODY" >/dev/null 2>&1 || \
+  curl -s -X PATCH "${IT}/projects/${PROJECT}/defaultSupportedIdpConfigs/google.com?updateMask=enabled,clientId,clientSecret" \
+    -H "$(H_AUTH)" -H "$QP" -H "Content-Type: application/json" -d "$BODY" >/dev/null
+  echo "   proveedor Google habilitado"
+else
+  echo "   SKIP: exportá GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET para habilitar Google"
+fi
 
 echo "== Authorized domains (agregar dominio de Cloud Run) =="
 RUN_HOST="$(gcloud run services describe "$SERVICE" --region "$REGION" \
