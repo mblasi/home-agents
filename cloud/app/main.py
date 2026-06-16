@@ -16,7 +16,7 @@ from fastapi.templating import Jinja2Templates
 from . import firestore_db as fdb
 from .auth import ALLOWED_EMAILS, FIREBASE_PROJECT_ID, require_bridge, require_dashboard_user
 from .commands import CommandError, catalog_summary, validate_command
-from .models import CommandRequest, CommandResult, StateSnapshot
+from .models import SCHEMA_VERSION, CommandRequest, CommandResult, StateSnapshot
 
 HERE = os.path.dirname(__file__)
 app = FastAPI(title="home-agents cloud backoffice", docs_url=None, redoc_url=None)
@@ -34,7 +34,7 @@ def health():
 
 @app.post("/ingest/state")
 def ingest_state(snapshot: StateSnapshot, sa: str = Depends(require_bridge)):
-    if snapshot.schema_version != StateSnapshot().schema_version:
+    if snapshot.schema_version != SCHEMA_VERSION:
         raise HTTPException(status_code=422, detail="schema_version no soportada")
     fdb.store_state(snapshot.model_dump())
     return {"ok": True}
