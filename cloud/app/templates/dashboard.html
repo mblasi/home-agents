@@ -112,8 +112,18 @@ async function refresh() {
   } catch (e) { $("updated").textContent = "error: " + e.message; }
   try {
     const { commands } = await api("/api/commands");
+    const st = (s) => s === "done" ? "🟢" : s === "error" ? "🔴" : s === "running" ? "🟡" : "⚪";
     $("audit").querySelector("tbody").innerHTML = commands
-      .map(c => `<tr><td>${c.status}</td><td><b>${c.type}</b></td><td class="muted">${JSON.stringify(c.params)}</td><td class="muted">${c.issued_by}</td><td class="muted">${c.issued_at}</td></tr>`).join("");
+      .map(c => {
+        const r = c.result || {};
+        const res = c.status === "pending" || c.status === "running" ? ""
+          : (r.ok ? (r.output || "ok") : ("error: " + (r.error || ""))).slice(0, 80);
+        return `<tr><td>${st(c.status)} ${c.status}</td><td><b>${c.type}</b></td>`
+          + `<td class="muted">${JSON.stringify(c.params)}</td>`
+          + `<td class="muted">${c.issued_by}</td>`
+          + `<td class="muted">${c.issued_at}</td>`
+          + `<td class="muted">${res}</td></tr>`;
+      }).join("");
   } catch (e) {}
 }
 

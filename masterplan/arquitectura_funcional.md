@@ -105,6 +105,27 @@ archivos `.json` más abajo describen el **modelo lógico**; físicamente son fi
 la DB. Quedan como archivos por diseño: embeddings `.npy`, traces JSONL, sesión de WhatsApp,
 samples de audio, y `panels.yaml` (config del repo leída por backoffice/scripts).
 
+### cloud (backoffice en la nube) — FASE 33
+
+Backoffice accesible desde internet **sin exponer el SER9 ni HAOS**, con principio
+egress-only: la nube nunca inicia conexiones hacia la casa. Patrón command/executor por
+inversión de control.
+
+- **Servicio** (`cloud/`, Cloud Run + Firestore, scale-to-zero): endpoints del bridge
+  (`/ingest/state`, `/commands/pending` con claim atómico, `/commands/{id}/result`) y API
+  del dashboard (`/api/state|commands|catalog`, emisión). Login Firebase Auth (Google) con
+  allow-list por email; rate limiting por identidad + límite de payload.
+- **Bridge** (`cloud/bridge/`, daemon systemd en el LXC): empuja el snapshot de estado y
+  polea la cola de comandos — **sólo conexiones salientes**. Reusa datos de core/audio_server.
+  Executor seguro: cada tipo del catálogo tipado → función concreta (sin shell). Auth por ID
+  token OIDC de una Service Account sin roles de proyecto (permiso mínimo absoluto).
+- **Seguridad**: secretos y PII nunca cruzan a la nube (allow-list de campos en el snapshot);
+  comandos tipados y cerrados; reglas Firestore deny-all de cliente.
+- **Failover**: si la nube cae, el core sigue local y el bridge reintenta con backoff; si el
+  bridge cae, el backoffice local en LAN (`:8080`, FASE 12) sigue operando.
+
+Contrato y modelo de amenazas: `masterplan/fase33_cloud_backoffice.md`.
+
 ---
 
 ## Agentes

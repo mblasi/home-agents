@@ -98,7 +98,8 @@ Every agent inherits `ProactiveMixin`, enabling autonomous intent detection by s
 home-agents/
 ├── ear/          → submodule: home-agents-ear
 ├── core/         → submodule: home-agents-core
-├── backoffice/   → web admin UI at :8080
+├── backoffice/   → web admin UI at :8080 (LAN)
+├── cloud/        → cloud backoffice (Cloud Run + Firestore) + bridge (egress-only)
 ├── masterplan/   → estado.md (task list + decisions + functional docs)
 ├── scripts/      → sync_issues.py, lint_estado.py
 └── interagent/   → product concept (Interagent network)
