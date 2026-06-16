@@ -1320,7 +1320,9 @@ Objetivo: Distribuir la interfaz de voz por toda la casa. Los NSPanel Pro (Andro
           como servidor de audio puro (sin hardware local): recibe audio de los NSPanels,
           corre STT+TTS, delega al core, devuelve el WAV de respuesta.
           La laptop queda 100% desarrollo sin servicios.
-Estado:   EN CURSO (19/30 — pipeline nodo+voice-id+enrollment+paneles operativo; quedan extras)
+Estado:   EN CURSO (22/30 — pipeline nodo+voice-id+enrollment+paneles+observabilidad operativo.
+          Pendientes: 16.6/16.7/16.9-16.12 (multi-nodo/room routing, diferibles hasta tener más
+          paneles) y 16.13/16.14 (RPi — ⏸ POSTERGADAS hasta comprar el hardware).)
 Deps:     FASE 1 (STT, TTS, Piper), FASE 3 (core/server.py, /process),
           FASE 21 (SER9 operativo — COMPLETA), FASE 2.5 (speaker_id), FASE 12 (backoffice)
 Hardware: NSPanel Pro — Android 8.1, sounddevice/PortAudio, mic (pcmC0D0c) + speaker (pcmC0D0p).
@@ -1435,13 +1437,13 @@ Hardware: Raspberry Pi 5 (4GB+) + pantalla oficial 7" o 10" + ReSpeaker 4-mic ha
             → enviar `{type:"tts_text", text:"..."}` al nodo (sintetiza con Piper local).
             Si no → enviar `{type:"tts_wav", wav_b64:"..."}` como hace hoy con NSPanel.
             El nodo NSPanel existente ignora mensajes de tipo desconocido — no se rompe.
-- [ ] 16.13 `ear/satellite_rpi.py` — cliente satélite nativo Linux para RPi 5:
+- [ ] 16.13 ⏸ POSTERGADA (hasta comprar hardware RPi) — `ear/satellite_rpi.py` — cliente satélite nativo Linux para RPi 5:
             mismo protocolo WS que `satellite.py`, declara capabilities RPi 5.
             Audio: ALSA / sounddevice apuntando al ReSpeaker (plughw:seeed4micvoicec,0),
             captura en 16kHz (ReSpeaker lo soporta nativamente — sin resampleo).
             TTS: Piper local con voz daniela, ffplay, igual que el ear actual.
             Configurable: CORE_WS_URL, ROOM, DISPLAY_URL (URL del dashboard HA para Chromium).
-- [ ] 16.14 Setup guide RPi 5 + pantalla oficial + ReSpeaker hat:
+- [ ] 16.14 ⏸ POSTERGADA (hasta comprar hardware RPi) — Setup guide RPi 5 + pantalla oficial + ReSpeaker hat:
             Raspberry Pi OS Lite (64-bit), seeed-voicecard driver, Piper TTS, Chromium en
             kiosk mode (`/etc/xdg/autostart/kiosk.desktop` apuntando a DISPLAY_URL),
             rotación de pantalla si montaje vertical, systemd service `capitan-satellite.service`
