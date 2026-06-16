@@ -30,6 +30,7 @@ fi
 echo "=== Smoke test (esperando 5s) ==="
 sleep 5
 ssh capitan-lxc "curl -sf http://localhost:8765/health" && echo "core OK" || echo "core NO responde"
-ssh capitan-lxc "curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/" | grep -qE '^(200|307)' && echo "backoffice OK" || echo "backoffice NO responde"
+# / redirige a /login (303) cuando no hay sesión — un 3xx es respuesta sana
+ssh capitan-lxc "curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/" | grep -qE '^(2..|3..)' && echo "backoffice OK" || echo "backoffice NO responde"
 
 echo "=== Deploy completo ==="
