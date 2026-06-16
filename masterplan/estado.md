@@ -2866,7 +2866,7 @@ Objetivo: Tener un backoffice accesible desde internet SIN exponer el SER9 ni HA
           La nube nunca inicia conexiones hacia la casa: el SER9 empuja estado para
           dibujar el dashboard y POLEA una cola de comandos para ejecutar acciones de
           administración (patrón command / executor). Plataforma: Google Cloud.
-Estado:   EN CURSO (9/17 — Etapas A (diseño) y B (servicio en la nube, desplegado) completas)
+Estado:   EN CURSO (13/17 — Etapas A, B y C completas; bridge desplegado y empujando estado)
 Deps:     FASE 12 (backoffice local — COMPLETA, fuente de datos y UI a reusar),
           FASE 21 (SER9 estable — COMPLETA), FASE 32 (datos en SQLite — COMPLETA).
 Principio de seguridad: el SER9 sólo hace conexiones SALIENTES (HTTPS) a la nube.
@@ -2914,13 +2914,14 @@ Stack GCP elegido: Cloud Run (web + API, scale-to-zero), Firestore (snapshot de
             TTL, SAs) + `infra/setup_firebase.sh` (Identity Platform/Firebase Auth).
 
 #### Etapa C - Bridge / executor en el SER9
-- [ ] 33.10 Daemon `cloud_bridge.py` (systemd unit en el LXC): push periódico del snapshot
+> Desplegado en capitan-lxc: `cloud/bridge/` + systemd `capitan-bridge.service`.
+- [x] 33.10 Daemon `cloud_bridge.py` (systemd unit en el LXC): push periódico del snapshot
             de estado a `/ingest/state`, reusando datos que ya escriben core/backoffice.
-- [ ] 33.11 Loop de polling: `GET /commands/pending` con backoff/reconexión; ejecuta cada
+- [x] 33.11 Loop de polling: `GET /commands/pending` con backoff/reconexión; ejecuta cada
             comando contra el allowlist tipado; postea el resultado a `/commands/{id}/result`.
-- [ ] 33.12 Executor seguro: cada tipo de comando mapeado a una función concreta (sin eval).
+- [x] 33.12 Executor seguro: cada tipo de comando mapeado a una función concreta (sin eval).
             Auditoría: log de cada comando ejecutado, parámetros y resultado.
-- [ ] 33.13 Credenciales del bridge: Service Account con permiso mínimo (sólo los endpoints
+- [x] 33.13 Credenciales del bridge: Service Account con permiso mínimo (sólo los endpoints
             necesarios), almacenadas fuera del repo. Rotación documentada.
 
 #### Etapa D - Seguridad, costo y operación
