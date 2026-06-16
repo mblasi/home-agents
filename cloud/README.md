@@ -51,16 +51,23 @@ PROJECT=capitan-495518 REGION=southamerica-east1 \
   ALLOWED_EMAILS=matias@blasi.ar bash infra/provision.sh
 ```
 
-Login del dashboard (Firebase Auth + Google sign-in), automatizado:
+Login del dashboard (Firebase Auth + Google sign-in):
+
+**Prerrequisito manual** (Identity Platform exige un OAuth client propio): en la consola
+crear el OAuth consent screen y un **OAuth client ID (Web)** con redirect
+`https://<project>.firebaseapp.com/__/auth/handler`. Copiar client id y secret.
 
 ```bash
-PROJECT=capitan-495518 REGION=southamerica-east1 bash infra/setup_firebase.sh
+PROJECT=capitan-495518 REGION=southamerica-east1 \
+  GOOGLE_CLIENT_ID=...apps.googleusercontent.com \
+  GOOGLE_CLIENT_SECRET=GOCSPX-... \
+  bash infra/setup_firebase.sh
 ```
 
-`setup_firebase.sh` hace: addFirebase → crea la web app → habilita el proveedor Google
-(OAuth Google-managed, sin client manual) → agrega el dominio de Cloud Run a
-*authorized domains* → fija `FIREBASE_API_KEY`/`FIREBASE_AUTH_DOMAIN` en el servicio.
-Idempotente. El acceso queda restringido por `ALLOWED_EMAILS` (validado en el backend).
+`setup_firebase.sh` hace: addFirebase → web app → `initializeAuth` → habilita el proveedor
+Google con el client → agrega el dominio de Cloud Run a *authorized domains* → fija
+`FIREBASE_API_KEY`/`FIREBASE_AUTH_DOMAIN` en el servicio. Idempotente. El acceso queda
+restringido por `ALLOWED_EMAILS` (validado en el backend).
 
 ## Variables de entorno del servicio
 
