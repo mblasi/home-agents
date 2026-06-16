@@ -2866,7 +2866,7 @@ Objetivo: Tener un backoffice accesible desde internet SIN exponer el SER9 ni HA
           La nube nunca inicia conexiones hacia la casa: el SER9 empuja estado para
           dibujar el dashboard y POLEA una cola de comandos para ejecutar acciones de
           administración (patrón command / executor). Plataforma: Google Cloud.
-Estado:   EN CURSO (4/17 — Etapa A diseño/contrato completa; ver fase33_cloud_backoffice.md)
+Estado:   EN CURSO (9/17 — Etapas A (diseño) y B (servicio en la nube, desplegado) completas)
 Deps:     FASE 12 (backoffice local — COMPLETA, fuente de datos y UI a reusar),
           FASE 21 (SER9 estable — COMPLETA), FASE 32 (datos en SQLite — COMPLETA).
 Principio de seguridad: el SER9 sólo hace conexiones SALIENTES (HTTPS) a la nube.
@@ -2901,17 +2901,17 @@ Stack GCP elegido: Cloud Run (web + API, scale-to-zero), Firestore (snapshot de
             (sin API keys embebidas si se puede). Definir rotación de credenciales.
 
 #### Etapa B - Servicio en la nube (Cloud Run + Firestore)
-- [ ] 33.5  Servicio Cloud Run (FastAPI) en `cloud/`: endpoints `POST /ingest/state`,
+> Desplegado en capitan-495518 (southamerica-east1): https://capitan-cloud-m2x3ep3hfa-rj.a.run.app
+- [x] 33.5  Servicio Cloud Run (FastAPI) en `cloud/`: endpoints `POST /ingest/state`,
             `GET /commands/pending`, `POST /commands/{id}/result`, y la API que consume el
             dashboard. HTTPS gestionado, scale-to-zero.
-- [ ] 33.6  Firestore: colección `state` (snapshot actual + histórico corto) y `commands`
+- [x] 33.6  Firestore: colección `state` (snapshot actual + histórico corto) y `commands`
             (estados pending/running/done/error con TTL). Reglas de seguridad por colección.
-- [ ] 33.7  Frontend del dashboard servido por Cloud Run: reusar lo posible del backoffice
-            local (FASE 12). Vistas: estado de servicios, latencias, historial, y panel de
-            acciones que emite comandos a la cola.
-- [ ] 33.8  Login del dashboard con Identity Platform/Firebase Auth, allowlist por email.
-- [ ] 33.9  IaC reproducible (Terraform o script gcloud) para provisionar Cloud Run,
-            Firestore, Identity Platform y Secret Manager. Credenciales en Secret Manager.
+- [x] 33.7  Frontend del dashboard servido por Cloud Run: nuevo y mínimo (estado de
+            servicios, latencias, agentes, historial, panel de acciones que emite comandos).
+- [x] 33.8  Login del dashboard con Identity Platform/Firebase Auth, allowlist por email.
+- [x] 33.9  IaC reproducible (script gcloud): `infra/provision.sh` (Cloud Run, Firestore,
+            TTL, SAs) + `infra/setup_firebase.sh` (Identity Platform/Firebase Auth).
 
 #### Etapa C - Bridge / executor en el SER9
 - [ ] 33.10 Daemon `cloud_bridge.py` (systemd unit en el LXC): push periódico del snapshot

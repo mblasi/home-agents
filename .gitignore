@@ -28,3 +28,8 @@ venv/
 *.swo
 
 wa/.wwebjs_cache/
+
+# FASE 33 — cloud bridge credentials (nunca al repo)
+cloud/**/*.env
+*-sa-key.json
+bridge-sa-key.json

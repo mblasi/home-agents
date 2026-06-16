@@ -1,0 +1,12 @@
+rules_version = '2';
+// Defense-in-depth: el dashboard NUNCA toca Firestore directo — todo pasa por la
+// API de Cloud Run, que usa la SA del servicio (bypassa estas reglas). Por lo tanto
+// se deniega TODO acceso de cliente. Si alguien obtiene credenciales de cliente
+// Firebase, igual no puede leer estado ni la cola de comandos.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
