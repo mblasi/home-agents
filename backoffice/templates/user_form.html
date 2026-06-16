@@ -130,6 +130,21 @@
       </p>
     </div>
 
+    <div>
+      <label class="block text-xs text-gray-400 mb-1 uppercase tracking-wider">
+        Email de login <span class="text-gray-600 normal-case">(opcional)</span>
+      </label>
+      <input type="email" name="email"
+             value="{{ user.email if user and user.email else '' }}"
+             placeholder="usuario@gmail.com"
+             class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm
+                    focus:border-blue-500 focus:outline-none font-mono">
+      <p class="text-xs text-gray-600 mt-1">
+        Identidad de acceso al backoffice en la nube (Google sign-in). Si se deja vacío,
+        se usa el email de Google Calendar.
+      </p>
+    </div>
+
     <div class="flex gap-2 pt-2">
       <button type="submit"
               class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm
