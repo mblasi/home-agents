@@ -265,6 +265,7 @@ Stack:    resemblyzer (GE2E 256-dim), JSON + .npy local, RBAC por rol
 - [x] 2.5.9  Panel de usuarios: panel_users.py con Rich, lista de usuarios + speaker activo
              con confidence, lee /tmp/capitan/speaker.json y GET /users
 - [x] 2.5.10 Gestión de información personal por voz: comandos para actualizar campos del
+- [ ] 2.5.11  Nombre de usuario se revierte a 'Nombre' (set_name pisado por ejemplo few-shot)
              propio perfil sin tocar el backoffice.
              Ej: "mi pasaporte vence el 15 de marzo de 2027", "mi nombre es Matías",
              "tengo 38 años", "prefiero respuestas cortas".
@@ -1600,7 +1601,7 @@ el alta de panel desde la UI y cerrar el flujo como un wizard cohesivo y validad
             usuario — usado por el wizard (16.27) para confirmar el enrollment y por el
             backoffice para mostrar la salud del voice-ID por usuario.
 - [x] 16.29 **Eliminar el stack legacy de enrollment laptop-ear** (reemplazado por el
-- [ ] 16.31  Overlay de estado del panel intercepta el touch (paneles inusables)
+- [x] 16.31  Overlay de estado del panel intercepta el touch (paneles inusables) — sizing por wm size (PR ear #35), passthrough probado fallido, fix final: overlay se encoge a 1x1 en idle y solo cubre en estados activos (PR ear #39). Touch verificado OK
 - [ ] 16.32  Reducir falsos positivos de wake word (TV/charla)
 - [ ] 16.33  Contexto de area por panel: atar room->area de HAOS para desambiguar comandos
             enrollment por nodo 16.21/16.22). El satellite del NSPanel NO lo usa. Quitar,
@@ -1789,7 +1790,7 @@ Deps:     FASE 1 (pipeline base, COMPLETA), FASE 16 (nodos de audio).
             (try/finally). Implementar en `ear/listen.py` (laptop/legacy).
 
 - [x] 18.3  **Indicador visual de estado en el nodo** — `ear/satellite_ui.py`: barra fina
-- [ ] 18.15  Saludo Hola <nombre> intrusivo en cada conversacion nueva
+- [x] 18.15  Saludo Hola <nombre> intrusivo en cada conversacion nueva (no era bug: el nombre en la DB era literal "Nombre"; el saludo era correcto. Refinamiento UX del saludo → épico 18.16 frente C)
 - [ ] 18.16  Epico: continuidad conversacional (paneles / WA proactivos / saludo+contexto)
             overlay (Termux:GUI) full-width en el borde superior, sobre HA Companion, que
             cambia color/animación por estado: listening=shimmer azul lento, wake=verde,

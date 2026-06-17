@@ -42,6 +42,7 @@
 "2.5.8": {number: 16, repo: mblasi/home-agents-core}
 "2.5.9":  {number: 3,  repo: mblasi/home-agents-ear}
 "2.5.10": 228
+"2.5.11": 546
 
 # ── FASE 2.6 (onboarding + wake word personalizado) ───────────────────────────
 "2.6.1": 233
