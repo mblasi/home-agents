@@ -2972,3 +2972,74 @@ Stack GCP elegido: Cloud Run (web + API, scale-to-zero), Firestore (snapshot de
             queda como bootstrap de emergencia offline (→admin). Acceso por IP de la LAN.
 - [x] 33.24 RBAC en el backoffice local: admin escribe; familiar/adolescente read-only (bloqueo
             de POST/PATCH/DELETE/PUT por middleware); roles sin acceso rechazados. Tests.
+
+### FASE 34 - Deploy remoto al SER9 (CD sobre el bridge egress-only)
+
+```
+Objetivo: Desplegar al SER9 desde cualquier lado (fuera de la LAN) de forma segura,
+          versionada y reversible, SIN abrir un solo puerto entrante en la casa. El
+          deploy es un comando tipado más en el allowlist del bridge (FASE 33): el
+          dashboard cloud lo emite, el SER9 lo polea y lo ejecuta como un release CD
+          (pin de ref por submodule → snapshot → deploy atómico → health-gate →
+          rollback automático si falla), registra la versión desplegada y la reporta.
+Estado:   Pendiente.
+Deps:     FASE 33 (bridge egress-only + allowlist tipado + auth/audit/RBAC — COMPLETA,
+          ya existe el comando `deploy.run` que esta fase eleva a CD real),
+          FASE 21 (SER9 estable — COMPLETA), FASE 12 (backoffice — COMPLETA).
+Principio de seguridad: se hereda intacto el modelo de FASE 33 — el SER9 sólo hace
+          conexiones SALIENTES. El deploy NO es un canal nuevo: es un tipo de comando
+          más en la cola que el SER9 ya polea. Cero inbound, cero port-forwarding, cero
+          SSH expuesto. Descartado VPN/Tailscale + SSH por abrir canal entrante.
+Punto de partida (gap a cerrar): hoy `deploy.run` (cloud/bridge/executor.py) hace
+          `git pull --recurse-submodules` ciego a main + install + restart. No pinea
+          ref, no snapshotea el estado previo, no hace health-check, no revierte si el
+          restart deja el sistema roto, y no registra qué versión quedó corriendo.
+Arquitectura:
+          [dashboard cloud] --emite deploy.release(refs)--> [cola Firestore]
+          [SER9 bridge] --poll--> executor CD --> postea resultado + versión
+              snapshot ref actual → fetch+checkout ref pedido → install → restart
+              → health-gate (/health core+backoffice) → OK: registra release
+                                                       → FAIL: rollback al snapshot
+```
+
+#### Etapa A - Contrato del release
+- [ ] 34.1  Extender el comando tipado a `deploy.release` (o ampliar `deploy.run`) en
+            `cloud/app/commands.py`: aceptar `core_ref` y `ear_ref` opcionales (default =
+            HEAD remoto de main), validados como sha/tag/branch con un validador estricto
+            (rechazar refs arbitrarios/inyección); mantener `restart_wa`. Tests del catálogo.
+- [ ] 34.2  Definir el contrato de "release" como dato versionado: refs desplegados por
+            submodule + commit del umbrella, timestamp, quién lo emitió, resultado y estado
+            del health-gate, y si hubo rollback. Persistencia local en el SER9 (fuente de
+            verdad) y subconjunto reportado en el snapshot a la nube.
+
+#### Etapa B - Executor CD en el SER9 (atómico + reversible)
+- [ ] 34.3  Snapshot pre-deploy: capturar el ref/commit actual de cada submodule (y del
+            umbrella) ANTES de tocar nada, para poder revertir exactamente a ese estado.
+- [ ] 34.4  Deploy con pin: `git fetch` + `checkout` del ref pedido por submodule (en lugar
+            del `pull` ciego a main); reinstalar requirements sólo si cambiaron; restart de
+            servicios. Lock de deploy (un único release a la vez) e idempotencia.
+- [ ] 34.5  Health-gate post-deploy: tras el restart, verificar `/health` de core y
+            backoffice (y readiness del propio bridge) con timeout + retries antes de
+            declarar éxito. Reusar la lógica del smoke test de `scripts/deploy.sh`.
+- [ ] 34.6  Rollback automático: si el health-gate falla, revertir a los refs del snapshot,
+            reinstalar, reiniciar y re-chequear; reportar `FAILED + rolled-back` con el
+            detalle de cada paso. Tras un rollback el sistema queda en el último estado sano.
+
+#### Etapa C - Visibilidad y operación
+- [ ] 34.7  Registrar la versión desplegada (refs + estado del release) y exponerla en el
+            snapshot → dashboard cloud: versión actual corriendo, último deploy, resultado
+            y si hubo rollback. Auditoría reusa la de FASE 33 (quién emitió, cuándo).
+- [ ] 34.8  Panel de deploy en el dashboard cloud (RBAC: sólo admin emite): elegir ref/tag,
+            disparar el release, ver progreso/resultado/rollback. Reusa el panel de acciones
+            y el gate de capacidades de FASE 33; el frontend oculta la acción a no-admin.
+- [ ] 34.9  Unificar `scripts/deploy.sh` con el nuevo flujo: el deploy LAN debe usar el
+            mismo executor (health-gate + rollback) para no tener dos rutas divergentes —
+            wrapper que invoca el mismo código de release, no una copia paralela.
+
+#### Etapa D - Tests y documentación
+- [ ] 34.10 Tests: validación del comando con refs (`cloud/tests`); executor con snapshot /
+            health / rollback mockeando git + systemd + HTTP (`cloud/bridge/test_bridge.py`);
+            caso e2e del flujo deploy → health falla → rollback al ref previo.
+- [ ] 34.11 Docs: actualizar `cloud/README.md`, `cloud/bridge/README.md`, la sección de
+            deploy de `CLAUDE.md`, `masterplan/arquitectura_funcional.md` (flujo de release y
+            rollback) y este plan. Reflejar la nueva versión visible en el dashboard.
