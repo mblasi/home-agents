@@ -1600,6 +1600,9 @@ el alta de panel desde la UI y cerrar el flujo como un wizard cohesivo y validad
             usuario — usado por el wizard (16.27) para confirmar el enrollment y por el
             backoffice para mostrar la salud del voice-ID por usuario.
 - [x] 16.29 **Eliminar el stack legacy de enrollment laptop-ear** (reemplazado por el
+- [ ] 16.31  Overlay de estado del panel intercepta el touch (paneles inusables)
+- [ ] 16.32  Reducir falsos positivos de wake word (TV/charla)
+- [ ] 16.33  Contexto de area por panel: atar room->area de HAOS para desambiguar comandos
             enrollment por nodo 16.21/16.22). El satellite del NSPanel NO lo usa. Quitar,
             asegurando que nada se rompa (con tests):
             - backoffice: rutas `/users/{uid}/onboard`, `/users/{uid}/enroll/start`,
@@ -1786,6 +1789,8 @@ Deps:     FASE 1 (pipeline base, COMPLETA), FASE 16 (nodos de audio).
             (try/finally). Implementar en `ear/listen.py` (laptop/legacy).
 
 - [x] 18.3  **Indicador visual de estado en el nodo** — `ear/satellite_ui.py`: barra fina
+- [ ] 18.15  Saludo Hola <nombre> intrusivo en cada conversacion nueva
+- [ ] 18.16  Epico: continuidad conversacional (paneles / WA proactivos / saludo+contexto)
             overlay (Termux:GUI) full-width en el borde superior, sobre HA Companion, que
             cambia color/animación por estado: listening=shimmer azul lento, wake=verde,
             recording=ámbar, waiting=respiro cian rápido, speaking=azul. Da feedback de
@@ -1839,6 +1844,7 @@ Deps:     FASE 3.5 (integración WA, COMPLETA), FASE 9 (coordinador, COMPLETA).
             alerta/proactivo enviados desde el core al usuario.
 
 - [x] 19.3  **Mensajes ricos en WhatsApp** — para respuestas que lo ameriten, incluir media:
+- [ ] 19.4  Respuestas de WhatsApp se enrutan al agente equivocado (cruce de intents)
             - Link preview automático: si el texto contiene una URL, enviar via `client.sendMessage`
               con `linkPreview: true` (whatsapp-web.js lo genera solo).
             - Imagen adjunta: si el agente devuelve un `media_url` o `image_path` en la respuesta,
@@ -2784,6 +2790,7 @@ Deps:     FASE 9 (coordinador), FASE 24 (tracing).
             Los tests existentes se actualizan para cubrir el loop y la invocación de tools.
 
 - [x] 30.9  **Tests** — `tests/test_tool_store.py`: CRUD de ToolDef, enable/disable, persistencia.
+- [ ] 30.10  Discusion: modelar skills reutilizables y componibles (coordinador + agentic loop)
             `tests/test_tool_hydrator.py`: hidratación desde schema mockeado (sin llamadas
             reales). `tests/test_agent_loop.py`: loop completo con Ollama mockeado — verifica
             iteraciones, límite de ciclos, registro en trace.

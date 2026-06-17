@@ -298,6 +298,9 @@
 "16.8":  {number: 89, repo: mblasi/home-agents-core}
 "16.9":  {number: 21, repo: mblasi/home-agents-ear}
 "16.10": 274
+"16.31": 527
+"16.32": 528
+"16.33": 529
 
 # ── FASE 17 (chat visual con la plataforma) ───────────────────────────────────
 "17.1":  290
@@ -316,6 +319,7 @@
 "19.1":  305
 "19.2":  306
 "19.3":  307
+"19.4": 530
 
 # ── FASE 20 (agente MercadoLibre) ────────────────────────────────────────────
 "20.1":  308
@@ -393,6 +397,7 @@
 "30.7":  424
 "30.8":  425
 "30.9":  426
+"30.10": 533
 
 # ── FASE 21 (consolidación en SER9) ──────────────────────────────────────────
 "21.1":  429
@@ -470,6 +475,8 @@
 "18.1": {number: 25, repo: mblasi/home-agents-ear}
 "18.2": {number: 26, repo: mblasi/home-agents-ear}
 "18.3": {number: 24, repo: mblasi/home-agents-ear}
+"18.15": 531
+"18.16": 532
 
 # ── FASE 33 — Backoffice en la nube (egress-only) ────────────────────────────
 "33.1":  484
