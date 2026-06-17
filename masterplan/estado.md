@@ -3044,3 +3044,46 @@ Arquitectura:
 - [ ] 34.11 Docs: actualizar `cloud/README.md`, `cloud/bridge/README.md`, la sección de
             deploy de `CLAUDE.md`, `masterplan/arquitectura_funcional.md` (flujo de release y
             rollback) y este plan. Reflejar la nueva versión visible en el dashboard.
+
+### FASE 35 - Observabilidad de voz/LLM + dashboards de métricas
+
+```
+Objetivo: Centralizar TODAS las métricas relevantes del análisis de voz (wake word,
+          falsos positivos, voice-id, retrains) y de las interacciones con LLMs
+          (latencias, tokens, tool calls, coordinador, aciertos/errores), exponerlas en
+          un dashboard amigable e interactivo en el backoffice local, y pushearlas al
+          backoffice cloud (vía el bridge egress-only de FASE 33) con su propio dashboard.
+Estado:   Pendiente.
+Deps:     FASE 24 (tracing de interacciones — fuente de métricas LLM), FASE 16 (métricas
+          de nodos/voz: _bump_metric, estado del retrain), FASE 33 (bridge egress-only +
+          cloud backoffice + RBAC), FASE 12 (backoffice local).
+```
+
+#### Etapa A - Instrumentación y almacenamiento
+- [ ] 35.1  Métricas de análisis de voz: serie temporal + agregados de wake detections,
+            falsos positivos (por nodo), voice-id (conf, identificado vs guest, aciertos),
+            y eventos de retrain (n_positive, n_negative, trigger, duración, versión).
+            Reusar lo que ya escriben `audio_server` (`_bump_metric`) y `/wakeword/train`.
+            Persistir en SQLite con retención configurable.
+- [ ] 35.2  Métricas de interacciones LLM: latencias por modelo/agente, tokens
+            (prompt/completion), tool calls, latencia del coordinador, tasa de
+            aciertos/errores y fallbacks. Fuente: `trace_store` (FASE 24); derivar agregados
+            sin duplicar el almacenamiento de traces.
+- [ ] 35.3  Capa de agregación + API de métricas en `core`: endpoints GET para series
+            temporales y agregados (por rango temporal, por nodo, por agente/modelo), con
+            shape listo para graficar (labels + series).
+
+#### Etapa B - Dashboards
+- [ ] 35.4  Dashboard de métricas en el backoffice local: páginas amigables e interactivas
+            (gráficos de línea/barras, filtros por rango/nodo/agente, auto-refresh).
+            Secciones separadas: Voz/Wake/Voice-id/Retrain y LLM/Agentes/Latencias.
+- [ ] 35.5  Push de métricas al cloud: extender el bridge (FASE 33, egress-only) para enviar
+            agregados de métricas al backoffice cloud; contrato + rate limiting + auth.
+- [ ] 35.6  Dashboard de métricas en el cloud backoffice: mismas vistas amigables e
+            interactivas, con el RBAC de FASE 33 (admin ve todo; roles limitados, vista básica).
+
+#### Etapa C - Tests y documentación
+- [ ] 35.7  Tests: agregadores de métricas (voz y LLM) con datos sintéticos; endpoints de
+            métricas; contrato del push al cloud mockeando el bridge.
+- [ ] 35.8  Docs: actualizar `README.md`, `masterplan/arquitectura_funcional.md` (sección de
+            observabilidad/métricas) y la política de dashboards de `CLAUDE.md`.
