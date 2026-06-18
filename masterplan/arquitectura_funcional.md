@@ -338,10 +338,19 @@ usuario/asistente al LLM.
   intent** (`intent_state.get_request_by_id`), evitando el cruce con el primer request
   pendiente de otro agente. Sin `intent_id`, fallback por conversación
   (`get_pending_request`).
+- **Estado de continuación unificado (36.2):** `ContinuationState` (waiting/kind/prompt/field/
+  agent_id) modela "esperando respuesta del usuario" como UN estado persistido en la
+  conversación, vista única para todos los canales. `kind ∈ {clarification, field, reply}`.
+  `pending_field` es una propiedad respaldada por él; los flags legacy (`needs_reply`,
+  `is_clarification`, `pending_field`) se **derivan**; las respuestas exponen `continuation`.
+- **Contexto uniforme a agentes (36.3):** el server inyecta `source["user_context"]`
+  (por-agente) **siempre** que hay usuario, independiente del prefix de intents; junto con
+  `conv.context()` (historial) cada agente recibe contexto consistente. Accessor:
+  `base_agent.user_context_from(source)`.
 
-> Continuidad conversacional unificada (modelo `ContinuationState`, proactivos como turnos,
-> reabrir mic en paneles, saludo por sesión) está EN CURSO en **FASE 36**; esta sección se
-> completa en 36.11.
+> Fronteras de continuidad pendientes (FASE 36): reabrir mic en paneles (etapa B), proactivos
+> como turnos + reanudar conversación en WhatsApp (etapa C), saludo por sesión (etapa D). La
+> sección se consolida en 36.11.
 
 ---
 
