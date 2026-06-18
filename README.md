@@ -144,7 +144,7 @@ bash ~/workspace/home-agents/ear/dashboard.sh
 | Audio server | FastAPI + uvicorn | :8766, STT/TTS + voice-id + enrollment channel |
 | Voice-ID | resemblyzer (GE2E) | server-side speaker gate (TV/guest → drop) |
 | Agent API | FastAPI + uvicorn | :8765, POST /process |
-| Backoffice | FastAPI + HTMX | :8080, users/agents/wake word/panels/provisioning |
+| Backoffice | FastAPI + HTMX | :8080, users/agents/wake word/panels/ambientes/provisioning |
 | Coordinator | qwen2.5:7b (multi-step) | generates ExecutionPlan for parallel agent dispatch |
 | Proactive | per-agent scheduler | detects patterns from history, generates intents |
 | Goals | goal_store.py | discovered→planning→in_progress→completed lifecycle |
