@@ -265,7 +265,7 @@ Stack:    resemblyzer (GE2E 256-dim), JSON + .npy local, RBAC por rol
 - [x] 2.5.9  Panel de usuarios: panel_users.py con Rich, lista de usuarios + speaker activo
              con confidence, lee /tmp/capitan/speaker.json y GET /users
 - [x] 2.5.10 Gestión de información personal por voz: comandos para actualizar campos del
-- [ ] 2.5.11  Nombre de usuario se revierte a 'Nombre' (set_name pisado por ejemplo few-shot)
+- [x] 2.5.11  Nombre de usuario se revierte a 'Nombre' (set_name pisado por ejemplo few-shot) — ejemplo realista input→output en el prompt + guard que rechaza placeholders antes de update_user; idem create_user en user_mgmt. PR core #205
              propio perfil sin tocar el backoffice.
              Ej: "mi pasaporte vence el 15 de marzo de 2027", "mi nombre es Matías",
              "tengo 38 años", "prefiero respuestas cortas".
@@ -1848,7 +1848,7 @@ Deps:     FASE 3.5 (integración WA, COMPLETA), FASE 9 (coordinador, COMPLETA).
             alerta/proactivo enviados desde el core al usuario.
 
 - [x] 19.3  **Mensajes ricos en WhatsApp** — para respuestas que lo ameriten, incluir media:
-- [ ] 19.4  Respuestas de WhatsApp se enrutan al agente equivocado (cruce de intents)
+- [x] 19.4  Respuestas de WhatsApp se enrutan al agente equivocado (cruce de intents) — reply con intent_id (quoted-reply) se rutea con get_request_by_id al agente dueño; nunca cae a get_pending_request (que agarraba el primer pendiente de cualquier agente). PR core #204
             - Link preview automático: si el texto contiene una URL, enviar via `client.sendMessage`
               con `linkPreview: true` (whatsapp-web.js lo genera solo).
             - Imagen adjunta: si el agente devuelve un `media_url` o `image_path` en la respuesta,
