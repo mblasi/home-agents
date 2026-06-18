@@ -174,12 +174,30 @@ def cmd_add(args):
     issue_num = int(url.rstrip("/").split("/")[-1])
     print(f"Issue #{issue_num}: {url}")
 
-    # Insert into estado.md
+    # Insert into estado.md. insert_after is the FIRST line of the last task of the
+    # phase; tasks can span multiple (indented) continuation lines, so extend past
+    # them to avoid splitting the task in two.
     lines = ESTADO.read_text().splitlines(keepends=True)
+    insert_after = _task_last_line(lines, insert_after)
     new_task_line = f"- [ ] {task_id}  {title}\n"
     lines.insert(insert_after + 1, new_task_line)
     ESTADO.write_text("".join(lines))
     print(f"Insertado en estado.md después de línea {insert_after + 1}")
+
+
+def _task_last_line(lines, start_idx):
+    """Given the 0-indexed first line of a task, return the 0-indexed last line,
+    extending over indented continuation lines (description that wraps). Stops at the
+    first blank line, new task, phase/section header, or any non-indented line."""
+    end = start_idx
+    for k in range(start_idx + 1, len(lines)):
+        line = lines[k]
+        if not line.strip():
+            break
+        if line[0] not in (" ", "\t"):
+            break
+        end = k
+    return end
 
     # Append to issues.yaml
     _append_to_issues_yaml(task_id, issue_num, repo, phase)
