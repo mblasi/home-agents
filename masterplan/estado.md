@@ -3205,7 +3205,7 @@ Objetivo: Una capa de conversación como COLUMNA VERTEBRAL de la continuidad, ch
           contexto y rutee al agente dueño; (c) identificar al usuario una vez por sesión
           (no por conversación); (d) dar a cada agente un contexto consistente (user_context
           por-agente + historial reciente). Reemplaza y expande el épico 18.16 (#532).
-Estado:   EN CURSO (1/11 — 36.1 hecha).
+Estado:   EN CURSO (2/11 — 36.1, 36.2 hechas).
 Deps:     conversations.py (FASE 9/22), intent_state + proactivo (FASE 22/27), 19.4 (ruteo WA
           por intent_id — base del frente proactivo), FASE 16 (audio_server/satellite), FASE 35
           (métricas, para 36.10).
@@ -3229,10 +3229,11 @@ Modelo conceptual (decisiones de diseño):
             persistente) + política de reanudación por recencia (`resume_latest(source)`).
             Refactor de `conversations.py` sin romper el keying actual. Tests. (PR core #207;
             limpió STORE_PATH/json muertos)
-- [ ] 36.2  `ContinuationState` unificado: modelar needs_reply/is_clarification/pending_field
-            como un estado de "esperando respuesta" persistido en la conversación; devolverlo
-            en `/process` y `wa_inbound` con un contrato único; helper para detectar/cerrar el
-            ciclo. Migrar los call-sites actuales. Tests.
+- [x] 36.2  `ContinuationState` unificado: modela needs_reply/is_clarification/pending_field
+            como un estado de "esperando respuesta" persistido en la conversación (waiting/kind/
+            prompt/field/agent_id); pending_field pasa a propiedad respaldada; los flags legacy
+            se derivan; las respuestas exponen `continuation`. Migración del pending_field legacy.
+            PR core #208. (wa_inbound expone continuation: pendiente afinar en 36.7/36.8)
 - [ ] 36.3  Contexto uniforme a agentes: contrato de que cada agente de dominio reciba
             `user_context` (por-agente) + `conv.context()` en su prompt. Auditar los agentes
             existentes, corregir los que no lo cumplen, test por agente.
