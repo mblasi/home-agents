@@ -1794,7 +1794,9 @@ Deps:     FASE 1 (pipeline base, COMPLETA), FASE 16 (nodos de audio).
 
 - [x] 18.3  **Indicador visual de estado en el nodo** — `ear/satellite_ui.py`: barra fina
 - [x] 18.15  Saludo Hola <nombre> intrusivo en cada conversacion nueva (no era bug: el nombre en la DB era literal "Nombre"; el saludo era correcto. Refinamiento UX del saludo → épico 18.16 frente C)
-- [ ] 18.16  Epico: continuidad conversacional (paneles / WA proactivos / saludo+contexto)
+- [x] 18.16  Epico: continuidad conversacional — REPLANTEADO y expandido como FASE 36
+            (continuidad conversacional unificada: modelo de conversación channel-aware +
+            ContinuationState + proactivos como turnos + saludo por sesión + contexto a agentes)
             overlay (Termux:GUI) full-width en el borde superior, sobre HA Companion, que
             cambia color/animación por estado: listening=shimmer azul lento, wake=verde,
             recording=ámbar, waiting=respiro cian rápido, speaking=azul. Da feedback de
@@ -3144,3 +3146,74 @@ Deps:     FASE 24 (tracing de interacciones — fuente de métricas LLM), FASE 1
             métricas; contrato del push al cloud mockeando el bridge.
 - [ ] 35.8  Docs: actualizar `README.md`, `masterplan/arquitectura_funcional.md` (sección de
             observabilidad/métricas) y la política de dashboards de `CLAUDE.md`.
+
+### FASE 36 - Continuidad conversacional unificada (voz + WhatsApp)
+
+```
+Objetivo: Una capa de conversación como COLUMNA VERTEBRAL de la continuidad, channel-aware,
+          en vez de parches por canal. Debe: (a) sostener intercambios multi-turno sin
+          re-disparar (wake word en voz, mensaje nuevo en WA); (b) integrar las notificaciones
+          proactivas como turnos de conversación, para que la respuesta del usuario caiga en
+          contexto y rutee al agente dueño; (c) identificar al usuario una vez por sesión
+          (no por conversación); (d) dar a cada agente un contexto consistente (user_context
+          por-agente + historial reciente). Reemplaza y expande el épico 18.16 (#532).
+Estado:   Pendiente.
+Deps:     conversations.py (FASE 9/22), intent_state + proactivo (FASE 22/27), 19.4 (ruteo WA
+          por intent_id — base del frente proactivo), FASE 16 (audio_server/satellite), FASE 35
+          (métricas, para 36.10).
+
+Modelo conceptual (decisiones de diseño):
+  - Conversation channel-aware: TTL y semántica por canal (voz: corta/síncrona ~120s; WA:
+    larga/asíncrona, persistente). El source_key sigue identificando el hilo; se agrega
+    política de reanudación por recencia.
+  - ContinuationState unificado: needs_reply / is_clarification / pending_field dejan de ser
+    flags sueltos y se modelan como UN estado de "esperando respuesta" persistido en la
+    conversación, devuelto en /process y wa_inbound, y consumible por cualquier canal.
+  - Proactivos = turnos `assistant` en una conversación, atados a su intent_id. El reply
+    (quoted o por recencia) se liga a esa conversación → agente dueño (extiende 19.4).
+  - Identidad: greeted_at por usuario/canal; saludo 1x por sesión señalando reconocimiento.
+  - Contexto a agentes: contrato uniforme (user_context por-agente + conv.context()),
+    auditado y testeado por agente (no asumido).
+```
+
+#### Etapa A - Fundaciones del modelo de conversación (core)
+- [ ] 36.1  `Conversation` channel-aware: TTL configurable por canal (voz ~120s, WA largo/
+            persistente) + política de reanudación por recencia (`resume_latest(source)`).
+            Refactor de `conversations.py` sin romper el keying actual. Tests.
+- [ ] 36.2  `ContinuationState` unificado: modelar needs_reply/is_clarification/pending_field
+            como un estado de "esperando respuesta" persistido en la conversación; devolverlo
+            en `/process` y `wa_inbound` con un contrato único; helper para detectar/cerrar el
+            ciclo. Migrar los call-sites actuales. Tests.
+- [ ] 36.3  Contexto uniforme a agentes: contrato de que cada agente de dominio reciba
+            `user_context` (por-agente) + `conv.context()` en su prompt. Auditar los agentes
+            existentes, corregir los que no lo cumplen, test por agente.
+
+#### Etapa B - Continuidad en paneles/voz (core + ear)
+- [ ] 36.4  `audio_server`: `/process-audio` devuelve metadata de continuación (headers
+            `X-Conversation-Id`, `X-Needs-Reply`) y propaga `conversation_id` al core en cada
+            request (hoy se descarta). Contrato + tests.
+- [ ] 36.5  `satellite`: ante `needs_reply`, reabrir el mic SIN wake word (beep + timeout),
+            threadeando el `conversation_id`; cerrar el ciclo si no hay respuesta a tiempo.
+            Tests del loop (mockear audio_server).
+- [ ] 36.6  Deploy a paneles + verificación e2e: wake → comando → repregunta → respuesta sin
+            re-wake; sin regresiones de falsos positivos.
+
+#### Etapa C - Continuidad en WhatsApp (core)
+- [ ] 36.7  Conversación activa en WA: TTL largo; un mensaje entrante reanuda la última
+            conversación activa del remitente si existe (no crea una nueva por gap temporal).
+            Tests.
+- [ ] 36.8  Proactivos como turnos: las notificaciones proactivas (advise/goal/request)
+            registran un turno `assistant` en una conversación con su `intent_id`; el reply
+            (quoted-reply o por recencia) se liga a esa conversación y rutea al agente dueño
+            (extiende 19.4). Tests del cruce resuelto end-to-end.
+
+#### Etapa D - Identidad y saludo (core)
+- [ ] 36.9  Saludo por sesión: `greeted_at` por usuario/canal; saludar 1x por sesión
+            señalando reconocimiento del usuario (no en cada conversación nueva). Cooldown
+            configurable. Reemplaza el saludo por-conversación actual. Tests.
+
+#### Etapa E - Observabilidad y documentación
+- [ ] 36.10 Métricas de continuidad (turnos por conversación, % de exchanges multi-turno,
+            repreguntas sostenidas, replies a proactivos) integradas a los dashboards de FASE 35.
+- [ ] 36.11 Tests e2e cross-canal (voz y WA) del ciclo completo + docs: sección "continuidad
+            conversacional" en `masterplan/arquitectura_funcional.md` y `README`.
