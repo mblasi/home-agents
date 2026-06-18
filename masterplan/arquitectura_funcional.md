@@ -614,6 +614,32 @@ Un `ProactiveRunTrace` agrega resultados por usuario: cada `ProactiveUserResult`
 
 ---
 
+## Observabilidad — métricas (FASE 35)
+
+`core/metrics_store.py` centraliza en SQLite (vía `db.py`) las métricas que antes vivían sólo
+en memoria, separadas de los traces (que guardan el detalle de cada request; las métricas
+guardan la serie temporal agregable).
+
+**Lado voz (FASE 35.1, implementado).** Dos tablas:
+
+| Tabla | Contenido |
+|-------|-----------|
+| `voice_metrics` | Un evento por disparo de wake word: `kind` (`tp`/`fp`), `reason` del fp (`noise`/`guest`/`core_unknown`), voice-id (`speaker`, `speaker_conf`), latencias (`stt_ms`/`core_ms`/`tts_ms`/`total_ms`), `node_id`, `room`, `ts` |
+| `retrain_events` | Un evento por reentrenamiento del wake word: `n_positive`/`n_negative`, `val_accuracy`, `fp_rate`, `duration_s`, `trigger`, `version`, `status` |
+
+Flujo de ingesta: el `audio_server` (ear) emite cada evento al core con
+`POST /metrics/voice/event` — fire-and-forget en thread daemon, nunca bloquea el pipeline de
+audio (gateado por `METRICS_PUSH`). El reentrenamiento (`/wakeword/train`) registra su evento
+directamente en el core. Complementa la vista live en memoria (`_bump_metric` → `/nodes`).
+
+API de consulta en `metrics_store`: `voice_aggregates` (totales tp/fp, `fp_rate`, voice-id,
+latencias promedio), `voice_series` (serie temporal bucketizada) y `retrain_history`. Quedan
+listas para exponerse como endpoints GET (FASE 35.3) y graficarse en el backoffice (35.4) y
+el cloud (35.6). Retención configurable con `METRICS_RETENTION_DAYS` (default 90, poda
+oportunista). Métricas de LLM/agentes (35.2) derivarán de `trace_store`, sin duplicar storage.
+
+---
+
 ## Persistencia en disco
 
 Todos los datos del usuario se almacenan en `~/.local/share/capitan/`:

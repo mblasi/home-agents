@@ -3105,18 +3105,23 @@ Objetivo: Centralizar TODAS las métricas relevantes del análisis de voz (wake 
           (latencias, tokens, tool calls, coordinador, aciertos/errores), exponerlas en
           un dashboard amigable e interactivo en el backoffice local, y pushearlas al
           backoffice cloud (vía el bridge egress-only de FASE 33) con su propio dashboard.
-Estado:   Pendiente.
+Estado:   EN CURSO (1/8 — 35.1 instrumentación+almacenamiento de voz/retrain en SQLite).
 Deps:     FASE 24 (tracing de interacciones — fuente de métricas LLM), FASE 16 (métricas
           de nodos/voz: _bump_metric, estado del retrain), FASE 33 (bridge egress-only +
           cloud backoffice + RBAC), FASE 12 (backoffice local).
 ```
 
 #### Etapa A - Instrumentación y almacenamiento
-- [ ] 35.1  Métricas de análisis de voz: serie temporal + agregados de wake detections,
+- [x] 35.1  Métricas de análisis de voz: serie temporal + agregados de wake detections,
             falsos positivos (por nodo), voice-id (conf, identificado vs guest, aciertos),
             y eventos de retrain (n_positive, n_negative, trigger, duración, versión).
             Reusar lo que ya escriben `audio_server` (`_bump_metric`) y `/wakeword/train`.
             Persistir en SQLite con retención configurable.
+            Hecho: `core/metrics_store.py` (tablas voice_metrics/retrain_events, ingesta,
+            agregación voice_aggregates/voice_series/retrain_history, retención
+            METRICS_RETENTION_DAYS); endpoint `POST /metrics/voice/event`; el ear
+            (`audio_server`) emite cada evento fire-and-forget al core (METRICS_PUSH).
+            Las funciones de consulta quedan listas para exponerse como API GET en 35.3.
 - [ ] 35.2  Métricas de interacciones LLM: latencias por modelo/agente, tokens
             (prompt/completion), tool calls, latencia del coordinador, tasa de
             aciertos/errores y fallbacks. Fuente: `trace_store` (FASE 24); derivar agregados
