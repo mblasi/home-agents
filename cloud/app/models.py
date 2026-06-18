@@ -6,6 +6,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 SCHEMA_VERSION = 1
+METRICS_SCHEMA_VERSION = 1
 
 
 class ServiceHealth(BaseModel):
@@ -73,6 +74,23 @@ class StateSnapshot(BaseModel):
     recent_commands: list[RecentCommand] = Field(default_factory=list)
     wakeword: Wakeword = Field(default_factory=Wakeword)
     users_summary: list[UserSummary] = Field(default_factory=list)
+
+
+class MetricsSnapshot(BaseModel):
+    """Agregados de métricas que el bridge envía a POST /ingest/metrics (FASE 35.5).
+
+    Los agregados se calculan en el SER9 (core, FASE 35.2/35.3); la nube sólo almacena
+    y muestra. Campos flexibles (dict/list) con el shape que devuelve la API del core."""
+    schema_version: int = METRICS_SCHEMA_VERSION
+    ts: str
+    window_hours: int = 24
+    voice_summary: dict[str, Any] = Field(default_factory=dict)
+    voice_series: dict[str, Any] = Field(default_factory=dict)
+    retrains: list[dict[str, Any]] = Field(default_factory=list)
+    llm_summary: dict[str, Any] = Field(default_factory=dict)
+    llm_by_model: list[dict[str, Any]] = Field(default_factory=list)
+    llm_by_agent: list[dict[str, Any]] = Field(default_factory=list)
+    llm_series: dict[str, Any] = Field(default_factory=dict)
 
 
 class CommandRequest(BaseModel):

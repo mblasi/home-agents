@@ -82,3 +82,35 @@ def test_snapshot_maps_agents_and_nodes():
     assert snap["recent_commands"][0]["text"] == "prende la luz"
     assert snap["latency"]["llm_ms"] == 3379
     assert snap["users_summary"][0]["intents_pending"] == 1
+
+
+# ── metrics_snapshot (FASE 35.5) ────────────────────────────────────────────────
+
+import metrics_snapshot  # noqa: E402
+
+
+def test_metrics_snapshot_resilient_when_core_down():
+    # Core caído: estructura válida, campos vacíos, nunca lanza.
+    with patch.object(metrics_snapshot, "_get", lambda *a, **k: None):
+        snap = metrics_snapshot.build_metrics_snapshot()
+    assert snap["schema_version"] == 1
+    assert snap["window_hours"] == 24
+    assert snap["voice_summary"] == {} and snap["llm_summary"] == {}
+    assert snap["retrains"] == [] and snap["llm_by_model"] == [] and snap["llm_by_agent"] == []
+
+
+def test_metrics_snapshot_unwraps_list_envelopes():
+    # by-model/by-agent/retrains vienen envueltos por la API; el snapshot los desenvuelve.
+    def fake_get(url, **k):
+        if "by-model" in url: return {"models": [{"model": "qwen2.5:7b", "calls": 3}]}
+        if "by-agent" in url: return {"agents": [{"agent_id": "haos", "steps": 2}]}
+        if "retrains" in url: return {"retrains": [{"version": "v1"}]}
+        if "summary" in url:  return {"total": 5}
+        return {"labels": [1, 2], "series": []}
+    with patch.object(metrics_snapshot, "_get", fake_get):
+        snap = metrics_snapshot.build_metrics_snapshot(hours=6)
+    assert snap["window_hours"] == 6
+    assert snap["llm_by_model"][0]["model"] == "qwen2.5:7b"
+    assert snap["llm_by_agent"][0]["agent_id"] == "haos"
+    assert snap["retrains"][0]["version"] == "v1"
+    assert snap["voice_series"]["labels"] == [1, 2]

@@ -3107,8 +3107,9 @@ Objetivo: Centralizar TODAS las métricas relevantes del análisis de voz (wake 
           (latencias, tokens, tool calls, coordinador, aciertos/errores), exponerlas en
           un dashboard amigable e interactivo en el backoffice local, y pushearlas al
           backoffice cloud (vía el bridge egress-only de FASE 33) con su propio dashboard.
-Estado:   EN CURSO (3/8 — Etapa A completa: 35.1 voz/retrain + 35.2 LLM + 35.3 API GET).
-          Falta Etapa B (dashboards 35.4/35.6 + push cloud 35.5) y Etapa C (tests/docs 35.7/35.8).
+Estado:   EN CURSO (6/8 — Etapas A+B completas: 35.1-35.3 instrumentación+API,
+          35.4 dashboard backoffice, 35.5 push cloud, 35.6 dashboard cloud).
+          Falta Etapa C (tests adicionales 35.7 + docs 35.8).
 Deps:     FASE 24 (tracing de interacciones — fuente de métricas LLM), FASE 16 (métricas
           de nodos/voz: _bump_metric, estado del retrain), FASE 33 (bridge egress-only +
           cloud backoffice + RBAC), FASE 12 (backoffice local).
@@ -3146,13 +3147,23 @@ Deps:     FASE 24 (tracing de interacciones — fuente de métricas LLM), FASE 1
             test_metrics_api (9). Quedan listos para los dashboards 35.4 (backoffice) y 35.6 (cloud).
 
 #### Etapa B - Dashboards
-- [ ] 35.4  Dashboard de métricas en el backoffice local: páginas amigables e interactivas
+- [x] 35.4  Dashboard de métricas en el backoffice local: páginas amigables e interactivas
             (gráficos de línea/barras, filtros por rango/nodo/agente, auto-refresh).
             Secciones separadas: Voz/Wake/Voice-id/Retrain y LLM/Agentes/Latencias.
-- [ ] 35.5  Push de métricas al cloud: extender el bridge (FASE 33, egress-only) para enviar
+            Hecho: página `/metrics` (Chart.js) con tabs Voz/LLM, filtros (rango/nodo/agente),
+            auto-refresh y tarjetas+gráficos+tablas. Proxy `/api/metrics/{path}` en el
+            backoffice reenvía a la API del core (mismo origen, autenticado). Nav "Métricas".
+- [x] 35.5  Push de métricas al cloud: extender el bridge (FASE 33, egress-only) para enviar
             agregados de métricas al backoffice cloud; contrato + rate limiting + auth.
-- [ ] 35.6  Dashboard de métricas en el cloud backoffice: mismas vistas amigables e
+            Hecho: `cloud/bridge/metrics_snapshot.py` arma los agregados desde la API del core
+            (resiliente); `cloud_bridge.push_metrics` los empuja a `POST /ingest/metrics` cada
+            METRICS_PUSH_INTERVAL (300s). Cloud: modelo `MetricsSnapshot`, `store_metrics`/
+            `get_metrics` en Firestore (TTL), endpoint con auth de bridge (OIDC) + rate limit.
+- [x] 35.6  Dashboard de métricas en el cloud backoffice: mismas vistas amigables e
             interactivas, con el RBAC de FASE 33 (admin ve todo; roles limitados, vista básica).
+            Hecho: sección Métricas en `cloud/app/templates/dashboard.html` (Chart.js),
+            `GET /api/metrics` con `rbac.filter_metrics` (sin view_full → sólo resúmenes y
+            series, sin detalle por modelo/agente ni reentrenamientos).
 
 #### Etapa C - Tests y documentación
 - [ ] 35.7  Tests: agregadores de métricas (voz y LLM) con datos sintéticos; endpoints de

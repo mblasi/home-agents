@@ -24,11 +24,13 @@ from google.auth.transport.requests import AuthorizedSession  # noqa: E402
 from google.oauth2 import service_account  # noqa: E402
 
 import executor  # noqa: E402
+import metrics_snapshot  # noqa: E402
 import snapshot  # noqa: E402
 
 CLOUD_URL = os.environ["CLOUD_URL"].rstrip("/")
 SA_KEY = os.environ["BRIDGE_SA_KEY"]
 PUSH_INTERVAL = int(os.environ.get("PUSH_INTERVAL", "30"))
+METRICS_PUSH_INTERVAL = int(os.environ.get("METRICS_PUSH_INTERVAL", "300"))
 POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", "10"))
 MAX_BACKOFF = int(os.environ.get("MAX_BACKOFF", "300"))
 
@@ -51,6 +53,13 @@ def push_state(sess: AuthorizedSession) -> None:
     r.raise_for_status()
     log.info("push estado OK (%d servicios, %d agentes)",
              len(snap["services"]), len(snap["agents"]))
+
+
+def push_metrics(sess: AuthorizedSession) -> None:
+    snap = metrics_snapshot.build_metrics_snapshot()
+    r = sess.post(f"{CLOUD_URL}/ingest/metrics", json=snap, timeout=20)
+    r.raise_for_status()
+    log.info("push métricas OK (ventana %dh)", snap.get("window_hours"))
 
 
 def poll_and_execute(sess: AuthorizedSession) -> None:
@@ -79,6 +88,7 @@ def main() -> None:
              CLOUD_URL, PUSH_INTERVAL, POLL_INTERVAL)
     sess = _session()
     last_push = 0.0
+    last_metrics_push = 0.0
     backoff = POLL_INTERVAL
     while True:
         try:
@@ -86,6 +96,9 @@ def main() -> None:
             if now - last_push >= PUSH_INTERVAL:
                 push_state(sess)
                 last_push = now
+            if now - last_metrics_push >= METRICS_PUSH_INTERVAL:
+                push_metrics(sess)
+                last_metrics_push = now
             poll_and_execute(sess)
             backoff = POLL_INTERVAL  # reset tras un ciclo OK
         except Exception as exc:  # noqa: BLE001 — la nube puede estar caída

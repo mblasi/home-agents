@@ -1,0 +1,263 @@
+{% extends "base.html" %}
+{% block title %}Métricas{% endblock %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+  <h1 class="text-2xl font-bold">Métricas <span class="text-sm font-normal text-gray-500">observabilidad</span></h1>
+  <div class="flex flex-wrap items-center gap-2 text-sm">
+    <select id="f-range" class="bg-gray-800 border border-gray-700 rounded px-2 py-1">
+      <option value="1">última hora</option>
+      <option value="6">últimas 6h</option>
+      <option value="24" selected>últimas 24h</option>
+      <option value="168">últimos 7d</option>
+      <option value="720">últimos 30d</option>
+    </select>
+    <label class="flex items-center gap-1 text-gray-400">
+      <input type="checkbox" id="f-auto" class="accent-emerald-500"> auto
+    </label>
+    <button id="f-refresh" class="bg-gray-800 border border-gray-700 rounded px-3 py-1 hover:bg-gray-700">↻</button>
+  </div>
+</div>
+
+<!-- Tabs -->
+<div class="flex gap-2 mb-5 border-b border-gray-800">
+  <button data-tab="voz" class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-emerald-500 text-white">🎙️ Voz</button>
+  <button data-tab="llm" class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-400 hover:text-white">🤖 LLM / Agentes</button>
+</div>
+
+<!-- ── Sección VOZ ──────────────────────────────────────────────────────────── -->
+<section data-panel="voz">
+  <div class="flex items-center gap-2 mb-4 text-sm">
+    <span class="text-gray-500">nodo:</span>
+    <select id="f-node" class="bg-gray-800 border border-gray-700 rounded px-2 py-1">
+      <option value="">todos</option>
+      {% for n in nodes %}<option value="{{ n }}">{{ n }}</option>{% endfor %}
+    </select>
+  </div>
+
+  <div id="voz-cards" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6"></div>
+
+  <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 mb-6">
+    <div class="text-xs text-gray-400 uppercase tracking-wider mb-3">Wake word — comandos (TP) vs falsos positivos (FP)</div>
+    <canvas id="voz-chart" height="90"></canvas>
+  </div>
+
+  <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+    <div class="text-xs text-gray-400 uppercase tracking-wider mb-3">Reentrenamientos</div>
+    <table class="w-full text-sm">
+      <thead class="text-gray-500 text-xs uppercase">
+        <tr><th class="text-left py-1">Fecha</th><th class="text-right">Pos</th><th class="text-right">Neg</th>
+            <th class="text-right">Val acc</th><th class="text-right">FP rate</th><th class="text-right">Dur</th><th class="text-right">Estado</th></tr>
+      </thead>
+      <tbody id="voz-retrains" class="font-mono text-gray-300"></tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ── Sección LLM ──────────────────────────────────────────────────────────── -->
+<section data-panel="llm" class="hidden">
+  <div class="flex items-center gap-2 mb-4 text-sm">
+    <span class="text-gray-500">agente:</span>
+    <select id="f-agent" class="bg-gray-800 border border-gray-700 rounded px-2 py-1">
+      <option value="">todos</option>
+      {% for a in agents %}<option value="{{ a }}">{{ a }}</option>{% endfor %}
+    </select>
+  </div>
+
+  <div id="llm-cards" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6"></div>
+
+  <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 mb-6">
+    <div class="text-xs text-gray-400 uppercase tracking-wider mb-3">Requests y latencia total promedio</div>
+    <canvas id="llm-chart" height="90"></canvas>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+      <div class="text-xs text-gray-400 uppercase tracking-wider mb-3">Por modelo</div>
+      <table class="w-full text-sm">
+        <thead class="text-gray-500 text-xs uppercase">
+          <tr><th class="text-left py-1">Modelo</th><th class="text-right">Llamadas</th><th class="text-right">Lat ms</th><th class="text-right">Tokens p/c</th></tr>
+        </thead>
+        <tbody id="llm-models" class="font-mono text-gray-300"></tbody>
+      </table>
+    </div>
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+      <div class="text-xs text-gray-400 uppercase tracking-wider mb-3">Por agente</div>
+      <table class="w-full text-sm">
+        <thead class="text-gray-500 text-xs uppercase">
+          <tr><th class="text-left py-1">Agente</th><th class="text-right">Steps</th><th class="text-right">Aciertos</th><th class="text-right">Lat ms</th><th class="text-right">Tools</th></tr>
+        </thead>
+        <tbody id="llm-agents" class="font-mono text-gray-300"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const fmtNum = (v) => v == null ? "—" : (typeof v === "number" ? v.toLocaleString("es") : v);
+const fmtPct = (v) => v == null ? "—" : (v * 100).toFixed(1) + "%";
+
+// Etiqueta de tiempo según el rango (horas → HH:MM, días → DD/MM)
+function fmtLabel(ts) {
+  const d = new Date(ts * 1000);
+  const hours = parseInt($("f-range").value, 10);
+  return hours <= 24
+    ? d.toLocaleTimeString("es", {hour: "2-digit", minute: "2-digit"})
+    : d.toLocaleDateString("es", {day: "2-digit", month: "2-digit"});
+}
+
+function card(label, value, sub) {
+  return `<div class="bg-gray-900 border border-gray-800 rounded-xl p-3">
+    <div class="text-[10px] text-gray-500 uppercase tracking-wider">${label}</div>
+    <div class="text-xl font-bold text-gray-100 mt-1">${value}</div>
+    ${sub ? `<div class="text-[11px] text-gray-500 mt-0.5">${sub}</div>` : ""}</div>`;
+}
+
+async function getJSON(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(url + " → " + r.status);
+  return r.json();
+}
+
+function qs(extra) {
+  const p = new URLSearchParams({hours: $("f-range").value});
+  for (const [k, v] of Object.entries(extra || {})) if (v) p.set(k, v);
+  return p.toString();
+}
+
+// ── Charts (creados una vez, actualizados en cada carga) ──────────────────────
+Chart.defaults.color = "#9ca3af";
+Chart.defaults.borderColor = "#1f2937";
+const palette = ["#34d399", "#f87171", "#60a5fa", "#fbbf24"];
+
+function mkChart(canvasId, type) {
+  return new Chart($(canvasId), {
+    type: type || "line",
+    data: {labels: [], datasets: []},
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      interaction: {mode: "index", intersect: false},
+      plugins: {legend: {labels: {boxWidth: 12, font: {size: 11}}}},
+      scales: {x: {grid: {display: false}}, y: {beginAtZero: true}},
+    },
+  });
+}
+const vozChart = mkChart("voz-chart", "bar");
+const llmChart = mkChart("llm-chart", "line");
+
+function applySeries(chart, payload, colorOffset) {
+  chart.data.labels = (payload.labels || []).map(fmtLabel);
+  chart.data.datasets = (payload.series || []).map((s, i) => ({
+    label: s.name,
+    data: s.data,
+    backgroundColor: palette[(i + (colorOffset || 0)) % palette.length],
+    borderColor: palette[(i + (colorOffset || 0)) % palette.length],
+    tension: 0.3, borderWidth: 2, pointRadius: 2,
+  }));
+  chart.update();
+}
+
+// ── Voz ───────────────────────────────────────────────────────────────────────
+async function loadVoz() {
+  const extra = {node_id: $("f-node").value};
+  const [sum, series, retr] = await Promise.all([
+    getJSON("/api/metrics/voice/summary?" + qs(extra)),
+    getJSON("/api/metrics/voice/series?" + qs({...extra, bucket: bucketFor()})),
+    getJSON("/api/metrics/voice/retrains?limit=10"),
+  ]);
+  $("voz-cards").innerHTML =
+    card("Eventos", fmtNum(sum.total)) +
+    card("Comandos (TP)", fmtNum(sum.tp)) +
+    card("Falsos pos. (FP)", fmtNum(sum.fp), "rate " + fmtPct(sum.fp_rate)) +
+    card("Conocidos", fmtNum(sum.known), "guest " + fmtNum(sum.guest)) +
+    card("Lat. total", sum.avg_total_ms != null ? sum.avg_total_ms + " ms" : "—",
+         "stt " + fmtNum(sum.avg_stt_ms) + " / tts " + fmtNum(sum.avg_tts_ms)) +
+    card("Voice-id conf", sum.avg_conf != null ? sum.avg_conf : "—");
+  // sólo tp/fp en el gráfico (total/fp_rate fuera para no saturar)
+  applySeries(vozChart, {labels: series.labels,
+                         series: (series.series || []).filter(s => ["tp", "fp"].includes(s.name))});
+  $("voz-retrains").innerHTML = (retr.retrains || []).map(r => `<tr class="border-t border-gray-800">
+    <td class="py-1">${r.ts ? new Date(r.ts*1000).toLocaleString("es") : "—"}</td>
+    <td class="text-right">${fmtNum(r.n_positive)}</td><td class="text-right">${fmtNum(r.n_negative)}</td>
+    <td class="text-right">${r.val_accuracy != null ? r.val_accuracy : "—"}</td>
+    <td class="text-right">${r.fp_rate != null ? r.fp_rate : "—"}</td>
+    <td class="text-right">${r.duration_s != null ? r.duration_s + "s" : "—"}</td>
+    <td class="text-right">${r.status || "—"}</td></tr>`).join("") ||
+    `<tr><td colspan="7" class="py-2 text-gray-600">sin reentrenamientos</td></tr>`;
+}
+
+// ── LLM ─────────────────────────────────────────────────────────────────────
+async function loadLLM() {
+  const extra = {agent_id: $("f-agent").value};
+  const [sum, series, models, agents] = await Promise.all([
+    getJSON("/api/metrics/llm/summary?" + qs(extra)),
+    getJSON("/api/metrics/llm/series?" + qs({bucket: bucketFor()})),
+    getJSON("/api/metrics/llm/by-model?" + qs()),
+    getJSON("/api/metrics/llm/by-agent?" + qs(extra)),
+  ]);
+  const rq = sum.requests || {}, lc = sum.llm_calls || {};
+  $("llm-cards").innerHTML =
+    card("Requests", fmtNum(rq.requests)) +
+    card("Lat. total", rq.avg_total_latency_ms != null ? rq.avg_total_latency_ms + " ms" : "—") +
+    card("Lat. coord", rq.avg_coordinator_ms != null ? rq.avg_coordinator_ms + " ms" : "—") +
+    card("Fast-path", fmtPct(rq.fast_classifier_rate), "unknown " + fmtPct(rq.unknown_rate)) +
+    card("LLM calls", fmtNum(lc.calls), "lat " + fmtNum(lc.avg_latency_ms) + " ms") +
+    card("Tokens", fmtNum((lc.prompt_tokens||0)+(lc.completion_tokens||0)),
+         "p " + fmtNum(lc.prompt_tokens) + " / c " + fmtNum(lc.completion_tokens));
+  applySeries(llmChart, series, 2);
+  $("llm-models").innerHTML = (models.models || []).map(m => `<tr class="border-t border-gray-800">
+    <td class="py-1">${m.model || "—"}</td><td class="text-right">${fmtNum(m.calls)}</td>
+    <td class="text-right">${fmtNum(m.avg_latency_ms)}</td>
+    <td class="text-right">${fmtNum(m.prompt_tokens)}/${fmtNum(m.completion_tokens)}</td></tr>`).join("") ||
+    `<tr><td colspan="4" class="py-2 text-gray-600">sin datos</td></tr>`;
+  $("llm-agents").innerHTML = (agents.agents || []).map(a => `<tr class="border-t border-gray-800">
+    <td class="py-1">${a.agent_id || "—"}</td><td class="text-right">${fmtNum(a.steps)}</td>
+    <td class="text-right">${fmtPct(a.success_rate)}</td><td class="text-right">${fmtNum(a.avg_latency_ms)}</td>
+    <td class="text-right">${fmtNum(a.tool_calls)}</td></tr>`).join("") ||
+    `<tr><td colspan="5" class="py-2 text-gray-600">sin datos</td></tr>`;
+}
+
+// bucket adaptativo: ~30-40 puntos según el rango
+function bucketFor() {
+  const hours = parseInt($("f-range").value, 10);
+  if (hours <= 6) return 600;        // 10 min
+  if (hours <= 24) return 3600;      // 1 h
+  if (hours <= 168) return 21600;    // 6 h
+  return 86400;                      // 1 d
+}
+
+let activeTab = "voz";
+async function reload() {
+  try { activeTab === "voz" ? await loadVoz() : await loadLLM(); }
+  catch (e) { console.error(e); }
+}
+
+// Tabs
+document.querySelectorAll(".tab-btn").forEach(btn => btn.addEventListener("click", () => {
+  activeTab = btn.dataset.tab;
+  document.querySelectorAll(".tab-btn").forEach(b => {
+    const on = b.dataset.tab === activeTab;
+    b.classList.toggle("border-emerald-500", on); b.classList.toggle("text-white", on);
+    b.classList.toggle("border-transparent", !on); b.classList.toggle("text-gray-400", !on);
+  });
+  document.querySelectorAll("[data-panel]").forEach(p =>
+    p.classList.toggle("hidden", p.dataset.panel !== activeTab));
+  reload();
+}));
+
+// Filtros
+["f-range", "f-node", "f-agent"].forEach(id => $(id).addEventListener("change", reload));
+$("f-refresh").addEventListener("click", reload);
+
+let timer = null;
+$("f-auto").addEventListener("change", (e) => {
+  if (timer) { clearInterval(timer); timer = null; }
+  if (e.target.checked) timer = setInterval(reload, 30000);
+});
+
+reload();
+</script>
+{% endblock %}
