@@ -19,6 +19,21 @@ Los paneles leen métricas de `/tmp/capitan/*.json` escritos por `listen.py`.
 Si la feature genera datos nuevos, agregar la escritura a `listen.py` y
 actualizar el panel correspondiente (o crear uno nuevo si no aplica a ninguno).
 
+### Métricas persistidas y dashboards web (FASE 35)
+
+Además del dashboard zellij (vista live efímera), hay observabilidad **persistida**:
+- `core/metrics_store.py` — SQLite con métricas de voz (`voice_metrics`, `retrain_events`)
+  y de LLM/agentes (`llm_calls`, `agent_steps`, `request_metrics`). Las de LLM se derivan
+  de `trace_store` al cerrar cada request; las de voz las empuja el `audio_server` a
+  `POST /metrics/voice/event`. API de consulta: `GET /metrics/{voice,llm}/*`.
+- Dashboard web de métricas: `/metrics` en el **backoffice local** (`backoffice/templates/metrics.html`,
+  Chart.js) y la sección equivalente en el **backoffice cloud** (`cloud/app/templates/dashboard.html`),
+  alimentada por el push egress-only del bridge (`POST /ingest/metrics`).
+
+Política: si una feature introduce una **métrica nueva** (latencia, tasa, contador, evento),
+evaluar persistirla en `metrics_store` (no sólo en `/tmp/capitan/*.json`) y reflejarla en el
+dashboard web `/metrics`, además del panel zellij que corresponda.
+
 ---
 
 ## Flujo de trabajo por tarea
