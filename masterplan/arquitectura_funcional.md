@@ -632,11 +632,38 @@ Flujo de ingesta: el `audio_server` (ear) emite cada evento al core con
 audio (gateado por `METRICS_PUSH`). El reentrenamiento (`/wakeword/train`) registra su evento
 directamente en el core. Complementa la vista live en memoria (`_bump_metric` → `/nodes`).
 
-API de consulta en `metrics_store`: `voice_aggregates` (totales tp/fp, `fp_rate`, voice-id,
-latencias promedio), `voice_series` (serie temporal bucketizada) y `retrain_history`. Quedan
-listas para exponerse como endpoints GET (FASE 35.3) y graficarse en el backoffice (35.4) y
-el cloud (35.6). Retención configurable con `METRICS_RETENTION_DAYS` (default 90, poda
-oportunista). Métricas de LLM/agentes (35.2) derivarán de `trace_store`, sin duplicar storage.
+**Lado LLM (FASE 35.2, implementado).** `metrics_store.record_request_metrics` deriva, al
+cerrar cada request, filas compactas y agregables desde el `RequestTrace` (FASE 24) — NO
+duplica el trace. Tres tablas:
+
+| Tabla | Grano | Contenido |
+|-------|-------|-----------|
+| `llm_calls` | una por llamada al LLM | `source`, `model`, `agent_id`, `latency_ms`, `prompt_tokens`, `completion_tokens` |
+| `agent_steps` | una por step de agente | `agent_id`, `success`, `latency_ms`, `n_tool_calls`, `n_api_calls` |
+| `request_metrics` | una por request | `total_latency_ms`, `coordinator_ms`, `fast_classifier_used` (fallback), `all_success`, `unknown` |
+
+Los tokens se capturan de la respuesta de Ollama (`prompt_eval_count`/`eval_count`) en
+`LLMCall` y en los sitios principales (coordinator, `agent._ask_llm`, `agent_loop`,
+`generic_agent`, `backend_router`); donde no se capturan quedan `NULL` y el agregador
+reporta `calls_with_tokens`. `server` hookea `record_request_metrics` en el mismo thread
+daemon que persiste el trace.
+
+**API de métricas (FASE 35.3).** Endpoints GET en `core`:
+
+| Endpoint | Devuelve |
+|----------|----------|
+| `/metrics/voice/summary` | `voice_aggregates` |
+| `/metrics/voice/series` | serie voz `{labels, series}` |
+| `/metrics/voice/retrains` | `retrain_history` |
+| `/metrics/llm/summary` | `request_aggregates` + `llm_aggregates` |
+| `/metrics/llm/by-model` | latencia y tokens por modelo |
+| `/metrics/llm/by-agent` | steps, tasa de aciertos, tool calls por agente |
+| `/metrics/llm/series` | serie de requests `{labels, series}` |
+
+Rango temporal por `since`/`until`/`hours`; filtros por `model`/`agent_id`/`node_id`. Las
+series devuelven shape graficable `{labels, series:[{name, data}]}`. Retención configurable
+con `METRICS_RETENTION_DAYS` (default 90, poda oportunista que cubre las 5 tablas). Pendiente:
+dashboards en backoffice (35.4) y cloud (35.6, vía bridge egress-only 35.5).
 
 ---
 

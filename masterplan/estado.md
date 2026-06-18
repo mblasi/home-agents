@@ -3107,7 +3107,8 @@ Objetivo: Centralizar TODAS las métricas relevantes del análisis de voz (wake 
           (latencias, tokens, tool calls, coordinador, aciertos/errores), exponerlas en
           un dashboard amigable e interactivo en el backoffice local, y pushearlas al
           backoffice cloud (vía el bridge egress-only de FASE 33) con su propio dashboard.
-Estado:   EN CURSO (1/8 — 35.1 instrumentación+almacenamiento de voz/retrain en SQLite).
+Estado:   EN CURSO (3/8 — Etapa A completa: 35.1 voz/retrain + 35.2 LLM + 35.3 API GET).
+          Falta Etapa B (dashboards 35.4/35.6 + push cloud 35.5) y Etapa C (tests/docs 35.7/35.8).
 Deps:     FASE 24 (tracing de interacciones — fuente de métricas LLM), FASE 16 (métricas
           de nodos/voz: _bump_metric, estado del retrain), FASE 33 (bridge egress-only +
           cloud backoffice + RBAC), FASE 12 (backoffice local).
@@ -3124,13 +3125,25 @@ Deps:     FASE 24 (tracing de interacciones — fuente de métricas LLM), FASE 1
             METRICS_RETENTION_DAYS); endpoint `POST /metrics/voice/event`; el ear
             (`audio_server`) emite cada evento fire-and-forget al core (METRICS_PUSH).
             Las funciones de consulta quedan listas para exponerse como API GET en 35.3.
-- [ ] 35.2  Métricas de interacciones LLM: latencias por modelo/agente, tokens
+- [x] 35.2  Métricas de interacciones LLM: latencias por modelo/agente, tokens
             (prompt/completion), tool calls, latencia del coordinador, tasa de
             aciertos/errores y fallbacks. Fuente: `trace_store` (FASE 24); derivar agregados
             sin duplicar el almacenamiento de traces.
-- [ ] 35.3  Capa de agregación + API de métricas en `core`: endpoints GET para series
+            Hecho: `metrics_store.record_request_metrics` deriva filas agregables de cada
+            RequestTrace a SQLite (tablas llm_calls/agent_steps/request_metrics) sin duplicar
+            el trace. Captura de tokens (prompt_eval_count/eval_count) en LLMCall y en los
+            sitios principales (coordinator, agent._ask_llm, agent_loop, generic_agent,
+            backend_router). Agregadores llm_aggregates/llm_by_model/agent_aggregates/
+            request_aggregates/llm_series. server hookea record_request_metrics al cerrar
+            el trace. Fix: faltaba el import de metrics_store en server (revertido por un
+            checkout concurrente en 35.1) → POST /metrics/voice/event tiraba NameError.
+- [x] 35.3  Capa de agregación + API de métricas en `core`: endpoints GET para series
             temporales y agregados (por rango temporal, por nodo, por agente/modelo), con
             shape listo para graficar (labels + series).
+            Hecho: GET /metrics/voice/{summary,series,retrains} y
+            /metrics/llm/{summary,by-model,by-agent,series}. Rango por since/until/hours,
+            filtros model/agent_id/node_id; series con shape {labels, series}. Tests:
+            test_metrics_api (9). Quedan listos para los dashboards 35.4 (backoffice) y 35.6 (cloud).
 
 #### Etapa B - Dashboards
 - [ ] 35.4  Dashboard de métricas en el backoffice local: páginas amigables e interactivas
