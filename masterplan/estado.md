@@ -1399,8 +1399,10 @@ sabe cuándo hablar y el STT captura ruido. Es el bloqueante de UX principal.
             (RPi 5), enviar `{type: "tts_text"}` en lugar de WAV — el nodo sintetiza con
             Piper local, menor latencia y sin saturar el WebSocket con audio. El path Echo
             es ortogonal: aplica cuando el room tiene Echo asignado, independiente del nodo.
-- [ ] 16.7  Backoffice `/rooms` — CRUD de ambientes: nombre, entity_id del Echo asignado,
-            node_id del satélite si hay uno conectado. Tabla editable con estado en tiempo real.
+- [x] 16.7  Backoffice `/rooms` — CRUD de ambientes. Fuente de verdad = áreas de HAOS
+            (ha_client.get_areas vía /api/template). Tabla edita el media_player/Echo por área
+            y muestra paneles bindeados; alta de panel elige el área de HA (dropdown). Binding
+            panel→area_id. Backend PR core #200 (+ fix config HAOS doc store), frontend #555.
 
 #### Etapa C — Observabilidad y robustez
 - [x] 16.8  Health check periódico por nodo de audio: ping cada 30s desde el core,
