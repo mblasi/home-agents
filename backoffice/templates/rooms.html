@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Ambientes{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-bold">Ambientes</h1>
+  <a href="/panels" class="text-sm text-gray-400 hover:text-gray-200">Paneles →</a>
+</div>
+
+<p class="text-sm text-gray-400 mb-4">
+  Los ambientes son las <strong>áreas definidas en Home Assistant</strong> (fuente de verdad).
+  Acá se aumentan con config local: el <em>media_player</em> (Echo) al que se enruta la respuesta
+  de voz, y qué paneles están bindeados a cada área.
+</p>
+
+<div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+  <table class="w-full text-sm">
+    <thead class="bg-gray-800/50 text-gray-400 text-xs uppercase tracking-wider">
+      <tr>
+        <th class="text-left px-4 py-2">Área (HA)</th>
+        <th class="text-left px-4 py-2">Media player / Echo</th>
+        <th class="text-left px-4 py-2">Paneles</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rooms %}
+      <tr class="border-t border-gray-800 align-top">
+        <td class="px-4 py-3">
+          <div class="font-medium text-gray-200">{{ r.name }}</div>
+          <div class="text-xs font-mono text-gray-600">{{ r.area_id }}</div>
+        </td>
+        <td class="px-4 py-3">
+          <form hx-post="/rooms/{{ r.area_id }}/echo" hx-target="#echo-st-{{ r.area_id }}"
+                hx-swap="innerHTML" class="flex items-center gap-2">
+            <input name="echo_entity_id" value="{{ r.echo_entity_id or '' }}"
+                   placeholder="media_player.echo_..."
+                   class="px-2 py-1 bg-gray-800 border border-gray-700 rounded-lg text-xs text-gray-200 font-mono w-64">
+            <button type="submit"
+                    class="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded-lg text-gray-200">guardar</button>
+            <span id="echo-st-{{ r.area_id }}"></span>
+          </form>
+        </td>
+        <td class="px-4 py-3 text-xs text-gray-400">
+          {% for p in r.panels %}
+          <span class="inline-block bg-gray-800 rounded px-2 py-0.5 mr-1 mb-1">
+            🖥️ {{ p.name }}{% if p.node_id %} <span class="text-gray-600 font-mono">({{ p.node_id }})</span>{% endif %}
+          </span>
+          {% else %}
+          <span class="text-gray-600 italic">—</span>
+          {% endfor %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="3" class="px-4 py-6 text-center text-gray-600">
+        No se pudieron leer las áreas de Home Assistant.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<p class="text-xs text-gray-600 mt-3">
+  El binding panel→área se hace desde <a href="/panels" class="text-gray-400 hover:text-gray-200 underline">Paneles</a>.
+</p>
+{% endblock %}

@@ -18,7 +18,7 @@
     <thead class="bg-gray-800/50 text-gray-400 text-xs uppercase tracking-wider">
       <tr>
         <th class="text-left px-4 py-2">Panel</th>
-        <th class="text-left px-4 py-2">Ambiente</th>
+        <th class="text-left px-4 py-2">Área HA</th>
         <th class="text-left px-4 py-2">IP</th>
         <th class="text-left px-4 py-2">Estado</th>
         <th class="text-left px-4 py-2">Usuarios</th>
@@ -30,7 +30,17 @@
       {% set node = nodes.get(p.node_id) %}
       <tr id="panel-{{ p.name }}" class="border-t border-gray-800">
         <td class="px-4 py-2 font-medium text-gray-200">{{ p.name }}</td>
-        <td class="px-4 py-2 text-gray-400">{{ p.room }}</td>
+        <td class="px-4 py-2">
+          <select name="area_id" hx-post="/panels/{{ p.name }}/area" hx-trigger="change"
+                  hx-target="#area-st-{{ p.name }}" hx-swap="innerHTML"
+                  class="px-2 py-1 bg-gray-800 border border-gray-700 rounded-lg text-xs text-gray-200">
+            <option value="" {% if not p.area_id %}selected{% endif %}>— sin área —</option>
+            {% for a in areas %}
+            <option value="{{ a.area_id }}" {% if a.area_id == p.area_id %}selected{% endif %}>{{ a.name }}</option>
+            {% endfor %}
+          </select>
+          <span id="area-st-{{ p.name }}" class="ml-1"></span>
+        </td>
         <td class="px-4 py-2 font-mono text-gray-500">{{ p.ip }}</td>
         <td class="px-4 py-2">
           {% if node and node.state == 'active' %}
@@ -75,9 +85,14 @@
              class="px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-200">
     </div>
     <div>
-      <label class="block text-xs text-gray-500 mb-1">Ambiente</label>
-      <input name="room" placeholder="dormitorio"
-             class="px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-200">
+      <label class="block text-xs text-gray-500 mb-1">Área (Home Assistant)</label>
+      <select name="area_id"
+              class="px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-200">
+        <option value="">— elegir área —</option>
+        {% for a in areas %}
+        <option value="{{ a.area_id }}">{{ a.name }}</option>
+        {% endfor %}
+      </select>
     </div>
     <div>
       <label class="block text-xs text-gray-500 mb-1">IP</label>
