@@ -3107,9 +3107,8 @@ Objetivo: Centralizar TODAS las métricas relevantes del análisis de voz (wake 
           (latencias, tokens, tool calls, coordinador, aciertos/errores), exponerlas en
           un dashboard amigable e interactivo en el backoffice local, y pushearlas al
           backoffice cloud (vía el bridge egress-only de FASE 33) con su propio dashboard.
-Estado:   EN CURSO (6/8 — Etapas A+B completas: 35.1-35.3 instrumentación+API,
-          35.4 dashboard backoffice, 35.5 push cloud, 35.6 dashboard cloud).
-          Falta Etapa C (tests adicionales 35.7 + docs 35.8).
+Estado:   COMPLETA (8/8 — Etapa A instrumentación+API, Etapa B dashboards backoffice+cloud
+          + push egress-only, Etapa C tests+docs).
 Deps:     FASE 24 (tracing de interacciones — fuente de métricas LLM), FASE 16 (métricas
           de nodos/voz: _bump_metric, estado del retrain), FASE 33 (bridge egress-only +
           cloud backoffice + RBAC), FASE 12 (backoffice local).
@@ -3166,10 +3165,17 @@ Deps:     FASE 24 (tracing de interacciones — fuente de métricas LLM), FASE 1
             series, sin detalle por modelo/agente ni reentrenamientos).
 
 #### Etapa C - Tests y documentación
-- [ ] 35.7  Tests: agregadores de métricas (voz y LLM) con datos sintéticos; endpoints de
+- [x] 35.7  Tests: agregadores de métricas (voz y LLM) con datos sintéticos; endpoints de
             métricas; contrato del push al cloud mockeando el bridge.
-- [ ] 35.8  Docs: actualizar `README.md`, `masterplan/arquitectura_funcional.md` (sección de
+            Hecho: core `test_metrics_store` (agregadores voz+LLM, datos sintéticos) y
+            `test_metrics_api` (endpoints GET del core). Cloud `test_metrics_api` (endpoints
+            /ingest/metrics y /api/metrics con TestClient, auth override + Firestore mockeado,
+            RBAC) y `test_metrics_contract` (modelo + RBAC + el snapshot del bridge valida
+            como MetricsSnapshot). Bridge: `metrics_snapshot` resiliente.
+- [x] 35.8  Docs: actualizar `README.md`, `masterplan/arquitectura_funcional.md` (sección de
             observabilidad/métricas) y la política de dashboards de `CLAUDE.md`.
+            Hecho: README sección "Observability"; arquitectura_funcional sección
+            "Observabilidad — métricas"; CLAUDE.md política de métricas persistidas + dashboards web.
 
 ### FASE 36 - Continuidad conversacional unificada (voz + WhatsApp)
 

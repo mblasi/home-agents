@@ -86,6 +86,25 @@ Every agent inherits `ProactiveMixin`, enabling autonomous intent detection by s
 
 ---
 
+## Observability (Phase 35)
+
+Voice and LLM metrics are centralized in SQLite by `core/metrics_store.py`, separate from
+the per-request traces:
+
+- **Voice** — every wake-word event (TP/FP with reason, voice-id, latencies) is pushed by the
+  audio server to `POST /metrics/voice/event`; retrains are recorded from `/wakeword/train`.
+- **LLM** — derived from each `RequestTrace` at close time into `llm_calls` / `agent_steps` /
+  `request_metrics` (latencies by model/agent, tokens, tool calls, coordinator latency,
+  success/fallback rates) without duplicating the trace.
+
+The core exposes a read-only metrics API (`GET /metrics/{voice,llm}/*`: summaries, time
+series as `{labels, series}`, by-model, by-agent, retrains) with range/model/agent/node
+filters. The **local backoffice** renders it at `/metrics` (Chart.js, filters, auto-refresh);
+the **cloud backoffice** shows an equivalent view, fed by the egress-only bridge that pushes
+aggregates to `POST /ingest/metrics` and gated by the FASE 33 RBAC.
+
+---
+
 ## Repositories
 
 | Repo | Purpose |
