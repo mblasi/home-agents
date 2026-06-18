@@ -322,6 +322,29 @@ loop cada 60s:
 
 ---
 
+## Conversaciones y continuidad
+
+`conversations.py` — una `Conversation` agrupa los turnos de un exchange con una fuente
+(voz/`ear`, WhatsApp, etc.), identificada por `source_key`. Se persiste en SQLite (doc store,
+FASE 32.4) y sobrevive reinicios. `conv.context()` inyecta los últimos `MAX_TURNS` pares
+usuario/asistente al LLM.
+
+- **TTL channel-aware (36.1):** el TTL de inactividad es por canal (`CHANNEL_TTL`/
+  `ttl_for_channel`): voz ~120s (síncrono), **WhatsApp 6h** (asíncrono — el usuario puede
+  responder mucho después). `resume_latest(source)` reanuda la última conversación vigente
+  del source en vez de crear una nueva por gap temporal.
+- **Captura de respuestas y ruteo (19.4):** cuando el usuario responde a un request intent,
+  si el mensaje trae `intent_id` (quoted-reply de WhatsApp) se rutea al agente **dueño de ese
+  intent** (`intent_state.get_request_by_id`), evitando el cruce con el primer request
+  pendiente de otro agente. Sin `intent_id`, fallback por conversación
+  (`get_pending_request`).
+
+> Continuidad conversacional unificada (modelo `ContinuationState`, proactivos como turnos,
+> reabrir mic en paneles, saludo por sesión) está EN CURSO en **FASE 36**; esta sección se
+> completa en 36.11.
+
+---
+
 ## Sistema de intents
 
 ### Tipos
