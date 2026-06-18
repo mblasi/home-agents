@@ -30,3 +30,14 @@ def filter_state(state: dict, caps: dict[str, bool]) -> dict:
     redacted = dict(state)
     redacted["users_summary"] = []  # adolescente no ve la lista de usuarios
     return redacted
+
+
+def filter_metrics(metrics: dict, caps: dict[str, bool]) -> dict:
+    """RBAC sobre las métricas (35.6): los roles sin view_full ven sólo los resúmenes
+    y las series agregadas, no el detalle operativo (por modelo/agente, reentrenamientos)."""
+    if caps.get("view_full"):
+        return metrics
+    basic = dict(metrics)
+    for k in ("llm_by_model", "llm_by_agent", "retrains"):
+        basic[k] = []
+    return basic

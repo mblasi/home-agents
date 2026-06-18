@@ -45,6 +45,23 @@
       <table id="recent"><tbody></tbody></table>
     </section>
 
+    <section class="card" id="metrics-card">
+      <h2>Métricas <span class="muted" id="metrics-window"></span></h2>
+      <div id="metrics-empty" class="muted hidden">sin métricas todavía</div>
+      <div id="metrics-body" class="hidden">
+        <h3>Voz</h3>
+        <div id="m-voice-summary" class="grid"></div>
+        <canvas id="m-voice-chart" height="80"></canvas>
+        <h3>LLM / Agentes</h3>
+        <div id="m-llm-summary" class="grid"></div>
+        <canvas id="m-llm-chart" height="80"></canvas>
+        <div id="m-tables">
+          <table id="m-models"><thead><tr><th>modelo</th><th>llamadas</th><th>lat ms</th><th>tokens</th></tr></thead><tbody></tbody></table>
+          <table id="m-agents"><thead><tr><th>agente</th><th>steps</th><th>aciertos</th><th>lat ms</th></tr></thead><tbody></tbody></table>
+        </div>
+      </div>
+    </section>
+
     <section class="card hidden" id="actions-card">
       <h2>Acciones admin</h2>
       <form id="emit">
@@ -64,6 +81,7 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
 const CFG = {
   apiKey: "{{ firebase_api_key }}",
@@ -112,6 +130,7 @@ async function refresh() {
     $("recent").querySelector("tbody").innerHTML = (state.recent_commands || [])
       .map(c => `<tr><td>${dot(c.ok)}</td><td>${c.text}</td><td class="muted">${c.agent}</td><td class="muted">${c.latency_ms ?? "—"}ms</td></tr>`).join("");
   } catch (e) { $("updated").textContent = "error: " + e.message; }
+  loadMetrics();
   if (!CAPS.view_full) return;  // adolescente: sin auditoría
   try {
     const { commands } = await api("/api/commands");
@@ -128,6 +147,65 @@ async function refresh() {
           + `<td class="muted">${res}</td></tr>`;
       }).join("");
   } catch (e) {}
+}
+
+// ── Métricas (FASE 35.6) ──────────────────────────────────────────────────────
+let mVoiceChart = null, mLlmChart = null;
+const mLabel = (ts) => new Date(ts * 1000).toLocaleString("es", {day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
+
+function mkMetricChart(canvasId, type) {
+  return new Chart($(canvasId), {
+    type, data: {labels: [], datasets: []},
+    options: {responsive: true, plugins: {legend: {labels: {boxWidth: 12}}}, scales: {y: {beginAtZero: true}}},
+  });
+}
+
+function setSeries(chart, payload, colors) {
+  chart.data.labels = (payload.labels || []).map(mLabel);
+  chart.data.datasets = (payload.series || []).map((s, i) => ({
+    label: s.name, data: s.data, backgroundColor: colors[i % colors.length],
+    borderColor: colors[i % colors.length], tension: 0.3, borderWidth: 2, pointRadius: 2,
+  }));
+  chart.update();
+}
+
+const mFmt = (v) => v == null ? "—" : v.toLocaleString("es");
+const mPct = (v) => v == null ? "—" : (v * 100).toFixed(1) + "%";
+
+async function loadMetrics() {
+  let metrics;
+  try { ({ metrics } = await api("/api/metrics")); } catch (e) { return; }
+  if (!metrics) { show("metrics-empty"); hide("metrics-body"); return; }
+  hide("metrics-empty"); show("metrics-body");
+  $("metrics-window").textContent = "· últimas " + (metrics.window_hours || 24) + "h";
+
+  const vs = metrics.voice_summary || {};
+  $("m-voice-summary").innerHTML =
+    `<div><b>${mFmt(vs.total)}</b> eventos</div><div><b>${mFmt(vs.tp)}</b> TP</div>` +
+    `<div><b>${mFmt(vs.fp)}</b> FP <span class="muted">${mPct(vs.fp_rate)}</span></div>` +
+    `<div><b>${vs.avg_total_ms ?? "—"}</b> ms lat</div>`;
+  if (!mVoiceChart) mVoiceChart = mkMetricChart("m-voice-chart", "bar");
+  setSeries(mVoiceChart, {labels: (metrics.voice_series||{}).labels,
+    series: ((metrics.voice_series||{}).series || []).filter(s => ["tp","fp"].includes(s.name))},
+    ["#34d399", "#f87171"]);
+
+  const ls = metrics.llm_summary || {}, rq = ls.requests || {}, lc = ls.llm_calls || {};
+  $("m-llm-summary").innerHTML =
+    `<div><b>${mFmt(rq.requests)}</b> requests</div><div><b>${rq.avg_total_latency_ms ?? "—"}</b> ms lat</div>` +
+    `<div><b>${mPct(rq.fast_classifier_rate)}</b> fast-path</div>` +
+    `<div><b>${mFmt((lc.prompt_tokens||0)+(lc.completion_tokens||0))}</b> tokens</div>`;
+  if (!mLlmChart) mLlmChart = mkMetricChart("m-llm-chart", "line");
+  setSeries(mLlmChart, metrics.llm_series || {}, ["#60a5fa", "#fbbf24"]);
+
+  // Tablas de detalle (sólo presentes para roles con view_full)
+  const models = metrics.llm_by_model || [], agents = metrics.llm_by_agent || [];
+  $("m-tables").style.display = (models.length || agents.length) ? "" : "none";
+  $("m-models").querySelector("tbody").innerHTML = models.map(m =>
+    `<tr><td>${m.model || "—"}</td><td>${mFmt(m.calls)}</td><td>${mFmt(m.avg_latency_ms)}</td>` +
+    `<td class="muted">${mFmt(m.prompt_tokens)}/${mFmt(m.completion_tokens)}</td></tr>`).join("");
+  $("m-agents").querySelector("tbody").innerHTML = agents.map(a =>
+    `<tr><td>${a.agent_id || "—"}</td><td>${mFmt(a.steps)}</td><td>${mPct(a.success_rate)}</td>` +
+    `<td>${mFmt(a.avg_latency_ms)}</td></tr>`).join("");
 }
 
 async function loadCatalog() {

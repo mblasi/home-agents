@@ -1279,6 +1279,27 @@ def stats_page(request: Request):
     return _render(request, "stats.html", "stats", history=history)
 
 
+@app.get("/metrics", response_class=HTMLResponse)
+def metrics_page(request: Request):
+    """Dashboard de observabilidad (FASE 35.4): métricas de voz y LLM desde el core."""
+    _require_auth(request)
+    nodes  = [n.get("node_id") for n in (_audio("/nodes") or []) if n.get("node_id")]
+    agents = sorted((_core("/agents-meta", timeout=5) or {}).keys())
+    return _render(request, "metrics.html", "metrics", nodes=nodes, agents=agents)
+
+
+# Proxy de solo-lectura a la API de métricas del core (FASE 35.3). El browser pega
+# acá (mismo origen, autenticado) y el backoffice reenvía al core en la LAN.
+@app.get("/api/metrics/{path:path}")
+def api_metrics_proxy(path: str, request: Request):
+    _require_auth(request)
+    qs = request.url.query
+    data = _core(f"/metrics/{path}" + (f"?{qs}" if qs else ""), timeout=8)
+    if data is None:
+        return JSONResponse({"detail": "core no disponible"}, status_code=502)
+    return JSONResponse(data)
+
+
 @app.get("/alerts", response_class=HTMLResponse)
 def alerts_page(request: Request):
     data = _core("/alerts") or []

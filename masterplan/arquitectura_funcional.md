@@ -662,8 +662,19 @@ daemon que persiste el trace.
 
 Rango temporal por `since`/`until`/`hours`; filtros por `model`/`agent_id`/`node_id`. Las
 series devuelven shape graficable `{labels, series:[{name, data}]}`. Retención configurable
-con `METRICS_RETENTION_DAYS` (default 90, poda oportunista que cubre las 5 tablas). Pendiente:
-dashboards en backoffice (35.4) y cloud (35.6, vía bridge egress-only 35.5).
+con `METRICS_RETENTION_DAYS` (default 90, poda oportunista que cubre las 5 tablas).
+
+**Dashboards (FASE 35.4/35.6).** El backoffice local sirve `/metrics` (Chart.js, tabs
+Voz/LLM, filtros de rango/nodo/agente, auto-refresh); un proxy `/api/metrics/{path}` reenvía
+a la API del core (mismo origen, autenticado). El backoffice cloud muestra una sección de
+métricas equivalente en su dashboard, leyendo `GET /api/metrics` con RBAC (`filter_metrics`:
+sin `view_full` → sólo resúmenes y series, sin detalle por modelo/agente ni reentrenamientos).
+
+**Push al cloud (FASE 35.5, egress-only).** El bridge del SER9 (FASE 33) arma agregados con
+`metrics_snapshot.build_metrics_snapshot` (desde la API del core) y los empuja a
+`POST /ingest/metrics` cada `METRICS_PUSH_INTERVAL` (300s), con la misma auth OIDC de la SA
+y rate limiting que el resto del bridge. La nube los guarda en Firestore (`metrics/current`
++ `metrics_history` con TTL). Cero inbound a la casa.
 
 ---
 

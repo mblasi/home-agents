@@ -27,7 +27,14 @@ from .auth import (
     require_dashboard_user,
 )
 from .commands import CommandError, catalog_summary, validate_command
-from .models import SCHEMA_VERSION, CommandRequest, CommandResult, StateSnapshot
+from .models import (
+    METRICS_SCHEMA_VERSION,
+    SCHEMA_VERSION,
+    CommandRequest,
+    CommandResult,
+    MetricsSnapshot,
+    StateSnapshot,
+)
 
 HERE = os.path.dirname(__file__)
 MAX_BODY = int(os.environ.get("MAX_BODY_BYTES", str(512 * 1024)))  # 512 KB
@@ -69,6 +76,17 @@ def ingest_state(snapshot: StateSnapshot, sa: str = Depends(require_bridge)):
     return {"ok": True}
 
 
+@app.post("/ingest/metrics")
+def ingest_metrics(snapshot: MetricsSnapshot, sa: str = Depends(require_bridge)):
+    """Recibe agregados de métricas del bridge (FASE 35.5). Egress-only: el SER9
+    empuja, la nube almacena."""
+    ratelimit.limit_ingest(sa)
+    if snapshot.schema_version != METRICS_SCHEMA_VERSION:
+        raise HTTPException(status_code=422, detail="schema_version no soportada")
+    fdb.store_metrics(snapshot.model_dump())
+    return {"ok": True}
+
+
 @app.get("/commands/pending")
 def commands_pending(sa: str = Depends(require_bridge)):
     ratelimit.limit_ingest(sa)
@@ -105,6 +123,15 @@ def api_state(p: Principal = Depends(require_dashboard_user)):
     if state is None:
         return JSONResponse({"state": None}, status_code=200)
     return {"state": rbac.filter_state(state, p.caps)}
+
+
+@app.get("/api/metrics")
+def api_metrics(p: Principal = Depends(require_dashboard_user)):
+    """Métricas para el dashboard cloud (FASE 35.6), filtradas por RBAC."""
+    metrics = fdb.get_metrics()
+    if metrics is None:
+        return JSONResponse({"metrics": None}, status_code=200)
+    return {"metrics": rbac.filter_metrics(metrics, p.caps)}
 
 
 @app.get("/api/commands")

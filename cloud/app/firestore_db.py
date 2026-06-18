@@ -47,6 +47,21 @@ def get_state() -> dict | None:
     return snap.to_dict() if snap.exists else None
 
 
+# ── Métricas (FASE 35.5) ────────────────────────────────────────────────────────
+
+def store_metrics(snapshot: dict) -> None:
+    received = _now()
+    doc = {**snapshot, "received_at": received}
+    db().collection("metrics").document("current").set(doc)
+    hist = {**doc, "expires_at": received + timedelta(hours=HISTORY_TTL_HOURS)}
+    db().collection("metrics_history").document(received.strftime("%Y%m%dT%H%M%S%f")).set(hist)
+
+
+def get_metrics() -> dict | None:
+    snap = db().collection("metrics").document("current").get()
+    return snap.to_dict() if snap.exists else None
+
+
 # ── Roster de autorización (email→rol), materializado desde el snapshot ─────────
 
 def store_roster(users_summary: list[dict]) -> None:
