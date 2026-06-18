@@ -1855,7 +1855,35 @@ def panels_page(request: Request):
     """Administración de paneles (16.26): lista del registro (DB) + estado en vivo del audio_server."""
     panels = _panels()
     nodes = {n["node_id"]: n for n in (_audio("/nodes") or [])}
-    return _render(request, "panels.html", "panels", panels=panels, nodes=nodes)
+    areas = _core("/areas") or []   # áreas de HAOS para bindear el panel (16.7)
+    return _render(request, "panels.html", "panels", panels=panels, nodes=nodes, areas=areas)
+
+
+@app.post("/panels/{name}/area", response_class=HTMLResponse)
+async def panels_set_area(name: str, request: Request):
+    """Bindea un panel a un área de HAOS (16.7)."""
+    form = await request.form()
+    area_id = str(form.get("area_id", "")).strip()
+    _core("/panels", method="POST", json={"name": name, "area_id": area_id})
+    return HTMLResponse('<span class="text-xs text-emerald-400">✓ guardado</span>')
+
+
+# ── Ambientes / Rooms (FASE 16.7) — fuente de verdad = áreas de HAOS ──────────
+
+@app.get("/rooms", response_class=HTMLResponse)
+def rooms_page(request: Request):
+    """Ambientes: áreas de HAOS (fuente de verdad) + augmentación local (Echo) + paneles."""
+    rooms = _core("/rooms") or []
+    return _render(request, "rooms.html", "rooms", rooms=rooms)
+
+
+@app.post("/rooms/{area_id}/echo", response_class=HTMLResponse)
+async def rooms_save_echo(area_id: str, request: Request):
+    """Guarda el media_player (Echo) asignado a un área (augmentación local)."""
+    form = await request.form()
+    echo = str(form.get("echo_entity_id", "")).strip()
+    _core("/rooms", method="POST", json={"area_id": area_id, "echo_entity_id": echo})
+    return HTMLResponse('<span class="text-xs text-emerald-400">✓ guardado</span>')
 
 
 @app.delete("/panels/{name}", response_class=HTMLResponse)
@@ -1888,7 +1916,8 @@ def _provision_log_fragment(name: str) -> str:
 async def panels_provision(request: Request):
     form = await request.form()
     name = str(form.get("name", "")).strip().lower()
-    room = str(form.get("room", "")).strip().lower() or name
+    area_id = str(form.get("area_id", "")).strip()       # área de HAOS (16.7)
+    room = area_id or str(form.get("room", "")).strip().lower() or name
     ip   = str(form.get("ip", "")).strip()
     if not name or not ip:
         return HTMLResponse('<p class="text-red-400 text-xs">Faltan nombre o IP.</p>')
@@ -1901,6 +1930,8 @@ async def panels_provision(request: Request):
                          stdout=f, stderr=subprocess.STDOUT, cwd=str(_REPO_DIR))
     except Exception as e:
         return HTMLResponse(f'<p class="text-red-400 text-xs">No se pudo lanzar: {e}</p>')
+    if area_id:   # bindear el panel al área elegida (16.7)
+        _core("/panels", method="POST", json={"name": name, "area_id": area_id})
     return HTMLResponse(_provision_log_fragment(name))
 
 
