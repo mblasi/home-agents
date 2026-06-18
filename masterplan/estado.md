@@ -1606,7 +1606,7 @@ el alta de panel desde la UI y cerrar el flujo como un wizard cohesivo y validad
 - [x] 16.29 **Eliminar el stack legacy de enrollment laptop-ear** (reemplazado por el
 - [x] 16.31  Overlay de estado del panel intercepta el touch (paneles inusables) — sizing por wm size (PR ear #35), passthrough probado fallido, fix final: overlay se encoge a 1x1 en idle y solo cubre en estados activos (PR ear #39). Touch verificado OK
 - [ ] 16.32  Reducir falsos positivos de wake word (TV/charla)
-- [ ] 16.33  Contexto de area por panel: atar room->area de HAOS para desambiguar comandos
+- [x] 16.33  Contexto de area por panel: el HaosAgent resuelve area del panel (source→binding 16.7) y trae nombre+entidades del area (ha_client.get_area_info vía /api/template); inyecta ubicacion+entidades del ambiente al prompt para desambiguar comandos sin lugar explicito (PR core #201)
             enrollment por nodo 16.21/16.22). El satellite del NSPanel NO lo usa. Quitar,
             asegurando que nada se rompa (con tests):
             - backoffice: rutas `/users/{uid}/onboard`, `/users/{uid}/enroll/start`,

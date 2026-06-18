@@ -59,8 +59,14 @@ graba inline (usando el stream del mic, evita conflicto OpenSLES) y reporta prog
 `POST /enroll-sample` (wake word), `POST /enroll-voice`, `POST /verify-voice`, `GET /wakeword/negatives`,
 `GET /wakeword/model[/version]` (propagación a nodos, 16.17).
 
-**Registro de paneles:** `panels.yaml` (name/room/ip/node_id/users) — fuente de verdad,
-resuelto por nombre/ambiente. Alta/provisioning: `scripts/nspanel.sh provision` o backoffice `/panels`.
+**Registro de paneles:** tabla `panels` en SQLite (name/room/ip/node_id/users/area_id, FASE 32).
+Alta/provisioning: `scripts/nspanel.sh provision` o backoffice `/panels`.
+
+**Ambientes (16.7):** la fuente de verdad de los ambientes son las **áreas de Home Assistant**
+(`ha_client.get_areas()` vía `/api/template`, porque el area registry no está en la REST API de
+estados). El core las expone en `GET /areas` y `GET /rooms` (áreas + augmentación local del
+`media_player`/Echo + paneles bindeados); el backoffice `/rooms` edita el Echo por área y `/panels`
+bindea cada panel a un `area_id`. Endpoints core: `GET /areas`, `GET|POST /rooms`, `DELETE /rooms/{area_id}`.
 
 **Latencia warm:** ~5s (STT + LLM con GPU ROCm + TTS).
 
@@ -144,6 +150,8 @@ Contrato y modelo de amenazas: `masterplan/fase33_cloud_backoffice.md`.
 - **Archivo:** `agent.py`
 - **LLM prompt:** genera `ACTION: domain.service | entity_id: X [| param: value]`
 - **Entidades mapeadas:** 13 entity IDs (luces WiZ, aire Midea, persiana, zonas de riego Rachio, TV Samsung, Echo, llaves de agua/patio/garaje)
+- **Contexto de área (16.33):** resuelve el área del panel que originó el comando (binding panel→área de 16.7) y trae nombre+entidades del área (`ha_client.get_area_info`); inyecta la ubicación en el prompt para desambiguar comandos sin lugar explícito (ej. "apagá el televisor" → el TV del ambiente del panel; el del living vs el del cuarto).
+- **Config HAOS:** `ha_client` lee `HAOS_URL`/`HAOS_TOKEN` del doc store SQLite (`agent_config/haos`, FASE 32), con fallback a `agents.json`/`.env`.
 - **Proactivo:** detecta patrones de uso (olvidó apagar, horario habitual, etc.)
 
 ### clima — Clima
@@ -651,9 +659,14 @@ Paneles Rich en terminal, lanzados con `bash ear/dashboard.sh`. Leen de `/tmp/ca
 | LLM | qwen2.5:7b via Ollama (int8, CPU, ~3.5s warm) |
 | STT | faster-whisper `small` (int8, CPU, ~4.6s para 5s audio) |
 | TTS | Piper v1.2.0, `es_AR-daniela-high.onnx`, 22050Hz |
-| Wake word | openWakeWord custom, `capitan.onnx` (848KB), threshold 0.8 |
+| Wake word | openWakeWord custom, `capitan.onnx`, threshold 0.8 + `FRAMES_REQ=2` (2 frames consecutivos, anti-transitorios) |
+| Voice-id | resemblyzer (GE2E), `SPEAKER_THRESHOLD=0.65`, gate `REQUIRE_KNOWN_SPEAKER` (guest=TV se descarta) |
 | Audio capture | PyAudio device_index=4 (ALC256 hw:1,0), 44100Hz |
 | Resampling | scipy.signal.resample_poly up=160 down=441 |
+
+**Loop de mejora continua del wake word:** captura automática de hard-negatives en el audio_server
+(FP de TV/charla → `guest`/204 se guardan) → **retrain automático** (timer systemd en el LXC, cada 4h,
+condicional a ≥20 negativos nuevos) → los nodos bajan el modelo nuevo solo cada ≤10 min (16.17).
 
 ---
 
