@@ -1392,6 +1392,24 @@ sabe cuándo hablar y el STT captura ruido. Es el bloqueante de UX principal.
 ```
 
 #### Etapa B — Output via Echo (sin hardware nuevo)
+
+> **DECISIÓN PENDIENTE — mapeo ambiente→Echo vs. output por panel.** El CRUD del
+> mapeo Echo-por-área ya existe (16.7), pero su único consumidor (16.6
+> `response_router`) no está implementado, así que hoy asignar un Echo a un ambiente
+> **no produce ningún efecto**. Antes de implementar 16.6 hay que decidir el modelo de
+> salida de audio:
+>   (a) **Echo por ambiente** — la respuesta TTS sale por el Echo del área de origen
+>       vía `media_player.play_media`. Pro: aprovecha parlantes ya instalados. Contra:
+>       depende de hardware cerrado de Amazon, latencia extra (subir WAV a HAOS), y
+>       el mapeo área→Echo es config manual a mantener.
+>   (b) **Output por el propio panel/nodo** — la respuesta vuelve por el speaker del
+>       NSPanel/nodo que originó el comando (mismo dispositivo que ya capturó el audio).
+>       Pro: cero config de routing, el origen ya se conoce (`source.node_id`), sin
+>       dependencia de Amazon. Contra: calidad de parlante del NSPanel.
+> Si se elige (b), el mapeo ambiente→Echo y la tabla de `/rooms` quedan obsoletos para
+> output (podrían seguir sirviendo a los Echo solo como entidad-objetivo de comandos).
+> Resolver esto define si 16.6 se hace, se reescribe o se descarta.
+
 - [ ] 16.6  `core/response_router.py` — routear la respuesta al speaker correcto según
             `source.room`. Si el room tiene un Echo asignado: sintetizar TTS a WAV y
             reproducir via HAOS `media_player.play_media`. Si no: TTS local como ahora.
