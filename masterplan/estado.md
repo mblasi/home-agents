@@ -697,6 +697,7 @@ Nota:     El SER9 (Beelink, iGPU 780M/ROCm) alcanza para los servicios y el 7b, 
 - [ ] 8.29 Backup automático de modelos fine-tuneados y configuraciones
 - [ ] 8.30 Wake-on-LAN desde laptop (servidor puede estar en suspend fuera de horario)
 - [ ] 8.31 Auto power-on del SER9 tras corte de luz: setear en BIOS "Restore AC Power Loss"
+- [ ] 8.32  Investigar por qué sin internet no se accede a HAOS en la LAN
            = Power On (no Last State) para que Proxmox levante solo. Verificar que VM 100
            (HAOS) y LXC 101 (capitan-lxc) tengan onboot=1. Complementa 8.25 (UPS): sin BIOS,
            un corte largo deja todo caído hasta volver físicamente.
@@ -2993,16 +2994,44 @@ Principio de seguridad: se hereda intacto el modelo de FASE 33 — el SER9 sólo
           conexiones SALIENTES. El deploy NO es un canal nuevo: es un tipo de comando
           más en la cola que el SER9 ya polea. Cero inbound, cero port-forwarding, cero
           SSH expuesto. Descartado VPN/Tailscale + SSH por abrir canal entrante.
+Principio de unificación de backend (CIMIENTO, no cleanup posterior): existe UN solo
+          motor de deploy que corre en el SER9 (snapshot → pin de ref → install →
+          restart → health-gate → rollback). Ese motor es el ÚNICO backend de deploy.
+          Hay UN solo frontend de deploy: el dashboard cloud egress-only (FASE 33), para
+          operar el deploy de forma REMOTA. En LOCAL no hay frontend/UI interno: el
+          operador es Claude (corriendo en la laptop), que invoca el motor directamente
+          vía `scripts/deploy.sh` / la skill `deploy`. Es decir, dos invocadores del
+          mismo motor:
+            - Remoto: dashboard cloud egress-only → comando `deploy.release` → el bridge
+                      executor NO reimplementa deploy, sólo invoca el motor en el SER9.
+            - Local:  Claude → `scripts/deploy.sh` (wrapper fino que invoca el motor por
+                      SSH). No es una "UI": es el operador humano/Claude llamando al motor.
+          Regla: ninguna lógica de deploy (pin/install/restart/health/rollback) puede
+          vivir duplicada en `deploy.sh` ni en `cloud/bridge/executor.py`. Toda vive en
+          el motor; ambos invocadores sólo lo llaman. Se construye desde la primera tarea
+          de la Etapa B, no se "unifica" al final.
+Principio de versionado formal en GitHub: el motor de deploy crea versiones FORMALES en
+          GitHub (git tag + GitHub Release) por cada release exitoso, de modo que "qué
+          versión está desplegada" sea un ref real, inmutable y trazable (no un sha suelto).
+          La versión desplegada de CADA componente (core, ear, umbrella), referenciando ese
+          release, se muestra en LOS DOS frontends: el dashboard cloud egress-only Y el
+          backoffice interno (LAN, FASE 12). El rollback también queda registrado como evento
+          sobre esos refs versionados, visible en ambos.
 Punto de partida (gap a cerrar): hoy `deploy.run` (cloud/bridge/executor.py) hace
           `git pull --recurse-submodules` ciego a main + install + restart. No pinea
           ref, no snapshotea el estado previo, no hace health-check, no revierte si el
-          restart deja el sistema roto, y no registra qué versión quedó corriendo.
-Arquitectura:
-          [dashboard cloud] --emite deploy.release(refs)--> [cola Firestore]
-          [SER9 bridge] --poll--> executor CD --> postea resultado + versión
+          restart deja el sistema roto, no versiona en GitHub y no registra/muestra qué
+          versión quedó corriendo por componente.
+Arquitectura (un motor, dos invocadores):
+          REMOTO (frontend): [dashboard cloud] --deploy.release(refs)--> [Firestore]
+                             [SER9 bridge] --poll--> executor (sin lógica propia) ─┐
+          LOCAL (sin UI):    [Claude/laptop] --SSH--> scripts/deploy.sh (wrapper) ─┤
+                                                                                   ▼
+                                            [MOTOR DE DEPLOY en el SER9]
               snapshot ref actual → fetch+checkout ref pedido → install → restart
-              → health-gate (/health core+backoffice) → OK: registra release
-                                                       → FAIL: rollback al snapshot
+              → health-gate (/health core+backoffice)
+                  → OK:   tag + GitHub Release por componente → registra versión desplegada
+                  → FAIL: rollback al snapshot (registra evento sobre los refs versionados)
 ```
 
 #### Etapa A - Contrato del release
@@ -3015,29 +3044,50 @@ Arquitectura:
             del health-gate, y si hubo rollback. Persistencia local en el SER9 (fuente de
             verdad) y subconjunto reportado en el snapshot a la nube.
 
-#### Etapa B - Executor CD en el SER9 (atómico + reversible)
-- [ ] 34.3  Snapshot pre-deploy: capturar el ref/commit actual de cada submodule (y del
-            umbrella) ANTES de tocar nada, para poder revertir exactamente a ese estado.
-- [ ] 34.4  Deploy con pin: `git fetch` + `checkout` del ref pedido por submodule (en lugar
-            del `pull` ciego a main); reinstalar requirements sólo si cambiaron; restart de
-            servicios. Lock de deploy (un único release a la vez) e idempotencia.
-- [ ] 34.5  Health-gate post-deploy: tras el restart, verificar `/health` de core y
-            backoffice (y readiness del propio bridge) con timeout + retries antes de
+#### Etapa B - Motor de deploy en el SER9 (único backend: atómico + reversible)
+- [ ] 34.3  Crear el MOTOR de deploy como artefacto ÚNICO que corre en el SER9 (script/
+            módulo, p.ej. `scripts/deploy_engine.sh` o `cloud/bridge/deploy_engine.py`),
+            invocable por CLI con args tipados (refs por submodule, restart_wa). Es el único
+            lugar con lógica de deploy; ningún frontend la duplica. Snapshot pre-deploy:
+            capturar el ref/commit actual de cada submodule (y del umbrella) ANTES de tocar
+            nada, para revertir exactamente a ese estado.
+- [ ] 34.4  Deploy con pin (en el motor): `git fetch` + `checkout` del ref pedido por
+            submodule (en lugar del `pull` ciego a main); reinstalar requirements sólo si
+            cambiaron; restart de servicios. Lock de deploy (un único release a la vez) e
+            idempotencia.
+- [ ] 34.5  Health-gate post-deploy (en el motor): tras el restart, verificar `/health` de
+            core y backoffice (y readiness del propio bridge) con timeout + retries antes de
             declarar éxito. Reusar la lógica del smoke test de `scripts/deploy.sh`.
-- [ ] 34.6  Rollback automático: si el health-gate falla, revertir a los refs del snapshot,
-            reinstalar, reiniciar y re-chequear; reportar `FAILED + rolled-back` con el
-            detalle de cada paso. Tras un rollback el sistema queda en el último estado sano.
+- [ ] 34.6  Rollback automático (en el motor): si el health-gate falla, revertir a los refs
+            del snapshot, reinstalar, reiniciar y re-chequear; reportar `FAILED + rolled-back`
+            con el detalle de cada paso. Tras un rollback el sistema queda en el último estado
+            sano.
+- [ ] 34.12 Versionado formal en GitHub (en el motor, camino de éxito post health-gate):
+            crear tag + GitHub Release por componente desplegado (core/ear/umbrella) con el ref
+            efectivamente desplegado y un esquema de versión consistente (semver o fecha+sha).
+            El tag/release es la fuente de verdad de "qué versión está corriendo" (ref inmutable).
+            El rollback registra un evento sobre esos refs versionados. Esta versión por
+            componente la consumen los dos frontends (34.7). Requiere credencial de GitHub para
+            el motor en el SER9 (egress-only; el SER9 ya hace sólo conexiones salientes).
 
 #### Etapa C - Visibilidad y operación
-- [ ] 34.7  Registrar la versión desplegada (refs + estado del release) y exponerla en el
-            snapshot → dashboard cloud: versión actual corriendo, último deploy, resultado
-            y si hubo rollback. Auditoría reusa la de FASE 33 (quién emitió, cuándo).
+- [ ] 34.7  Registrar la versión desplegada por componente (core/ear/umbrella → release de
+            GitHub + estado del release) y exponerla en LOS DOS frontends: (a) dashboard cloud
+            egress-only vía snapshot, y (b) backoffice interno (LAN, FASE 12) leyendo el estado
+            local del SER9. Mostrar versión actual corriendo, último deploy, resultado y si
+            hubo rollback. Auditoría reusa la de FASE 33 (quién emitió, cuándo).
 - [ ] 34.8  Panel de deploy en el dashboard cloud (RBAC: sólo admin emite): elegir ref/tag,
             disparar el release, ver progreso/resultado/rollback. Reusa el panel de acciones
             y el gate de capacidades de FASE 33; el frontend oculta la acción a no-admin.
-- [ ] 34.9  Unificar `scripts/deploy.sh` con el nuevo flujo: el deploy LAN debe usar el
-            mismo executor (health-gate + rollback) para no tener dos rutas divergentes —
-            wrapper que invoca el mismo código de release, no una copia paralela.
+- [ ] 34.9  Invocadores sobre el motor único (cierra el principio de unificación). Las dos
+            rutas invocan el MISMO motor (34.3-34.6); ninguna reimplementa nada:
+            (a) REMOTO — el `executor` del bridge (`cloud/bridge/executor.py`) deja de hacer
+                `git pull` propio y pasa a invocar el motor con los refs de `deploy.release`;
+                el bridge sólo traduce comando→args y reporta resultado;
+            (b) LOCAL — `scripts/deploy.sh` pasa a ser un wrapper fino que invoca el motor por
+                SSH (es el deploy que Claude corre desde la laptop; no hay UI interna de deploy).
+            Verificar que no quede lógica de pin/install/restart/health/rollback duplicada
+            fuera del motor.
 
 #### Etapa D - Tests y documentación
 - [ ] 34.10 Tests: validación del comando con refs (`cloud/tests`); executor con snapshot /
