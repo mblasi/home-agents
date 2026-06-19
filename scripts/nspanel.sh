@@ -289,7 +289,25 @@ SAMPLE_RATE=16000
 EOF
     echo "  ✓ satellite.env"
 
-    echo "\n[8/9] Boot script"
+    echo "\n[8/9] Supervisor del nodo de voz + boot script"
+    # Supervisor en un script aparte (no inline en el boot): su cmdline NO contiene
+    # "satellite.py", así `pkill -f satellite.py` mata solo el python y deja vivo el
+    # supervisor → reiniciar el satélite no deja el nodo sin auto-reinicio.
+    ssh_panel "cat > ~/voice-node.sh" <<'EOF'
+#!/data/data/com.termux/files/usr/bin/bash
+# Supervisor del nodo de voz: relanza satellite.py si crashea (audio HAL no listo tras
+# boot, etc.). Para reiniciar el satélite sin perder el supervisor: pkill -f satellite.py
+# (este script no matchea ese patrón). Para frenar todo: pkill -f voice-node.sh primero.
+export PATH=/data/data/com.termux/files/usr/bin:$PATH
+termux-wake-lock 2>/dev/null
+while true; do
+  echo "[boot] arrancando satellite $(date)" >> ~/.satellite.log
+  python3.13 ~/satellite.py >> ~/.satellite.log 2>&1
+  echo "[boot] satellite salió rc=$? — reintento en 5s" >> ~/.satellite.log
+  sleep 5
+done
+EOF
+    ssh_panel "chmod +x ~/voice-node.sh" 2>/dev/null
     ssh_panel "cat > ~/.termux/boot/start-ha.sh" <<'EOF'
 #!/data/data/com.termux/files/usr/bin/bash
 export PATH=/data/data/com.termux/files/usr/bin:$PATH
@@ -299,8 +317,8 @@ sleep 10
 monkey -p com.termux.gui -c android.intent.category.LAUNCHER 1
 am start -n io.homeassistant.companion.android.minimal/io.homeassistant.companion.android.launch.LaunchActivity
 sleep 15
-# auto-reinicio: si satellite crashea (ej. audio HAL no listo aún tras boot), reintenta
-nohup bash -c 'while true; do echo "[boot] arrancando satellite $(date)" >> ~/.satellite.log; python3.13 ~/satellite.py >> ~/.satellite.log 2>&1; echo "[boot] satellite salió rc=$? — reintento en 5s" >> ~/.satellite.log; sleep 5; done' >/dev/null 2>&1 &
+# Nodo de voz bajo supervisor (auto-reinicio). setsid → sobrevive el cierre de la sesión.
+setsid nohup bash ~/voice-node.sh >/dev/null 2>&1 </dev/null &
 EOF
     ssh_panel "chmod +x ~/.termux/boot/start-ha.sh" 2>/dev/null
     adb_cmd shell am start -n "com.termux.boot/.BootActivity" >/dev/null 2>&1
