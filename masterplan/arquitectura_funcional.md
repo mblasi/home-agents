@@ -356,6 +356,13 @@ usuario/asistente al LLM.
   preguntar, el usuario no contesta (silencio = timeout) o se alcanza `FOLLOWUP_MAX`
   (anti-loop). Una repregunta del agente cae en contexto sin que el usuario diga "Capitán"
   de nuevo.
+- **Desenlace del turno visible + feedback de STT dudoso:** `/process-audio` emite
+  `X-Status` en toda respuesta (`ok | low-confidence | no-speech | unknown-voice |
+  core-unknown`); el satellite lo logea en el panel (antes el motivo del 204 solo se veía
+  en el audio_server del SER9). Si el STT descarta un comando por baja confianza
+  (anti-alucinación) pero el voice-id reconoce al hablante, el server NO calla: sintetiza
+  "no te entendí, repetí" con `needs_reply` (reabre el mic). Voz guest con STT dudoso →
+  204 mudo + hard negative (probable TV). `_transcribe` devuelve `(texto, motivo)`.
 
 > Fronteras de continuidad pendientes (FASE 36): deploy + verificación e2e en paneles (36.6),
 > proactivos como turnos + reanudar conversación en WhatsApp (etapa C), saludo por sesión
