@@ -184,6 +184,10 @@ def cmd_add(args):
     ESTADO.write_text("".join(lines))
     print(f"Insertado en estado.md después de línea {insert_after + 1}")
 
+    # Append to issues.yaml
+    _append_to_issues_yaml(task_id, issue_num, repo, phase)
+    print(f"Registrado en issues.yaml")
+
 
 def _task_last_line(lines, start_idx):
     """Given the 0-indexed first line of a task, return the 0-indexed last line,
@@ -198,10 +202,6 @@ def _task_last_line(lines, start_idx):
             break
         end = k
     return end
-
-    # Append to issues.yaml
-    _append_to_issues_yaml(task_id, issue_num, repo, phase)
-    print(f"Registrado en issues.yaml")
 
 
 def _append_to_issues_yaml(task_id: str, issue_num: int, repo: str, phase: str):

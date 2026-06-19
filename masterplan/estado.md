@@ -3399,3 +3399,29 @@ Mapa de paridad local→cloud (qué se incluye y bajo qué gate):
 - [ ] 37.9  Tests cloud (`cloud/tests`) + bridge (`cloud/bridge/test_bridge.py`) de todo lo
             nuevo; docs en `masterplan/arquitectura_funcional.md`, `cloud/README.md` y `README`;
             lint de estado + sync de issues.
+
+#### Etapa G - Observabilidad de detección: score WW + voice-id en el tiempo (ambos backoffices)
+- [ ] 37.11 Visualizar el comportamiento del SCORE de wake word vs el threshold a lo largo del
+            tiempo, en la sección Métricas de AMBOS backoffices (local LAN + cloud egress-only).
+            El score hoy sólo vive en stdout del satélite (`ear/satellite.py:_score_chunk`,
+            logea >= `SCORE_LOG_MIN`, dispara >= `WAKEWORD_THRESH`) — NO se persiste. Pipeline
+            nuevo: el satélite reporta los frames scoreados (granularidad near-misses + picos:
+            todos los frames con `score >= SCORE_LOG_MIN`, incluidos los que NO dispararon) con
+            el `threshold` vigente y el `rms` → relay por `audio_server` → core (endpoint nuevo
+            tipo `POST /metrics/wakeword/score`) → `metrics_store` (tabla nueva `ww_scores`:
+            ts, node_id, score, threshold, fired, rms; con `prune` por `METRICS_RETENTION_DAYS`)
+            → `GET /metrics/wakeword/series` → chart en `backoffice/templates/metrics.html` y la
+            sección cloud `cloud/app/templates/dashboard.html` (Chart.js, view_full): serie de
+            score con la línea de threshold superpuesta, para ver el margen y los casi-disparos.
+            Egress-only: viaja por el push de métricas existente (`cloud/bridge/metrics_snapshot.py`
+            → `POST /ingest/metrics`), sin inbound. Tests de ingesta/serie/prune y del relay con
+            HTTP mockeado.
+- [ ] 37.12 Visualizar el comportamiento del VOICE-ID (`speaker_conf`) vs `SPEAKER_THRESHOLD` a lo
+            largo del tiempo, en Métricas de ambos backoffices. El dato YA se persiste por evento
+            en `voice_metrics.speaker_conf` (lo empuja `audio_server` en cada tp/fp); falta (a)
+            exponer el `SPEAKER_THRESHOLD` vigente (no se guarda con el evento — sumarlo al evento
+            o al summary), y (b) una serie de `speaker_conf` (hoy `voice_series()` sólo devuelve
+            conteos tp/fp): agregar la consulta (puntos por evento o promedio/percentil por bucket)
+            + endpoint, y el chart en local+cloud con `speaker_conf` vs la línea de threshold,
+            distinguiendo known vs guest. Reusa el dato existente, sin nuevo pipeline de ingesta.
+            Tests de la serie nueva y del threshold expuesto.
