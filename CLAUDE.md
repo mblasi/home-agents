@@ -434,6 +434,14 @@ Pipeline anterior (hasta FASE 21): laptop con mic/speaker local. Ya reemplazado.
   libicu/clang — un `pkg update` sin upgrade deja `clang` roto (`libicuuc.so.78 not found`).
   La instalación se corre DETACHED con `termux-wake-lock` (una sesión SSH directa la mata a
   mitad porque Android suspende el proceso) y se verifica importando cada módulo, no por rc.
-  El boot script sostiene `termux-wake-lock` y reinicia satellite en loop si crashea (audio
-  HAL puede no estar listo justo tras boot). `nspanel.sh reboot` necesita `su -c reboot` (el
-  firmware eWeLink ignora el reboot sin root). Todo esto ya está en `scripts/nspanel.sh`.
+  El boot script lanza `~/voice-node.sh` (supervisor: sostiene `termux-wake-lock` y reinicia
+  satellite en loop si crashea — audio HAL puede no estar listo justo tras boot). El supervisor
+  vive en un script aparte A PROPÓSITO: su cmdline no contiene `satellite.py`, así
+  `pkill -f satellite.py` mata solo el python y el supervisor lo relanza. FOOTGUN: `pkill -f
+  satellite.py` también mata cualquier shell (incl. el comando SSH remoto) cuya cmdline
+  contenga ese string — al reiniciar por SSH, no metas `satellite.py` en el comando lanzador
+  ni uses esa palabra en el one-liner. Para frenar todo: `pkill -f voice-node.sh` y luego el
+  python. Para arrancar el supervisor por SSH (sobrevive al cierre de sesión):
+  `termux-wake-lock; setsid nohup bash ~/voice-node.sh >/dev/null 2>&1 </dev/null & disown`.
+  `nspanel.sh reboot` necesita `su -c reboot` (el firmware eWeLink ignora el reboot sin root).
+  Todo esto ya está en `scripts/nspanel.sh`.
