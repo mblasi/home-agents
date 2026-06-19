@@ -28,7 +28,8 @@ Beyond reactive commands, the system also runs **proactively**: each agent perio
 ┌─────────────────────────────────────────────────────────────────────────┐
 │  INPUT                                                                  │
 │  NSPanel node (satellite.py) → openWakeWord "Capitán" → record command │
-│       │ POST /process-audio (WAV)                                       │
+│       │ POST /process-audio (WAV)   ◄── follow-up turns: if agent asks  │
+│       │ X-Needs-Reply → reopen mic WITHOUT re-wake (conversation_id)     │
 │  ┌────▼──────────────────────────────────────────────────────────┐     │
 │  │ AUDIO SERVER :8766 (SER9) — STT (faster-whisper) + voice-id    │     │
 │  │ speaker_id gate (TV/guest → drop) → core → Piper TTS → WAV     │     │

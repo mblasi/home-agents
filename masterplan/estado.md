@@ -3205,7 +3205,8 @@ Objetivo: Una capa de conversación como COLUMNA VERTEBRAL de la continuidad, ch
           contexto y rutee al agente dueño; (c) identificar al usuario una vez por sesión
           (no por conversación); (d) dar a cada agente un contexto consistente (user_context
           por-agente + historial reciente). Reemplaza y expande el épico 18.16 (#532).
-Estado:   EN CURSO (3/11 — Etapa A completa: 36.1, 36.2, 36.3).
+Estado:   EN CURSO (5/11 — Etapa A completa: 36.1, 36.2, 36.3; Etapa B: 36.4, 36.5 listas,
+          falta 36.6 deploy+e2e contra NSPanel físico).
 Deps:     conversations.py (FASE 9/22), intent_state + proactivo (FASE 22/27), 19.4 (ruteo WA
           por intent_id — base del frente proactivo), FASE 16 (audio_server/satellite), FASE 35
           (métricas, para 36.10).
@@ -3240,12 +3241,14 @@ Modelo conceptual (decisiones de diseño):
             contrato documentado. PR core #209. (clima/finance ya cumplían)
 
 #### Etapa B - Continuidad en paneles/voz (core + ear)
-- [ ] 36.4  `audio_server`: `/process-audio` devuelve metadata de continuación (headers
+- [x] 36.4  `audio_server`: `/process-audio` devuelve metadata de continuación (headers
             `X-Conversation-Id`, `X-Needs-Reply`) y propaga `conversation_id` al core en cada
-            request (hoy se descarta). Contrato + tests.
-- [ ] 36.5  `satellite`: ante `needs_reply`, reabrir el mic SIN wake word (beep + timeout),
-            threadeando el `conversation_id`; cerrar el ciclo si no hay respuesta a tiempo.
-            Tests del loop (mockear audio_server).
+            request (antes se descartaba). `_call_core` → (response, agent_id, conversation_id,
+            needs_reply). PR ear #43. Tests.
+- [x] 36.5  `satellite`: ante `needs_reply`, reabre el mic SIN wake word (beep + grabación),
+            threadeando el `conversation_id`; cierra el ciclo si no hay respuesta a tiempo
+            (silencio) o se alcanza `FOLLOWUP_MAX`. Turno extraído a `_run_turn`. PR ear #44.
+            Tests del loop con `sounddevice`/audio_server mockeados.
 - [ ] 36.6  Deploy a paneles + verificación e2e: wake → comando → repregunta → respuesta sin
             re-wake; sin regresiones de falsos positivos.
 

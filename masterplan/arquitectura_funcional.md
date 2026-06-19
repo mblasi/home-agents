@@ -347,10 +347,19 @@ usuario/asistente al LLM.
   (por-agente) **siempre** que hay usuario, independiente del prefix de intents; junto con
   `conv.context()` (historial) cada agente recibe contexto consistente. Accessor:
   `base_agent.user_context_from(source)`.
+- **Continuidad multi-turno en voz (36.4/36.5):** el `audio_server` propaga el
+  `conversation_id` al core en cada `/process-audio` (antes se descartaba) y devuelve la
+  metadata de continuación en la respuesta WAV vía headers `X-Conversation-Id` y
+  `X-Needs-Reply` (derivado del `ContinuationState`). El `satellite`, ante `needs_reply`,
+  **reabre el mic SIN re-disparar la wake word** (beep + grabación) threadeando el
+  `conversation_id`: los turnos se encadenan (`_run_turn`) hasta que el agente deja de
+  preguntar, el usuario no contesta (silencio = timeout) o se alcanza `FOLLOWUP_MAX`
+  (anti-loop). Una repregunta del agente cae en contexto sin que el usuario diga "Capitán"
+  de nuevo.
 
-> Fronteras de continuidad pendientes (FASE 36): reabrir mic en paneles (etapa B), proactivos
-> como turnos + reanudar conversación en WhatsApp (etapa C), saludo por sesión (etapa D). La
-> sección se consolida en 36.11.
+> Fronteras de continuidad pendientes (FASE 36): deploy + verificación e2e en paneles (36.6),
+> proactivos como turnos + reanudar conversación en WhatsApp (etapa C), saludo por sesión
+> (etapa D). La sección se consolida en 36.11.
 
 ---
 
