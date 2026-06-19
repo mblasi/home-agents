@@ -3042,6 +3042,16 @@ Punto de partida (gap a cerrar): hoy `deploy.run` (cloud/bridge/executor.py) hac
           ref, no snapshotea el estado previo, no hace health-check, no revierte si el
           restart deja el sistema roto, no versiona en GitHub y no registra/muestra qué
           versión quedó corriendo por componente.
+Alcance multi-dispositivo (segundo gap): el componente `ear` NO corre en un solo lugar.
+          `audio_server.py` corre en el SER9 LXC; `satellite.py`/`satellite_ui.py` corren en
+          CADA NSPanel (comedor, etc.) vía Termux, desplegados por un mecanismo APARTE y no
+          trazado (`scripts/nspanel.sh` hace `scp` del satellite a cada panel; el hot-update
+          es scp + pkill, fuera de `deploy.sh`). El motor de deploy no toca los paneles. Por
+          eso la versión correcta a modelar no es "ref por componente" sino una MATRIZ
+          `dispositivo × componente → versión` (SER9: core/backoffice/wa/audio_server; cada
+          NSPanel: satellite), donde un panel puede quedar rezagado sin que nada lo registre.
+          Camino egress-only: el satélite ya se registra contra `audio_server` (cuyo estado
+          ya viaja al snapshot), así que reporta su versión al registrarse → snapshot → nube.
 Arquitectura (un motor, dos invocadores):
           REMOTO (frontend): [dashboard cloud] --deploy.release(refs)--> [Firestore]
                              [SER9 bridge] --poll--> executor (sin lógica propia) ─┐
@@ -3096,6 +3106,17 @@ Arquitectura (un motor, dos invocadores):
             egress-only vía snapshot, y (b) backoffice interno (LAN, FASE 12) leyendo el estado
             local del SER9. Mostrar versión actual corriendo, último deploy, resultado y si
             hubo rollback. Auditoría reusa la de FASE 33 (quién emitió, cuándo).
+- [ ] 34.13 Satélites NSPanel bajo el motor único (cierra el gap multi-dispositivo): el motor
+            (o un sub-comando `deploy.satellites`) despliega `satellite.py`/`satellite_ui.py` a
+            los paneles registrados con pin de ref (no el `scp` suelto de `nspanel.sh`), reusando
+            su transporte; registra la versión desplegada por panel. El satélite AUTO-REPORTA su
+            versión (ref/tag corriendo) al registrarse en `audio_server`. Tests con scp/ssh
+            mockeados. (Hereda el modelo egress-only y los footguns de pkill/supervisor del panel.)
+- [ ] 34.14 Matriz `dispositivo × componente → versión` en LOS DOS frontends: en vez de "versión
+            de core", una tabla por dispositivo (SER9: core/backoffice/wa/audio_server; cada
+            NSPanel: satellite) con la versión corriendo, si está rezagada vs. el release vigente,
+            y último deploy/rollback por dispositivo. La versión por panel llega vía snapshot
+            (audio_server → bridge). Reusa el panel de versiones de 34.7.
 - [ ] 34.8  Panel de deploy en el dashboard cloud (RBAC: sólo admin emite): elegir ref/tag,
             disparar el release, ver progreso/resultado/rollback. Reusa el panel de acciones
             y el gate de capacidades de FASE 33; el frontend oculta la acción a no-admin.
@@ -3271,3 +3292,110 @@ Modelo conceptual (decisiones de diseño):
             repreguntas sostenidas, replies a proactivos) integradas a los dashboards de FASE 35.
 - [ ] 36.11 Tests e2e cross-canal (voz y WA) del ciclo completo + docs: sección "continuidad
             conversacional" en `masterplan/arquitectura_funcional.md` y `README`.
+
+### FASE 37 - Backoffice cloud completo (paridad de secciones egress-only + sidebar)
+
+```
+Objetivo: Llevar el backoffice cloud (FASE 33) de una única página SPA con tarjetas
+          apiladas a un backoffice con sidebar + secciones, con paridad funcional con el
+          backoffice local en TODO lo que tiene sentido exponer egress-only. Además,
+          reemplazar el mecanismo genérico de comandos (dropdown de tipo + input JSON que
+          respeta un schema) por una interfaz de comandos lograda: acciones contextuales
+          por entidad y formularios tipados con widgets propios.
+Estado:   Pendiente.
+Deps:     FASE 33 (backoffice cloud + bridge egress-only + RBAC — COMPLETA, base a extender),
+          FASE 35 (dashboards de métricas — COMPLETA, ya viven en el cloud),
+          FASE 34 (deploy remoto — la sección Deploy del sidebar consume su versión reportada).
+Principio de seguridad: se hereda intacto el modelo egress-only de FASE 33. El SER9 sólo
+          hace conexiones SALIENTES. Toda sección nueva se alimenta por snapshot-push
+          (cloud/bridge/snapshot.py → POST /ingest/state) o por comando-poll (allowlist
+          tipado de cloud/app/commands.py). Cero inbound. Nunca salen de la LAN: .env,
+          tokens HAOS/OAuth, ni contenido de conversaciones en claro.
+Reglas que gobiernan qué entra al cloud (ambas deben cumplirse por sección):
+          (1) Seguridad/PII: el dato puede salir sin exponer secretos ni contenido sensible.
+          (2) Egress-only: el dato se alimenta por snapshot-push o comando-poll.
+Decisiones tomadas:
+          - Superficie de control: agregar comandos de operación ACOTADOS al allowlist
+            (agent.toggle, panel.reboot, proactive.run), sólo admin, validados como los
+            existentes. No shell arbitrario.
+          - PII: secciones sensibles se muestran como resumen/conteos para todos; el detalle
+            (contenido) queda detrás de una capacidad RBAC admin-only NUEVA (view_pii),
+            distinta de view_full.
+          - Frontend: SPA único (no multipágina Jinja como el local), una sola Firebase auth
+            flow, sidebar con la taxonomía del local (Monitoreo/Sistema/Administración) y
+            router client-side por hash; cada link y vista gated por capacidad.
+          - Comandos: NO más select-de-tipo + input JSON genérico. Acciones contextuales
+            junto a la entidad (restart por servicio, toggle por agente, reboot por panel,
+            retrain en Wake word, reload por target, run por agente) y, para comandos sin
+            entidad-ancla, formularios tipados con widgets renderizados desde la metadata
+            de presentación de /api/catalog (enum→dropdown, int→número min/max, bool→toggle,
+            node/user→selector). Confirmación en acciones destructivas + feedback inline del
+            estado (pending→running→done/error) reusando la auditoría.
+Mapa de paridad local→cloud (qué se incluye y bajo qué gate):
+          - Inicio        → Resumen (landing nuevo; access)
+          - Dashboard     → Servicios/Agentes/Actividad (ya existe, se reorganiza; access)
+          - Métricas      → Métricas (ya existe; detalle view_full)
+          - Estadísticas  → se funde en Métricas/Resumen
+          - Alertas       → Alertas (nuevo; campo snapshot 'alerts'; access)
+          - Logs          → Logs (nuevo; comando logs.tail; emit)
+          - Traces        → resumen agregado en Métricas; detalle view_pii
+          - Agentes       → Agentes (lista ya existe + toggle vía agent.toggle; emit)
+          - Intenc/Goals/Rutinas → conteos en Resumen; detalle view_pii
+          - Conversaciones→ conteos; sin contenido (detalle view_pii)
+          - Usuarios      → roster read-only (ya viaja en users_summary; view_full)
+          - Wake word     → estado + retrain (wakeword.retrain; emit)
+          - Paneles       → estado + reboot (panel.reboot; emit)
+          - Deploy        → versión desplegada (FASE 34; emit admin)
+          - Config (.env) → sólo acción config.reload (sin editor de .env)
+          - FUERA del cloud: Shared State, Ambientes (rooms), Integraciones (OAuth/tokens).
+```
+
+#### Etapa A - Contrato y RBAC
+- [ ] 37.1  Contrato del snapshot ampliado: campos `alerts`, `wakeword.status`, conteos de
+            intents/goals/routines/conversaciones y versión desplegada (cruza FASE 34).
+            Documentar qué sale y qué NO (sin contenido PII en claro). Tests de contrato del
+            snapshot (`cloud/tests`).
+- [ ] 37.2  Capacidad `view_pii` (admin-only) en `cloud/app/rbac.py`, distinta de `view_full`;
+            `filter_state` redacta el detalle PII según ella (deja conteos). Catálogo de comandos
+            extendido en `cloud/app/commands.py` (`agent.toggle`, `panel.reboot`, `proactive.run`)
+            con validadores existentes. Tests de RBAC y de catálogo.
+
+#### Etapa B - Frontend reestructurado (sidebar + secciones)
+- [ ] 37.3  Base SPA con sidebar (Monitoreo/Sistema/Administración), router por hash y links
+            gated por caps (`access`/`view_full`/`view_pii`/`emit`); el sidebar oculta lo no
+            permitido y el router rechaza navegación a vistas sin capacidad.
+- [ ] 37.4  Secciones: Resumen, Servicios, Métricas, Alertas, Logs, Agentes, Actividad, Wake
+            word, Paneles, Usuarios, Deploy, Auditoría. Cada vista gated por capacidad.
+- [ ] 37.5  Interfaz de comandos contextual (reemplaza el `<select>` + input JSON): acciones
+            por entidad (restart/toggle/reboot/retrain/reload/run) con widgets propios,
+            confirmación en destructivas y feedback inline del estado; formularios tipados para
+            comandos sin entidad-ancla (ej. logs.tail), renderizados desde la metadata de
+            presentación de `/api/catalog`. Elimina `#cmd-params` JSON.
+
+#### Etapa C - Backend cloud
+- [ ] 37.6  Endpoints `/api/alerts` y `/api/logs` (poll del resultado de `logs.tail`); ampliar
+            `/api/me`/`/api/state` con las caps nuevas y `/api/catalog` con la metadata de
+            presentación por parámetro (`kind`/`label`/`choices`/`min`/`max`/`default`) sin
+            cambiar `validate_command`. RBAC aplicado por endpoint.
+
+#### Etapa D - Bridge / executor (SER9)
+- [ ] 37.7  `cloud/bridge/snapshot.py`: emitir los campos nuevos reusando datos que ya computan
+            core/backoffice (sin PII en claro; sólo conteos). No reimplementar lógica.
+- [ ] 37.8  `cloud/bridge/executor.py`: implementar `agent.toggle`, `panel.reboot`,
+            `proactive.run` (tipo→función concreta, sin eval; auditoría como los existentes),
+            invocando las APIs/scripts del SER9 ya existentes.
+
+#### Etapa F - Logs del satélite por panel (ambos backoffices)
+- [ ] 37.10 Ver los logs del satélite de CADA panel en LOS DOS backoffices (local LAN + cloud
+            egress-only). El log vive en el panel (`~/.satellite.log` en Termux). Mecanismo único
+            reutilizable "traer N líneas del satélite del panel X" (ssh a Termux:8022 desde el
+            SER9, o relay vía `audio_server`), invocado por: (a) backoffice local con selector de
+            panel en `/logs` (fetch directo, está en la LAN), y (b) cloud vía comando tipado
+            (extender `logs.tail` con `node_id` opcional, o `logs.satellite`) → bridge ejecuta el
+            fetch → resultado al panel Logs (37.4/37.6). Sin duplicar la lógica de fetch entre
+            local y bridge. Tests con ssh mockeado.
+
+#### Etapa E - Tests y documentación
+- [ ] 37.9  Tests cloud (`cloud/tests`) + bridge (`cloud/bridge/test_bridge.py`) de todo lo
+            nuevo; docs en `masterplan/arquitectura_funcional.md`, `cloud/README.md` y `README`;
+            lint de estado + sync de issues.
