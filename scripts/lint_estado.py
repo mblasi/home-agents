@@ -8,6 +8,9 @@ Detecta inconsistencias en masterplan/estado.md:
        - todas las tareas [x] (0 pendientes) pero Estado no es COMPLETA
        - hay tareas [x] y [ ] (avance parcial) pero Estado dice "Pendiente" (debería ser EN CURSO)
      (COMPLETA con algún [ ] está permitido — es la convención "COMPLETA (X postergada)".)
+  4. Tareas [ ] pendientes sin entrada en masterplan/issues.yaml (sync_issues.py las ignoraría:
+     itera el mapeo, no el plan, así que un pendiente sin mapeo nunca se crea/cierra en GitHub).
+     Las [x] sin mapeo se permiten (ruido histórico de fases ya cerradas).
 
 Solo reporta los headers Completado/Pendiente — el resto de #### son sección narrativa válida.
 
@@ -20,6 +23,10 @@ import re
 from pathlib import Path
 
 ESTADO = Path(__file__).parent.parent / "masterplan" / "estado.md"
+ISSUES_YAML = Path(__file__).parent.parent / "masterplan" / "issues.yaml"
+
+_TASK_ID        = re.compile(r"^\s*-\s+\[([ xX])\]\s+(\d+(?:\.\d+)+)\b")
+_YAML_KEY       = re.compile(r'^\s*"([^"]+)"\s*:')
 
 _SECTION_HEADER = re.compile(r"^#{1,3}\s")       # ###, ##, # → resetea contexto
 _SUB_HEADER     = re.compile(r"^####\s+(.+)")
@@ -73,6 +80,23 @@ def lint_phase_status(lines: list[str]) -> list[str]:
     return errors
 
 
+def lint_issue_mapping(lines: list[str], yaml_path: Path = ISSUES_YAML) -> list[str]:
+    """Toda tarea [ ] pendiente debe tener entrada en issues.yaml. Las [x] se ignoran
+    (ruido histórico). Parsea el YAML por regex para no depender de pyyaml en el gate."""
+    if not yaml_path.exists():
+        return []
+    mapped = {m.group(1) for line in yaml_path.read_text().splitlines()
+              if (m := _YAML_KEY.match(line))}
+    errors: list[str] = []
+    for i, line in enumerate(lines, 1):
+        m = _TASK_ID.match(line)
+        if m and m.group(1) == " " and m.group(2) not in mapped:
+            errors.append(
+                f"línea {i}: tarea pendiente {m.group(2)} sin entrada en issues.yaml "
+                f"— sync_issues.py la ignora; agregar el mapeo (o usar backlog.py add)")
+    return errors
+
+
 def lint(path: Path = ESTADO) -> list[str]:
     errors: list[str] = []
     lines = path.read_text().splitlines()
@@ -119,7 +143,7 @@ def lint(path: Path = ESTADO) -> list[str]:
 
 def main() -> None:
     lines = ESTADO.read_text().splitlines()
-    errors = lint() + lint_phase_status(lines)
+    errors = lint() + lint_phase_status(lines) + lint_issue_mapping(lines)
 
     if not errors:
         print("✓ estado.md sin inconsistencias (sub-headers + Estado de fase)")
