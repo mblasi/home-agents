@@ -158,20 +158,49 @@ def _users() -> list[dict]:
     return out
 
 
+_FETCH_INTERVAL = int(os.environ.get("VERSIONS_FETCH_INTERVAL", "1800"))   # cada cuánto fetch (s)
+_last_fetch = 0.0
+
+
+def _maybe_fetch(repos, de) -> None:
+    """git fetch de los repos para conocer la ÚLTIMA versión disponible (origin/main + tags), con
+    throttle (no en cada snapshot). Egress-only: el SER9 sólo hace una conexión saliente a GitHub."""
+    global _last_fetch
+    import time
+    if time.time() - _last_fetch < _FETCH_INTERVAL:
+        return
+    _last_fetch = time.time()
+    for repo in repos.values():
+        de._run(["git", "-C", repo.git_dir(), "fetch", "--quiet", "--tags", "origin"],
+                de._noop_emit, timeout=60)
+
+
 def _versions(nodes: list[dict]) -> dict:
     """Matriz de versiones dispositivo×componente (FASE 34 T5 / 34.7/34.14): por repo del SER9
-    (core/ear/umbrella) el sha+tag+link al release de GitHub que corre, y por panel la versión
-    de código reportada (heartbeat) vs la esperada (la que sirve el audio_server). Best-effort."""
+    (core/ear/umbrella) el sha+tag+link al release de GitHub que CORRE y la ÚLTIMA disponible
+    (origin/main + último tag) con flag `behind` para detectar rezago → disparar update; y por
+    panel la versión reportada (heartbeat) vs la esperada (la que sirve el audio_server). Best-effort."""
     out: dict = {"ser9": {}, "panels": [], "satellite_expected": None}
     try:
         import deploy_engine as de
+        _maybe_fetch(de.REPOS, de)
         for name, repo in de.REPOS.items():
             gd = repo.git_dir()
             sha = repo.head(de._noop_emit)
             tag = de._tag_at(gd, sha, de._noop_emit) if sha else None
             slug = de._repo_slug(gd, de._noop_emit)
             url = f"https://github.com/{slug}/releases/tag/{tag}" if (slug and tag) else None
-            out["ser9"][name] = {"version": sha, "tag": tag, "url": url}
+            # última disponible: origin/main + mayor tag semver conocido (tras el fetch)
+            r = de._run(["git", "-C", gd, "rev-parse", "--short", "origin/main"],
+                        de._noop_emit, timeout=15)
+            latest_sha = r.output.strip() if r.ok and r.output.strip() else None
+            lv = de._latest_semver(gd, de._noop_emit)
+            latest_tag = ("v%d.%d.%d" % lv) if lv else None
+            out["ser9"][name] = {
+                "version": sha, "tag": tag, "url": url,
+                "latest_sha": latest_sha, "latest_tag": latest_tag,
+                "behind": bool(latest_sha and sha and latest_sha != sha),
+            }
     except Exception:
         pass
     expected = (_get(f"{AUDIO_URL}/satellite/version") or {}).get("version")

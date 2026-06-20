@@ -247,7 +247,8 @@ def test_snapshot_versions_panels_y_ser9():
             return {"status": "ok", "nodes": 2}
         return None
     with patch.object(snapshot, "_get", fake_get), \
-         patch.object(snapshot, "_systemctl_active", lambda u: True):
+         patch.object(snapshot, "_systemctl_active", lambda u: True), \
+         patch.object(snapshot, "_maybe_fetch", lambda *a, **k: None):  # sin git fetch real
         snap = snapshot.build_snapshot()
     v = snap["versions"]
     assert isinstance(v["ser9"], dict)                  # repos del SER9 (best-effort)
