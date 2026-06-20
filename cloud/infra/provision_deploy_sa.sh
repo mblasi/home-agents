@@ -28,22 +28,42 @@ RUNTIME_SA_EMAIL="${RUNTIME_SA}@${PROJECT}.iam.gserviceaccount.com"
 gcloud config set project "$PROJECT" >/dev/null
 echo "== Proyecto: $PROJECT  Región: $REGION  Deploy SA: $DEPLOY_SA_EMAIL =="
 
+# IAM es de consistencia EVENTUAL: una SA recién creada tarda unos segundos en ser visible
+# para los add-iam-policy-binding (fallan con "does not exist"). Reintentar con backoff.
+_retry() {
+  local n=0 max=8
+  until "$@"; do
+    n=$((n+1))
+    if [[ $n -ge $max ]]; then
+      echo "   ✗ falló tras $max intentos: $*" >&2
+      return 1
+    fi
+    echo "   · reintento $n/$max (propagación IAM)…" >&2
+    sleep 5
+  done
+}
+
 echo "== APIs (idempotente) =="
 gcloud services enable \
   run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com \
   storage.googleapis.com --project "$PROJECT"
 
 echo "== Service Account de deploy =="
-gcloud iam service-accounts describe "$DEPLOY_SA_EMAIL" >/dev/null 2>&1 || \
+if gcloud iam service-accounts describe "$DEPLOY_SA_EMAIL" >/dev/null 2>&1; then
+  echo "   · ya existe."
+else
   gcloud iam service-accounts create "$DEPLOY_SA" \
     --display-name="Capitán deployer (SER9) — deploy Cloud Run, permiso mínimo"
+  # Esperar a que la SA propague antes de referenciarla en los bindings.
+  _retry gcloud iam service-accounts describe "$DEPLOY_SA_EMAIL" >/dev/null 2>&1 || true
+fi
 
 echo "== Roles a nivel proyecto (permiso mínimo para deploy + rollback) =="
 for ROLE in \
   roles/run.admin \
   roles/cloudbuild.builds.editor \
   roles/artifactregistry.writer ; do
-  gcloud projects add-iam-policy-binding "$PROJECT" \
+  _retry gcloud projects add-iam-policy-binding "$PROJECT" \
     --member="serviceAccount:${DEPLOY_SA_EMAIL}" \
     --role="$ROLE" --condition=None >/dev/null
   echo "   + $ROLE"
@@ -51,12 +71,12 @@ done
 
 echo "== actAs sobre las runtime SA de los servicios desplegados =="
 # Cloud Run deploy requiere que el deployer pueda 'actuar como' la runtime SA del servicio.
-gcloud iam service-accounts add-iam-policy-binding "$RUNTIME_SA_EMAIL" \
+_retry gcloud iam service-accounts add-iam-policy-binding "$RUNTIME_SA_EMAIL" \
   --member="serviceAccount:${DEPLOY_SA_EMAIL}" \
   --role="roles/iam.serviceAccountUser" >/dev/null
 echo "   + actAs ${RUNTIME_SA_EMAIL}"
 if [[ -n "$OAUTH_RUNTIME_SA" ]]; then
-  gcloud iam service-accounts add-iam-policy-binding \
+  _retry gcloud iam service-accounts add-iam-policy-binding \
     "${OAUTH_RUNTIME_SA}@${PROJECT}.iam.gserviceaccount.com" \
     --member="serviceAccount:${DEPLOY_SA_EMAIL}" \
     --role="roles/iam.serviceAccountUser" >/dev/null
