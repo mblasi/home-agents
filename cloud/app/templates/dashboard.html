@@ -135,9 +135,13 @@ function renderVersions(v) {
     return `<div>${i.behind ? "⚠️" : "🟢"} <b>${esc(name)}</b> ${run}`
       + `${i.tag && i.version ? ` <span class="muted">(${esc(i.version)})</span>` : ""}${availPart}</div>`;
   }).join("");
-  const panels = (v.panels || []).map(p =>
-    `<div>${p.up_to_date ? "🟢" : "⚠️"} <b>${esc(p.node_id)}</b> <span class="muted">${esc(p.version) || "—"}</span></div>`
-  ).join("");
+  const exp = v.satellite_expected;
+  const panels = (v.panels || []).map(p => {
+    const avail = p.up_to_date
+      ? ` · <span class="muted">al día</span>`
+      : ` · <span style="color:#fa0">⬆ disp. ${esc(exp || "?")}</span>`;
+    return `<div>${p.up_to_date ? "🟢" : "⚠️"} <b>${esc(p.node_id)}</b> ${esc(p.version) || "—"}${avail}</div>`;
+  }).join("");
   $("versions").innerHTML =
     `<h3>SER9 (repos)</h3><div class="grid">${repos || "<span class='muted'>sin datos</span>"}</div>`
     + `<h3>Paneles${v.satellite_expected ? ` <span class="muted">esperado ${esc(v.satellite_expected)}</span>` : ""}</h3>`
