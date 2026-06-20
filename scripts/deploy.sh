@@ -32,7 +32,10 @@ fi
 echo "=== Smoke test (esperando 5s) ==="
 sleep 5
 ssh capitan-lxc "curl -sf http://localhost:8765/health" && echo "core OK" || echo "core NO responde"
-ssh capitan-lxc "curl -sf http://localhost:8766/health" >/dev/null && echo "audio-server OK" || echo "audio-server NO responde"
+# El audio-server carga el modelo whisper al arrancar (varios segundos): reintentar ~25s
+# antes de declararlo caído, si no el smoke da falso negativo en cada deploy.
+ssh capitan-lxc "for i in \$(seq 1 12); do curl -sf http://localhost:8766/health >/dev/null && exit 0; sleep 2; done; exit 1" \
+  && echo "audio-server OK" || echo "audio-server NO responde"
 # / redirige a /login (303) cuando no hay sesión — un 3xx es respuesta sana
 ssh capitan-lxc "curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/" | grep -qE '^(2..|3..)' && echo "backoffice OK" || echo "backoffice NO responde"
 
