@@ -189,16 +189,23 @@ def _versions(nodes: list[dict]) -> dict:
             sha = repo.head(de._noop_emit)
             tag = de._tag_at(gd, sha, de._noop_emit) if sha else None
             slug = de._repo_slug(gd, de._noop_emit)
-            url = f"https://github.com/{slug}/releases/tag/{tag}" if (slug and tag) else None
             # última disponible: origin/main + mayor tag semver conocido (tras el fetch)
             r = de._run(["git", "-C", gd, "rev-parse", "--short", "origin/main"],
                         de._noop_emit, timeout=15)
             latest_sha = r.output.strip() if r.ok and r.output.strip() else None
             lv = de._latest_semver(gd, de._noop_emit)
             latest_tag = ("v%d.%d.%d" % lv) if lv else None
+
+            def _gh(ref, is_tag):  # link a release si es tag, al commit si es sha — siempre hay link
+                if not slug or not ref:
+                    return None
+                return (f"https://github.com/{slug}/releases/tag/{ref}" if is_tag
+                        else f"https://github.com/{slug}/commit/{ref}")
+
             out["ser9"][name] = {
-                "version": sha, "tag": tag, "url": url,
+                "version": sha, "tag": tag, "url": _gh(tag or sha, bool(tag)),
                 "latest_sha": latest_sha, "latest_tag": latest_tag,
+                "latest_url": _gh(latest_tag or latest_sha, bool(latest_tag)),
                 "behind": bool(latest_sha and sha and latest_sha != sha),
             }
     except Exception:

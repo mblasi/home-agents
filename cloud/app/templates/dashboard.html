@@ -125,14 +125,15 @@ function dot(ok) { return ok ? "🟢" : "🔴"; }
 function renderVersions(v) {
   const esc = (s) => String(s == null ? "" : s).replace(/[<>&]/g, c => ({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]));
   const ser9 = v.ser9 || {};
+  const link = (text, url) => url ? `<a href="${esc(url)}" target="_blank">${esc(text)}</a>` : esc(text);
   const repos = Object.entries(ser9).map(([name, i]) => {
-    const ver = esc(i.tag || i.version || "?");
-    const label = i.url ? `<a href="${esc(i.url)}" target="_blank">${ver}</a>` : ver;
-    const avail = i.behind
-      ? ` <span style="color:#fa0">⬆ disponible ${esc(i.latest_tag || i.latest_sha)}</span>`
-      : "";
-    return `<div>${i.behind ? "⚠️" : "🟢"} <b>${esc(name)}</b> ${label}`
-      + `${i.tag && i.version ? ` <span class="muted">(${esc(i.version)})</span>` : ""}${avail}</div>`;
+    const run = link(i.tag || i.version || "?", i.url);
+    const avail = link(i.latest_tag || i.latest_sha || "?", i.latest_url);
+    const availPart = i.behind
+      ? ` · <span style="color:#fa0">⬆ disp. ${avail}</span>`
+      : ` · <span class="muted">al día</span>`;
+    return `<div>${i.behind ? "⚠️" : "🟢"} <b>${esc(name)}</b> ${run}`
+      + `${i.tag && i.version ? ` <span class="muted">(${esc(i.version)})</span>` : ""}${availPart}</div>`;
   }).join("");
   const panels = (v.panels || []).map(p =>
     `<div>${p.up_to_date ? "🟢" : "⚠️"} <b>${esc(p.node_id)}</b> <span class="muted">${esc(p.version) || "—"}</span></div>`
