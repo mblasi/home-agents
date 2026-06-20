@@ -3130,6 +3130,44 @@ Arquitectura (un motor, dos invocadores):
             Verificar que no quede lógica de pin/install/restart/health/rollback duplicada
             fuera del motor.
 
+```
+REGISTRO — Deploy a los paneles (satélites): frágil y sin trazabilidad (a formalizar como
+Etapa E al tomar la fase). Hallazgos de campo 2026-06-19 (update manual de satellite.py en
+comedor + pieza):
+  1. deploy.sh no cubría el satélite ni el audio_server (ear). audio_server ya se agregó
+     (restart + smoke), pero el satellite.py de cada NSPanel sigue desplegándose a mano
+     (scp + pkill), fuera de todo flujo verificado.
+  2. El push del supervisor (voice-node.sh) por heredoc SSH se TRUNCÓ a archivo vacío con un
+     blip de red, sin error visible → el satélite no arrancaba y nada lo detectó. Falta
+     verificación de integridad post-copia (conteo de líneas/checksum) y readback.
+  3. Termux:Boot NO disparó start-ha.sh tras `adb reboot` (Android booteó pero sshd + voice
+     node quedaron caídos) → hubo que recuperar a mano por ADB (abrir Termux, tipear sshd).
+  4. Los procesos lanzados detached por SSH (`setsid nohup`) mueren al cerrar la sesión salvo
+     que el supervisor sostenga `termux-wake-lock`; lanzar el satélite suelto no persiste.
+  5. Divergencia entre paneles: la pieza se aprovisionó con una versión VIEJA de nspanel.sh
+     (boot directo `nohup python satellite.py`, sin supervisor); el comedor con voice-node.sh.
+     No había forma de saber "qué corre en cada panel".
+  6. Sin visibilidad de versión: el satélite no reporta qué código corre → no hay certeza de
+     la versión por panel. Cruza la matriz dispositivo×componente→versión ya descrita arriba.
+Estado tras la sesión: ambos paneles quedaron con el mismo mecanismo (voice-node.sh + boot
+script canónico) y el mismo satellite.py, y ambos reportan IP al audio_server. Pero todo el
+procedimiento fue manual y sin red de seguridad.
+
+Trabajo a formalizar como tareas (Etapa E) al tomar la fase:
+  E.1  `nspanel.sh update <panel>`: hot-update VERIFICADO del código del nodo (satellite.py +
+       satellite_ui.py + voice-node.sh) con verificación de integridad (líneas/checksum +
+       readback), restart vía el supervisor (`pkill -f satellite.py` → relanza), y confirmación
+       de re-registro. Idempotente. Reemplaza el scp+pkill manual. Uno o todos los paneles.
+  E.2  El satélite reporta su VERSIÓN de código (hash de satellite.py) en el heartbeat; el
+       audio_server la expone en `GET /nodes`, visible en backoffice/cloud y comparable contra
+       el repo → certeza de qué corre en cada panel. Cierra la matriz dispositivo×componente.
+  E.3  Robustez de arranque: asegurar que Termux:Boot dispare start-ha.sh tras reboot
+       (battery-optimization/permisos), supervisor único con wake-lock, y health-check del nodo
+       (audio_server marca offline + alerta si un panel deja de reportar).
+  E.4  Convergencia de provisioning: `nspanel.sh` lleva CUALQUIER panel al estado canónico
+       (mismo voice-node.sh/start-ha.sh/deps), detectando y corrigiendo setups viejos (pieza).
+```
+
 #### Etapa D - Tests y documentación
 - [ ] 34.10 Tests: validación del comando con refs (`cloud/tests`); executor con snapshot /
             health / rollback mockeando git + systemd + HTTP (`cloud/bridge/test_bridge.py`);
