@@ -3012,9 +3012,15 @@ Estado:   EN CURSO — motor único operativo y LIVE en el SER9. Hechas: 34.1 (c
           v0.1.0 en core/ear/umbrella; falta sólo el GitHub Release formal con notas = token GH),
           y LOGS EN VIVO (D5) end-to-end: el motor emite progreso → bridge lo postea por lotes →
           la nube lo acumula → el cloud-bo lo muestra en streaming (executor emit, /commands/
-          {id}/progress, /api/commands/{id}, frontend). Prep permisos gcloud de la deploy SA
-          hecho (D9). Pendientes: drivers panel+cloudrun (34.13), visibilidad/matriz en BO
-          (34.7/34.14/34.8), tests e2e + docs (34.10/34.11).
+          {id}/progress, /api/commands/{id}, frontend). T4a driver cloudrun ACTIVADO+probado
+          (deploy del cloud-bo desde el SER9 + rollback a revisión previa); gcloud en el SER9.
+          T4b: #602 resuelto, provisioning robusto (converge + escritura verificada por checksum),
+          satélites bajo el motor (34.13: auto-update por pull + reportan versión). T5 parcial:
+          MATRIZ DE VERSIONES en el snapshot + cloud-bo (34.7/34.14) — por repo del SER9 la versión
+          que corre (sha+tag+link al release GH) y la ÚLTIMA disponible (origin/main + tag, fetch
+          throttled) con flag `behind`; por panel versión vs esperada (up_to_date). Prep permisos
+          gcloud (D9). Pendientes: matriz en BACKOFFICE LOCAL (34.7/34.14), panel de deploy admin
+          en cloud (34.8), tests e2e + docs (34.10/34.11).
 Deps:     FASE 33 (bridge egress-only + allowlist tipado + auth/audit/RBAC — COMPLETA,
           ya existe el comando `deploy.run` que esta fase eleva a CD real),
           FASE 21 (SER9 estable — COMPLETA), FASE 12 (backoffice — COMPLETA).
