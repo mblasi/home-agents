@@ -3407,7 +3407,10 @@ Objetivo: Llevar el backoffice cloud (FASE 33) de una única página SPA con tar
           backoffice local en TODO lo que tiene sentido exponer egress-only. Además,
           reemplazar el mecanismo genérico de comandos (dropdown de tipo + input JSON que
           respeta un schema) por una interfaz de comandos lograda: acciones contextuales
-          por entidad y formularios tipados con widgets propios.
+          por entidad y formularios tipados con widgets propios. PREMISA TRANSVERSAL:
+          el backoffice cloud debe ser mobile-friendly (responsive, mobile-first), ya que
+          el acceso remoto egress-only es típicamente desde el celular — toda sección,
+          sidebar y formulario de comandos debe funcionar y ser usable en pantalla chica.
 Estado:   Pendiente.
 Deps:     FASE 33 (backoffice cloud + bridge egress-only + RBAC — COMPLETA, base a extender),
           FASE 35 (dashboards de métricas — COMPLETA, ya viven en el cloud),
@@ -3429,7 +3432,10 @@ Decisiones tomadas:
             distinta de view_full.
           - Frontend: SPA único (no multipágina Jinja como el local), una sola Firebase auth
             flow, sidebar con la taxonomía del local (Monitoreo/Sistema/Administración) y
-            router client-side por hash; cada link y vista gated por capacidad.
+            router client-side por hash; cada link y vista gated por capacidad. Mobile-first:
+            layout responsive, sidebar colapsable/drawer en pantalla chica, tablas y charts
+            que se reflowan, targets táctiles adecuados. Es requisito de aceptación, no un
+            extra — el acceso remoto se da mayormente desde el celular.
           - Comandos: NO más select-de-tipo + input JSON genérico. Acciones contextuales
             junto a la entidad (restart por servicio, toggle por agente, reboot por panel,
             retrain en Wake word, reload por target, run por agente) y, para comandos sin
@@ -3477,6 +3483,11 @@ Mapa de paridad local→cloud (qué se incluye y bajo qué gate):
             confirmación en destructivas y feedback inline del estado; formularios tipados para
             comandos sin entidad-ancla (ej. logs.tail), renderizados desde la metadata de
             presentación de `/api/catalog`. Elimina `#cmd-params` JSON.
+- [ ] 37.12 Mobile-friendly: el SPA (sidebar, secciones y formularios de comandos) debe ser
+            responsive/mobile-first. Sidebar colapsable a drawer en viewport chico, tablas y
+            charts (Chart.js) que se reflowan sin scroll horizontal, targets táctiles
+            adecuados, sin layout roto en portrait. Verificar las vistas clave en ancho de
+            celular. Premisa transversal de la fase, no una sección aparte.
 
 #### Etapa C - Backend cloud
 - [ ] 37.6  Endpoints `/api/alerts` y `/api/logs` (poll del resultado de `logs.tail`); ampliar
