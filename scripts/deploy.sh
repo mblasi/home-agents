@@ -15,7 +15,10 @@ ssh capitan-lxc "
   git pull --recurse-submodules
   ~/home-agents-env/bin/pip install -q -r core/requirements.txt
   ~/home-agents-env/bin/pip install -q -r backoffice/requirements.txt
-  systemctl --user restart capitan-core capitan-backoffice
+  # capitan-audio-server corre el código de ear/ (audio_server.py) en el LXC: si no se
+  # reinicia, los cambios de ear quedan en disco pero el proceso sigue con el binario viejo.
+  # (El satellite.py de cada NSPanel se despliega aparte con scripts/nspanel.sh — hot-update.)
+  systemctl --user restart capitan-core capitan-backoffice capitan-audio-server
   echo 'Servicios reiniciados.'
 "
 
@@ -29,6 +32,7 @@ fi
 echo "=== Smoke test (esperando 5s) ==="
 sleep 5
 ssh capitan-lxc "curl -sf http://localhost:8765/health" && echo "core OK" || echo "core NO responde"
+ssh capitan-lxc "curl -sf http://localhost:8766/health" >/dev/null && echo "audio-server OK" || echo "audio-server NO responde"
 # / redirige a /login (303) cuando no hay sesión — un 3xx es respuesta sana
 ssh capitan-lxc "curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/" | grep -qE '^(2..|3..)' && echo "backoffice OK" || echo "backoffice NO responde"
 
