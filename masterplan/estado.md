@@ -3008,10 +3008,13 @@ Objetivo: Desplegar al SER9 desde cualquier lado (fuera de la LAN) de forma segu
           rollback automático si falla), registra la versión desplegada y la reporta.
 Estado:   EN CURSO — motor único operativo y LIVE en el SER9. Hechas: 34.1 (contrato
           deploy.release), 34.3-34.6 (motor: pin/health/rollback), 34.9 (invocadores: executor
-          + deploy.sh sobre el motor). 34.12 parcial (tags semver implementados, gated off por
-          DEPLOY_TAG_RELEASES; falta activar + Release formal con token GH). Prep permisos gcloud
-          de la deploy SA hecho (D9). Pendientes: logs en vivo (D5), drivers panel+cloudrun
-          (34.13), visibilidad en BO (34.7/34.14/34.8), tests e2e + docs (34.10/34.11).
+          + deploy.sh sobre el motor), 34.12 (versionado semver: tag+push por repo, ACTIVO —
+          v0.1.0 en core/ear/umbrella; falta sólo el GitHub Release formal con notas = token GH),
+          y LOGS EN VIVO (D5) end-to-end: el motor emite progreso → bridge lo postea por lotes →
+          la nube lo acumula → el cloud-bo lo muestra en streaming (executor emit, /commands/
+          {id}/progress, /api/commands/{id}, frontend). Prep permisos gcloud de la deploy SA
+          hecho (D9). Pendientes: drivers panel+cloudrun (34.13), visibilidad/matriz en BO
+          (34.7/34.14/34.8), tests e2e + docs (34.10/34.11).
 Deps:     FASE 33 (bridge egress-only + allowlist tipado + auth/audit/RBAC — COMPLETA,
           ya existe el comando `deploy.run` que esta fase eleva a CD real),
           FASE 21 (SER9 estable — COMPLETA), FASE 12 (backoffice — COMPLETA).
@@ -3150,7 +3153,7 @@ DECISIONES CONSOLIDADAS (2026-06-20, al tomar la fase — amplían el alcance de
             del snapshot, reinstalar, reiniciar y re-chequear; reportar `FAILED + rolled-back`
             con el detalle de cada paso. Tras un rollback el sistema queda en el último estado
             sano.
-- [ ] 34.12 Versionado formal en GitHub (en el motor, camino de éxito post health-gate):
+- [x] 34.12 Versionado formal en GitHub (en el motor, camino de éxito post health-gate):
             crear tag + GitHub Release por componente desplegado (core/ear/umbrella) con el ref
             efectivamente desplegado y un esquema de versión consistente (semver o fecha+sha).
             El tag/release es la fuente de verdad de "qué versión está corriendo" (ref inmutable).
