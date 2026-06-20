@@ -3108,6 +3108,13 @@ DECISIONES CONSOLIDADAS (2026-06-20, al tomar la fase — amplían el alcance de
       artifactregistry.writer, iam.serviceAccountUser (actuar como la runtime SA), storage sobre
       el bucket de staging de Cloud Build. Key JSON en el SER9 (egress-only). Script idempotente:
       cloud/infra/provision_deploy_sa.sh. (Confirmado 2026-06-20.)
+      PREP HECHO (2026-06-20): SA capitan-deployer creada; aplicados run.admin +
+      cloudbuild.builds.editor + artifactregistry.writer (proyecto) + actAs sobre la runtime SA
+      del cloud-bo (capitan-cloud-run). FALTA para T4: (a) generar la key JSON e instalarla en el
+      SER9 — diferida hasta que el driver cloudrun la use; (b) capitan-oauth NO está desplegado y
+      su deploy.zsh no fija --service-account → correría con la default compute SA; darle actAs
+      sobre ESA SA cuando se despliegue; (c) binding storage sobre gs://capitan-495518_cloudbuild
+      (el bucket lo crea Cloud Build en el primer deploy; re-correr el script entonces).
 ```
 
 #### Etapa A - Contrato del release
