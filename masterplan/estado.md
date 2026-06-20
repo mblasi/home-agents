@@ -3097,6 +3097,17 @@ DECISIONES CONSOLIDADAS (2026-06-20, al tomar la fase — amplían el alcance de
   D6. Visualización de versión (requisito de UX): la versión corriendo de CADA componente, con
       LINK a la versión tageada en GitHub (release), se muestra en LOS DOS backoffices (local y
       cloud). Es la matriz dispositivo×componente→versión de 34.14, con deep-link al release.
+  D7. Atomicidad POR-COMPONENTE (no por-release): si un release toca varios componentes y uno
+      falla su health-gate, sólo ESE componente revierte a su snapshot; los demás (sanos) quedan
+      desplegados. No se revierte un componente sano porque otro falló. (Confirmado 2026-06-20.)
+  D8. Versionado SEMVER (vX.Y.Z) por componente; el tag vive en el repo de cada componente
+      (core/ear/umbrella) y el GitHub Release referencia ese tag. El bump (patch auto vs
+      minor/major explícito) se define en 34.12. (Confirmado 2026-06-20.)
+  D9. El driver cloudrun usa una SA de deploy DEDICADA (separada de runtime y bridge SA), con
+      permiso mínimo: run.admin (deploy + update-traffic/rollback), cloudbuild.builds.editor,
+      artifactregistry.writer, iam.serviceAccountUser (actuar como la runtime SA), storage sobre
+      el bucket de staging de Cloud Build. Key JSON en el SER9 (egress-only). Script idempotente:
+      cloud/infra/provision_deploy_sa.sh. (Confirmado 2026-06-20.)
 ```
 
 #### Etapa A - Contrato del release
@@ -3198,9 +3209,16 @@ Trabajo a formalizar como tareas (Etapa E) al tomar la fase:
        el repo → certeza de qué corre en cada panel. Cierra la matriz dispositivo×componente.
   E.3  Robustez de arranque: asegurar que Termux:Boot dispare start-ha.sh tras reboot
        (battery-optimization/permisos), supervisor único con wake-lock, y health-check del nodo
-       (audio_server marca offline + alerta si un panel deja de reportar).
+       (audio_server marca offline + alerta si un panel deja de reportar). [issue #602]
   E.4  Convergencia de provisioning: `nspanel.sh` lleva CUALQUIER panel al estado canónico
-       (mismo voice-node.sh/start-ha.sh/deps), detectando y corrigiendo setups viejos (pieza).
+       (mismo voice-node.sh/start-ha.sh/deps), detectando y corrigiendo setups viejos (pieza). [issue #602]
+
+BUG abierto [issue #602] — arranque no convergente comedor vs pieza: el comedor (instalado a
+mano) bootea a HA Companion limpio y con sshd accesible desde el momento 1; la pieza (provision
+sistémico) abre el dashboard de fábrica primero, a veces no llega a HA Companion, y sshd no
+arranca solo (hay que abrir Termux por ADB y tipear sshd). El provisioning sistémico NO replica
+lo que se logró a mano en el comedor (permiso de Termux:Boot, battery-optimization, app por
+defecto/supresión del launcher de fábrica). Diagnóstico y fix en E.3/E.4.
 ```
 
 #### Etapa D - Tests y documentación

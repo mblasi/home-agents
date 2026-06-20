@@ -33,3 +33,6 @@ wa/.wwebjs_cache/
 cloud/**/*.env
 *-sa-key.json
 bridge-sa-key.json
+# FASE 34 — deploy SA key (driver cloudrun; nunca al repo)
+*-key.json
+deployer-key.json
