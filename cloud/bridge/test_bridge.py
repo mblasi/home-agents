@@ -114,3 +114,61 @@ def test_metrics_snapshot_unwraps_list_envelopes():
     assert snap["llm_by_agent"][0]["agent_id"] == "haos"
     assert snap["retrains"][0]["version"] == "v1"
     assert snap["voice_series"]["labels"] == [1, 2]
+
+
+# ── deploy.run / deploy.release invocan el motor único (FASE 34) ───────────────
+
+def test_deploy_run_invokes_engine(monkeypatch):
+    import deploy_engine
+    captured = {}
+
+    class _Res:
+        ok = True
+        log = ["línea"]
+        def __init__(self): pass
+
+    def _fake(services=None, repo_refs=None, emit=None):
+        captured["services"] = services
+        captured["repo_refs"] = repo_refs
+        if emit:
+            emit("motor corrió")
+        return type("R", (), {"ok": True})()
+
+    monkeypatch.setattr(deploy_engine, "run_release", _fake)
+    r = executor.execute("deploy.run", {})
+    assert r.ok
+    # default: servicios del motor, sin wa
+    assert captured["services"] == list(deploy_engine.DEFAULT_SERVICES)
+    assert "motor corrió" in r.output
+
+
+def test_deploy_run_restart_wa_incluye_wa(monkeypatch):
+    import deploy_engine
+    captured = {}
+    monkeypatch.setattr(deploy_engine, "run_release",
+                        lambda services=None, repo_refs=None, emit=None:
+                        captured.update(services=services) or type("R", (), {"ok": True})())
+    executor.execute("deploy.run", {"restart_wa": True})
+    assert "wa" in captured["services"]
+
+
+def test_deploy_release_passes_refs(monkeypatch):
+    import deploy_engine
+    captured = {}
+    monkeypatch.setattr(deploy_engine, "run_release",
+                        lambda services=None, repo_refs=None, emit=None:
+                        captured.update(services=services, repo_refs=repo_refs)
+                        or type("R", (), {"ok": True})())
+    executor.execute("deploy.release",
+                     {"services": ["core"], "core_ref": "v1.2", "umbrella_ref": "abc"})
+    assert captured["services"] == ["core"]
+    assert captured["repo_refs"] == {"core": "v1.2", "umbrella": "abc"}
+
+
+def test_deploy_release_failure_reports_not_ok(monkeypatch):
+    import deploy_engine
+    monkeypatch.setattr(deploy_engine, "run_release",
+                        lambda services=None, repo_refs=None, emit=None:
+                        type("R", (), {"ok": False})())
+    r = executor.execute("deploy.release", {})
+    assert r.ok is False and "rollback" in r.error

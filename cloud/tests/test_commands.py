@@ -60,3 +60,40 @@ def test_catalog_summary_shape():
     cat = catalog_summary()
     types = {c["type"] for c in cat}
     assert "service.restart" in types and "voice.reenroll" in types
+
+
+# ── deploy.release (FASE 34): refs por repo + lista de servicios ───────────────
+
+def test_deploy_release_sin_params():
+    assert validate_command("deploy.release", {}) == {}
+
+
+def test_deploy_release_refs_validos():
+    out = validate_command("deploy.release",
+                           {"core_ref": "v1.2.3", "umbrella_ref": "abc1234", "ear_ref": "main"})
+    assert out == {"core_ref": "v1.2.3", "umbrella_ref": "abc1234", "ear_ref": "main"}
+
+
+def test_deploy_release_ref_con_inyeccion_rechazado():
+    for bad in ("a; rm -rf /", "x && y", "$(whoami)", "a b", "v1`id`"):
+        with pytest.raises(CommandError):
+            validate_command("deploy.release", {"core_ref": bad})
+
+
+def test_deploy_release_services_lista_valida():
+    out = validate_command("deploy.release", {"services": ["core", "bridge"]})
+    assert out == {"services": ["core", "bridge"]}
+
+
+def test_deploy_release_services_invalidos():
+    with pytest.raises(CommandError):
+        validate_command("deploy.release", {"services": ["core", "nope"]})
+    with pytest.raises(CommandError):
+        validate_command("deploy.release", {"services": "core"})   # no es lista
+    with pytest.raises(CommandError):
+        validate_command("deploy.release", {"services": []})       # vacía
+
+
+def test_deploy_release_param_desconocido_rechazado():
+    with pytest.raises(CommandError):
+        validate_command("deploy.release", {"wa_ref": "x"})

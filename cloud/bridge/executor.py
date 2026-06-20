@@ -55,22 +55,31 @@ def _logs_tail(p: dict) -> ExecResult:
     return _run(["journalctl", "--user", "-u", p["service"], "-n", lines, "--no-pager"], timeout=15)
 
 
+def _run_engine(services, repo_refs) -> ExecResult:
+    """Invoca el MOTOR único de deploy (FASE 34). El executor NO reimplementa lógica de deploy:
+    sólo traduce comando→args, corre el motor in-process (el bridge corre EN el SER9) y reporta
+    el log incremental + el ok/rollback. Ver deploy_engine.run_release / D1, D7."""
+    import deploy_engine
+    lines: list[str] = []
+    res = deploy_engine.run_release(services, repo_refs or None, emit=lines.append)
+    err = "" if res.ok else "deploy con fallos (ver rollback en el log)"
+    return ExecResult(res.ok, "\n".join(lines), err)
+
+
 def _deploy_run(p: dict) -> ExecResult:
-    out = []
-    for step in (
-        ["git", "-C", REPO_DIR, "pull", "--recurse-submodules"],
-        [PIP, "install", "-q", "-r", os.path.join(REPO_DIR, "core/requirements.txt")],
-        [PIP, "install", "-q", "-r", os.path.join(REPO_DIR, "backoffice/requirements.txt")],
-        ["systemctl", "--user", "restart", "capitan-core", "capitan-backoffice"],
-    ):
-        r = _run(step, timeout=180)
-        out.append(f"$ {' '.join(step)}\n{r.output}")
-        if not r.ok:
-            return ExecResult(False, "\n".join(out), r.error)
-    if p.get("restart_wa"):
-        r = _run(["systemctl", "--user", "restart", "capitan-wa"], timeout=30)
-        out.append(f"restart wa: {r.output}")
-    return ExecResult(True, "\n".join(out))
+    """Compat: deploy.run = release de los servicios default a HEAD de main (+ wa si restart_wa)."""
+    import deploy_engine
+    services = list(deploy_engine.DEFAULT_SERVICES) + (["wa"] if p.get("restart_wa") else [])
+    return _run_engine(services, None)
+
+
+def _deploy_release(p: dict) -> ExecResult:
+    """FASE 34: release con pin de ref por repo. `services` acota qué desplegar (default del
+    motor si se omite); core_ref/ear_ref/umbrella_ref pinean cada repo (default origin/main)."""
+    repo_refs = {repo: p[key] for repo, key in
+                 (("core", "core_ref"), ("ear", "ear_ref"), ("umbrella", "umbrella_ref"))
+                 if p.get(key)}
+    return _run_engine(p.get("services"), repo_refs)
 
 
 def _config_reload(p: dict) -> ExecResult:
@@ -109,6 +118,7 @@ HANDLERS = {
     "service.status": _service_status,
     "logs.tail": _logs_tail,
     "deploy.run": _deploy_run,
+    "deploy.release": _deploy_release,
     "config.reload": _config_reload,
     "wakeword.retrain": _wakeword_retrain,
     "voice.reenroll": _voice_reenroll,

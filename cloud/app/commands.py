@@ -8,10 +8,17 @@ Ver masterplan/fase33_cloud_backoffice.md (33.3).
 """
 from __future__ import annotations
 
+import re
 from typing import Any, Callable
 
 SERVICES = ("capitan-core", "capitan-backoffice", "capitan-wa", "capitan-ear")
 CONFIG_TARGETS = ("core", "backoffice")
+# Componentes del motor de deploy (FASE 34). Nombres lógicos del motor (deploy_engine.SERVICES),
+# distintos de las units de SERVICES de arriba.
+DEPLOY_SERVICES = ("core", "ear", "backoffice", "wa", "bridge")
+# Un ref git seguro: sha/tag/branch. Alfanumérico + . _ / - (sin espacios ni metacaracteres de
+# shell). El motor igual usa subprocess con lista de args (sin shell), esto es defensa en capas.
+_REF_RE = re.compile(r"^[A-Za-z0-9._/-]{1,100}$")
 
 
 class CommandError(ValueError):
@@ -50,11 +57,36 @@ def _str(name: str) -> Callable[[Any], str]:
     return check
 
 
+def _git_ref(name: str) -> Callable[[Any], str]:
+    def check(v: Any) -> str:
+        if not isinstance(v, str) or not _REF_RE.match(v):
+            raise CommandError(f"{name!r} debe ser un ref git válido (sha/tag/branch), no {v!r}")
+        return v
+    return check
+
+
+def _str_list(name: str, allowed: tuple[str, ...]) -> Callable[[Any], list[str]]:
+    def check(v: Any) -> list[str]:
+        if not isinstance(v, list) or not v:
+            raise CommandError(f"{name!r} debe ser una lista no vacía")
+        for item in v:
+            if item not in allowed:
+                raise CommandError(f"{name!r}: {item!r} debe ser uno de {allowed}")
+        return v
+    return check
+
+
 # type -> { param_name: (validator, required) }
 CATALOG: dict[str, dict[str, tuple[Callable[[Any], Any], bool]]] = {
     "service.restart": {"service": (_enum("service", SERVICES), True)},
     "service.status":  {"service": (_enum("service", SERVICES), False)},
     "deploy.run":      {"restart_wa": (_bool("restart_wa"), False)},
+    # FASE 34: release con pin de ref por repo. Sin params = todo a HEAD remoto de main
+    # (servicios default del motor). `services` acota qué desplegar; *_ref pinea cada repo.
+    "deploy.release":  {"services": (_str_list("services", DEPLOY_SERVICES), False),
+                        "core_ref": (_git_ref("core_ref"), False),
+                        "ear_ref": (_git_ref("ear_ref"), False),
+                        "umbrella_ref": (_git_ref("umbrella_ref"), False)},
     "logs.tail":       {"service": (_enum("service", SERVICES), True),
                         "lines": (_int_range("lines", 1, 500), False)},
     "config.reload":   {"target": (_enum("target", CONFIG_TARGETS), True)},
