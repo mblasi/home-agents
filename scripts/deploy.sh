@@ -1,42 +1,27 @@
 #!/usr/bin/env zsh
-# Deploy home-agents al LXC de producción en el SER9.
-# Uso: bash scripts/deploy.sh [--restart-wa]
-
+# Wrapper FINO sobre el MOTOR único de deploy (FASE 34). NO reimplementa lógica: invoca
+# cloud/bridge/deploy_engine.py en el SER9 por SSH. Toda la lógica de deploy (snapshot, pin de
+# ref, install, restart, health-gate, rollback) vive en el motor; este script sólo lo llama.
+# Es el invocador LOCAL (cuando Claude opera desde la LAN); el invocador REMOTO es el comando
+# deploy.release del cloud-bo, que corre el MISMO motor. Ver D1/D9 en masterplan/estado.md.
+#
+# Uso:
+#   bash scripts/deploy.sh                      # default: core+ear+backoffice a HEAD de main
+#   bash scripts/deploy.sh --restart-wa         # + wa
+#   bash scripts/deploy.sh --service bridge     # un servicio puntual
+#   bash scripts/deploy.sh --ref core=v1.2.3    # pin de un ref (rollback/release fijo)
+# Los flags --service/--ref se pasan tal cual al motor (ver deploy_engine.py --help).
 set -euo pipefail
 
-RESTART_WA=0
-[[ "${1:-}" == "--restart-wa" ]] && RESTART_WA=1
-
-echo "=== Deploy home-agents → capitan-lxc ==="
-
-ssh capitan-lxc "
-  set -e
-  cd ~/workspace/home-agents
-  git pull --recurse-submodules
-  ~/home-agents-env/bin/pip install -q -r core/requirements.txt
-  ~/home-agents-env/bin/pip install -q -r backoffice/requirements.txt
-  # capitan-audio-server corre el código de ear/ (audio_server.py) en el LXC: si no se
-  # reinicia, los cambios de ear quedan en disco pero el proceso sigue con el binario viejo.
-  # (El satellite.py de cada NSPanel se despliega aparte con scripts/nspanel.sh — hot-update.)
-  systemctl --user restart capitan-core capitan-backoffice capitan-audio-server
-  echo 'Servicios reiniciados.'
-"
-
-# WA solo se reinicia con --restart-wa (reconectar el cliente WhatsApp es caro:
-# puede requerir re-escanear el QR). El core no depende de WA para arrancar.
-if [[ $RESTART_WA -eq 1 ]]; then
-  echo "Reiniciando WA..."
-  ssh capitan-lxc "systemctl --user restart capitan-wa"
+ARGS=()
+if [[ "${1:-}" == "--restart-wa" ]]; then
+  # Compat con la invocación histórica: default + wa.
+  ARGS=(--service core --service ear --service backoffice --service wa)
+  shift
 fi
+ARGS+=("$@")
 
-echo "=== Smoke test (esperando 5s) ==="
-sleep 5
-ssh capitan-lxc "curl -sf http://localhost:8765/health" && echo "core OK" || echo "core NO responde"
-# El audio-server carga el modelo whisper al arrancar (varios segundos): reintentar ~25s
-# antes de declararlo caído, si no el smoke da falso negativo en cada deploy.
-ssh capitan-lxc "for i in \$(seq 1 12); do curl -sf http://localhost:8766/health >/dev/null && exit 0; sleep 2; done; exit 1" \
-  && echo "audio-server OK" || echo "audio-server NO responde"
-# / redirige a /login (303) cuando no hay sesión — un 3xx es respuesta sana
-ssh capitan-lxc "curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/" | grep -qE '^(2..|3..)' && echo "backoffice OK" || echo "backoffice NO responde"
-
-echo "=== Deploy completo ==="
+echo "=== Deploy home-agents → capitan-lxc (motor FASE 34) ==="
+ssh capitan-lxc \
+  "cd ~/workspace/home-agents && ~/home-agents-env/bin/python cloud/bridge/deploy_engine.py ${ARGS[*]}"
+echo "=== Deploy completo (health-gate y rollback los maneja el motor) ==="

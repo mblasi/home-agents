@@ -1,5 +1,5 @@
-"""Tests del motor de deploy (FASE 34): orquestación snapshot→deploy→health→rollback con
-git/systemd/http mockeados. No toca el repo real, ni systemctl, ni la red."""
+"""Tests del motor de deploy (FASE 34): modelo repo+service, orquestación snapshot→pin→install
+→restart→health→rollback con git/systemd/http mockeados. No toca el repo real ni la red."""
 import os
 import sys
 
@@ -18,119 +18,155 @@ def state_tmp(tmp_path, monkeypatch):
     return tmp_path
 
 
-class _FakeGit:
-    """Simula `git rev-parse --short HEAD` con un sha que cambia tras un checkout, y registra
-    los comandos corridos. Cualquier otro git/pip/systemctl devuelve ok salvo los marcados fail."""
-    def __init__(self, head="aaaaaaa", fail=()):
-        self.head = head
-        self.fail = set(fail)        # substrings de comando que deben fallar
+class _Fake:
+    """Mock de `_run`: trackea el HEAD por git dir (cambia con checkout), y deja pasar fetch/
+    pip/systemctl salvo los marcados en `fail` (substrings del comando)."""
+    def __init__(self, heads=None, fail=()):
+        self.heads = dict(heads or {})
+        self.fail = set(fail)
         self.calls: list[list[str]] = []
 
-    def __call__(self, args, emit, *, timeout=300, cwd=None):
+    def __call__(self, args, emit, *, timeout=300):
         self.calls.append(args)
         joined = " ".join(args)
         for f in self.fail:
             if f in joined:
-                return de.RunResult(False, f"forced-fail: {f}")
-        if "rev-parse" in args:
-            return de.RunResult(True, self.head)
-        if "checkout" in args:
-            self.head = args[-1].replace("origin/", "")[:7] or self.head  # nuevo sha
+                return de.RunResult(False, f"fail:{f}")
+        if args[0] == "git" and "-C" in args:
+            gd = args[args.index("-C") + 1]
+            if "rev-parse" in args:
+                return de.RunResult(True, self.heads.get(gd, "init000"))
+            if "checkout" in args:
+                self.heads[gd] = (args[-1].replace("origin/", "")[:7]) or self.heads.get(gd, "")
         return de.RunResult(True, "ok")
 
+    def did(self, *substrs) -> bool:
+        return any(all(x in " ".join(c) for x in substrs) for c in self.calls)
 
-def _setup(monkeypatch, fake):
-    monkeypatch.setattr(de, "_run", fake)
+
+def _gd(repo: str) -> str:
+    return de.REPOS[repo].git_dir()
 
 
 # ── happy path ────────────────────────────────────────────────────────────────
 
-def test_release_ok_deploys_and_records_version(state_tmp, monkeypatch):
-    fake = _FakeGit(head="old1234")
-    _setup(monkeypatch, fake)
-    monkeypatch.setattr(de, "_http_ok", lambda url, timeout=5.0: True)
+def test_deploy_core_ok(state_tmp, monkeypatch):
+    fake = _Fake(heads={_gd("core"): "old1234"})
+    monkeypatch.setattr(de, "_run", fake)
+    monkeypatch.setattr(de, "_http_ok", lambda *a, **k: True)
 
     res = de.run_release(["core"], {"core": "abc1234"})
     assert res.ok
-    assert res.components["core"]["ok"] is True
-    assert res.components["core"]["rolled_back"] is False
-    # snapshot capturó el sha viejo antes del checkout
-    assert res.components["core"]["snapshot"] == "old1234"
-    # restart de la unit ocurrió
-    assert any("restart" in c and "capitan-core" in c for c in fake.calls)
-    # versión registrada en el estado persistido
-    state = de.load_state()
-    assert state["components"]["core"]["status"] == "deployed"
-    assert state["last_release"]["ok"] is True
+    assert res.repos["core"]["ok"] is True and res.repos["core"]["rolled_back"] is False
+    assert res.services["core"]["ok"] is True
+    # pin (checkout) + restart de la unit
+    assert fake.did("checkout", "abc1234")
+    assert fake.did("restart", "capitan-core")
+    # versión registrada
+    st = de.load_state()
+    assert st["repos"]["core"]["status"] == "deployed"
+    assert st["last_release"]["ok"] is True
 
 
-def test_release_default_ref_is_origin_main(state_tmp, monkeypatch):
-    fake = _FakeGit()
-    _setup(monkeypatch, fake)
+def test_default_services_excluyen_wa(state_tmp, monkeypatch):
+    fake = _Fake()
+    monkeypatch.setattr(de, "_run", fake)
     monkeypatch.setattr(de, "_http_ok", lambda *a, **k: True)
-    de.run_release(["wa"])   # wa no tiene health_url ni requirements
-    assert any(c[:3] == ["git", "-C", os.path.join(de.REPO_DIR, "")] or "checkout" in c
-               and c[-1] == "origin/main" for c in fake.calls)
+    res = de.run_release()   # default
+    assert set(res.services) == set(de.DEFAULT_SERVICES)
+    assert "wa" not in res.services
+    assert not fake.did("restart", "capitan-wa")
 
 
-# ── health falla → rollback ─────────────────────────────────────────────────────
+def test_umbrella_un_ref_para_varios_servicios(state_tmp, monkeypatch):
+    # backoffice y bridge comparten el repo umbrella → un solo checkout del umbrella.
+    fake = _Fake()
+    monkeypatch.setattr(de, "_run", fake)
+    monkeypatch.setattr(de, "_http_ok", lambda *a, **k: True)
+    res = de.run_release(["backoffice", "bridge"], {"umbrella": "v2"})
+    assert res.ok
+    checkouts_umbrella = [c for c in fake.calls
+                          if "checkout" in c and c[c.index("-C") + 1] == _gd("umbrella")]
+    assert len(checkouts_umbrella) == 1   # un único checkout del umbrella
+    assert fake.did("restart", "capitan-backoffice")
+    assert fake.did("restart", "capitan-bridge")
 
-def test_release_health_fail_triggers_rollback(state_tmp, monkeypatch):
-    fake = _FakeGit(head="good999")
-    _setup(monkeypatch, fake)
-    # health HTTP siempre falla → tras el deploy se gatilla rollback; is-active (systemctl) ok
-    monkeypatch.setattr(de, "_http_ok", lambda *a, **k: False)
+
+# ── fallos → rollback ───────────────────────────────────────────────────────────
+
+def test_health_fail_revierte_repo(state_tmp, monkeypatch):
+    fake = _Fake(heads={_gd("core"): "good999"})
+    monkeypatch.setattr(de, "_run", fake)
+    monkeypatch.setattr(de, "_http_ok", lambda *a, **k: False)   # health siempre falla
 
     res = de.run_release(["core"], {"core": "bad5678"})
     assert res.ok is False
-    assert res.components["core"]["ok"] is False
-    assert res.components["core"]["rolled_back"] is True
-    # rollback hizo checkout del sha del snapshot (good999)
-    checkouts = [c[-1] for c in fake.calls if "checkout" in c]
-    assert "good999" in checkouts
-    state = de.load_state()
-    assert state["components"]["core"]["status"] in ("rolled_back", "broken")
+    assert res.repos["core"]["ok"] is False
+    assert res.repos["core"]["rolled_back"] is True
+    # rollback hizo checkout del snapshot
+    assert fake.did("checkout", "good999")
 
 
-def test_release_deploy_fail_triggers_rollback(state_tmp, monkeypatch):
-    # el checkout del ref pedido falla → deploy False → rollback
-    fake = _FakeGit(head="snap111", fail=("checkout --quiet bad",))
-    _setup(monkeypatch, fake)
+def test_pin_fail_revierte(state_tmp, monkeypatch):
+    fake = _Fake(heads={_gd("core"): "snap111"}, fail=("checkout --quiet bad",))
+    monkeypatch.setattr(de, "_run", fake)
     monkeypatch.setattr(de, "_http_ok", lambda *a, **k: True)
-
     res = de.run_release(["core"], {"core": "bad"})
     assert res.ok is False
-    assert res.components["core"]["rolled_back"] is True
+    assert res.repos["core"]["rolled_back"] is True
 
 
-def test_release_requirements_install_only_when_version_changed(state_tmp, monkeypatch):
-    # HEAD no cambia (checkout al mismo sha) → no se reinstala requirements
-    fake = _FakeGit(head="same777")
-    monkeypatch.setattr(fake, "head", "same777")
-    # forzar que el checkout NO cambie el head
-    orig = fake.__call__
+def test_atomicidad_por_repo(state_tmp, monkeypatch):
+    # deploy core + backoffice (repos core + umbrella). umbrella health falla, core ok.
+    # core (repo independiente) queda desplegado; umbrella revierte.
+    fake = _Fake(heads={_gd("core"): "c0", _gd("umbrella"): "u0"})
+    monkeypatch.setattr(de, "_run", fake)
+    # health: core (8765) ok, backoffice (8080) falla
+    monkeypatch.setattr(de, "_http_ok", lambda url, timeout=5.0: "8765" in url)
 
-    def _call(args, emit, **kw):
-        if "checkout" in args:
-            fake.calls.append(args)
-            return de.RunResult(True, "ok")   # no muta head
-        return orig(args, emit, **kw)
+    res = de.run_release(["core", "backoffice"], {"core": "c1", "umbrella": "u1"})
+    assert res.ok is False
+    assert res.repos["core"]["ok"] is True            # core sano, no revertido
+    assert res.repos["core"]["rolled_back"] is False
+    assert res.repos["umbrella"]["ok"] is False
+    assert res.repos["umbrella"]["rolled_back"] is True
+    assert fake.did("checkout", "u0")                 # umbrella revertido a su snapshot
+    assert res.services["core"]["ok"] is True
+    assert res.services["backoffice"]["ok"] is False
 
-    monkeypatch.setattr(de, "_run", _call)
+
+def test_install_solo_si_hay_requirements(state_tmp, monkeypatch):
+    # ear no tiene requirements → no se llama pip; core sí.
+    fake = _Fake()
+    monkeypatch.setattr(de, "_run", fake)
     monkeypatch.setattr(de, "_http_ok", lambda *a, **k: True)
-    de.run_release(["core"], {"core": "same777"})
-    assert not any("install" in c for c in fake.calls)
+    de.run_release(["ear"], {"ear": "e1"})
+    assert not fake.did("install")
+    de.run_release(["core"], {"core": "c1"})
+    assert fake.did("install", "core/requirements.txt")
 
 
-# ── targets / parsing ───────────────────────────────────────────────────────────
+# ── resolve / parsing ───────────────────────────────────────────────────────────
 
-def test_unknown_target_raises():
+def test_resolve_default():
+    svcs, refs = de.resolve(None, None)
+    assert svcs == de.DEFAULT_SERVICES
+    assert set(refs) == {"core", "ear", "umbrella"}   # repos de los servicios default
+    assert all(v is None for v in refs.values())
+
+
+def test_resolve_servicio_desconocido():
     with pytest.raises(ValueError):
-        de.get_target("nope")
+        de.resolve(["nope"], None)
+
+
+def test_resolve_repo_desconocido():
+    with pytest.raises(ValueError):
+        de.resolve(["core"], {"nope": "x"})
 
 
 def test_parse_refs():
-    assert de._parse_refs(["core=abc", "ear=v1.2"]) == {"core": "abc", "ear": "v1.2"}
+    assert de._parse_refs(["core=abc", "umbrella=v1.2"]) == {"core": "abc", "umbrella": "v1.2"}
 
 
 def test_parse_refs_invalid():
@@ -138,23 +174,10 @@ def test_parse_refs_invalid():
         de._parse_refs(["coreabc"])
 
 
-def test_emit_callback_receives_lines(state_tmp, monkeypatch):
-    fake = _FakeGit()
-    _setup(monkeypatch, fake)
+def test_emit_recibe_lineas(state_tmp, monkeypatch):
+    fake = _Fake()
+    monkeypatch.setattr(de, "_run", fake)
     monkeypatch.setattr(de, "_http_ok", lambda *a, **k: True)
     lines: list[str] = []
-    res = de.run_release(["wa"], emit=lines.append)
+    res = de.run_release(["bridge"], emit=lines.append)
     assert lines == res.log and len(lines) > 0
-    assert any("deploy wa" in l for l in lines)
-
-
-def test_multiple_targets_independent(state_tmp, monkeypatch):
-    fake = _FakeGit()
-    _setup(monkeypatch, fake)
-    # core sano, ear con health roto
-    monkeypatch.setattr(de, "_http_ok",
-                        lambda url, timeout=5.0: "8765" in url)
-    res = de.run_release(["core", "ear"])
-    assert res.components["core"]["ok"] is True
-    assert res.components["ear"]["ok"] is False
-    assert res.ok is False
