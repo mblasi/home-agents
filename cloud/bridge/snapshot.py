@@ -158,6 +158,33 @@ def _users() -> list[dict]:
     return out
 
 
+def _versions(nodes: list[dict]) -> dict:
+    """Matriz de versiones dispositivo×componente (FASE 34 T5 / 34.7/34.14): por repo del SER9
+    (core/ear/umbrella) el sha+tag+link al release de GitHub que corre, y por panel la versión
+    de código reportada (heartbeat) vs la esperada (la que sirve el audio_server). Best-effort."""
+    out: dict = {"ser9": {}, "panels": [], "satellite_expected": None}
+    try:
+        import deploy_engine as de
+        for name, repo in de.REPOS.items():
+            gd = repo.git_dir()
+            sha = repo.head(de._noop_emit)
+            tag = de._tag_at(gd, sha, de._noop_emit) if sha else None
+            slug = de._repo_slug(gd, de._noop_emit)
+            url = f"https://github.com/{slug}/releases/tag/{tag}" if (slug and tag) else None
+            out["ser9"][name] = {"version": sha, "tag": tag, "url": url}
+    except Exception:
+        pass
+    expected = (_get(f"{AUDIO_URL}/satellite/version") or {}).get("version")
+    out["satellite_expected"] = (expected or "")[:12] or None
+    for n in nodes:
+        v = n.get("version")
+        out["panels"].append({
+            "node_id": n.get("node_id"), "version": v,
+            "up_to_date": bool(v and expected and expected[:12] == v),
+        })
+    return out
+
+
 def build_snapshot() -> dict:
     """Arma el snapshot completo. Nunca lanza: campos faltantes quedan vacíos."""
     nodes = _nodes()
@@ -171,4 +198,5 @@ def build_snapshot() -> dict:
         "recent_commands": _recent_commands(nodes),
         "wakeword": _wakeword(nodes),
         "users_summary": _users(),
+        "versions": _versions(nodes),
     }

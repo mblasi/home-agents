@@ -74,6 +74,9 @@ class StateSnapshot(BaseModel):
     recent_commands: list[RecentCommand] = Field(default_factory=list)
     wakeword: Wakeword = Field(default_factory=Wakeword)
     users_summary: list[UserSummary] = Field(default_factory=list)
+    # Matriz de versiones dispositivo×componente (FASE 34 T5): {ser9: {repo: {version,tag,url}},
+    # panels: [{node_id,version,up_to_date}], satellite_expected}. Opcional (retrocompat).
+    versions: dict[str, Any] = Field(default_factory=dict)
 
 
 class MetricsSnapshot(BaseModel):

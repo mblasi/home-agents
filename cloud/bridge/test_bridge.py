@@ -232,3 +232,26 @@ def test_progress_emitter_batches_and_flushes(monkeypatch):
     emit("c")
     emit.flush()
     assert posts[1][1] == {"lines": ["c"]}  # flush manual vacía el resto
+
+
+# ── Matriz de versiones en el snapshot (FASE 34 T5) ───────────────────────────
+
+def test_snapshot_versions_panels_y_ser9():
+    def fake_get(url, timeout=4):
+        if url.endswith("/satellite/version"):
+            return {"version": "abc123def456789xyz"}
+        if url.endswith("/nodes"):
+            return [{"node_id": "comedor", "state": "active", "version": "abc123def456"},
+                    {"node_id": "pieza", "state": "active", "version": "vieja000"}]
+        if url.endswith("/health"):
+            return {"status": "ok", "nodes": 2}
+        return None
+    with patch.object(snapshot, "_get", fake_get), \
+         patch.object(snapshot, "_systemctl_active", lambda u: True):
+        snap = snapshot.build_snapshot()
+    v = snap["versions"]
+    assert isinstance(v["ser9"], dict)                  # repos del SER9 (best-effort)
+    assert v["satellite_expected"] == "abc123def456"    # [:12]
+    byid = {p["node_id"]: p for p in v["panels"]}
+    assert byid["comedor"]["up_to_date"] is True        # version == expected[:12]
+    assert byid["pieza"]["up_to_date"] is False         # rezagado

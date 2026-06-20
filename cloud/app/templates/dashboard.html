@@ -41,6 +41,11 @@
     </section>
 
     <section class="card">
+      <h2>Versiones desplegadas</h2>
+      <div id="versions"></div>
+    </section>
+
+    <section class="card">
       <h2>Últimos comandos de voz</h2>
       <table id="recent"><tbody></tbody></table>
     </section>
@@ -115,6 +120,25 @@ async function api(path, opts = {}) {
 
 function dot(ok) { return ok ? "🟢" : "🔴"; }
 
+// Matriz de versiones (FASE 34 T5): repos del SER9 con link al release de GitHub + paneles
+// con su versión y si están al día respecto del código que sirve el SER9.
+function renderVersions(v) {
+  const esc = (s) => String(s == null ? "" : s).replace(/[<>&]/g, c => ({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]));
+  const ser9 = v.ser9 || {};
+  const repos = Object.entries(ser9).map(([name, i]) => {
+    const ver = esc(i.tag || i.version || "?");
+    const label = i.url ? `<a href="${esc(i.url)}" target="_blank">${ver}</a>` : ver;
+    return `<div><b>${esc(name)}</b> ${label}${i.tag && i.version ? ` <span class="muted">(${esc(i.version)})</span>` : ""}</div>`;
+  }).join("");
+  const panels = (v.panels || []).map(p =>
+    `<div>${p.up_to_date ? "🟢" : "⚠️"} <b>${esc(p.node_id)}</b> <span class="muted">${esc(p.version) || "—"}</span></div>`
+  ).join("");
+  $("versions").innerHTML =
+    `<h3>SER9 (repos)</h3><div class="grid">${repos || "<span class='muted'>sin datos</span>"}</div>`
+    + `<h3>Paneles${v.satellite_expected ? ` <span class="muted">esperado ${esc(v.satellite_expected)}</span>` : ""}</h3>`
+    + `<div class="grid">${panels || "<span class='muted'>sin paneles</span>"}</div>`;
+}
+
 let CAPS = {};
 
 async function refresh() {
@@ -129,6 +153,7 @@ async function refresh() {
       .map(k => `<div><b>${k.replace("_ms","").toUpperCase()}</b> ${L[k] ?? "—"}</div>`).join("");
     $("agents").innerHTML = (state.agents || [])
       .map(a => `<div>${dot(a.active)} <b>${a.id}</b>${a.proactive ? " ⚡" : ""}</div>`).join("");
+    renderVersions(state.versions || {});
     $("recent").querySelector("tbody").innerHTML = (state.recent_commands || [])
       .map(c => `<tr><td>${dot(c.ok)}</td><td>${c.text}</td><td class="muted">${c.agent}</td><td class="muted">${c.latency_ms ?? "—"}ms</td></tr>`).join("");
   } catch (e) { $("updated").textContent = "error: " + e.message; }
