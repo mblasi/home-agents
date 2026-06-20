@@ -104,3 +104,8 @@ class CommandResult(BaseModel):
     ok: bool
     output: str = ""
     error: str = ""
+
+
+class CommandProgress(BaseModel):
+    """Líneas de log en vivo que el bridge postea a POST /commands/{id}/progress (D5)."""
+    lines: list[str] = Field(default_factory=list)

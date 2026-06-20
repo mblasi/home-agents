@@ -62,6 +62,36 @@ def push_metrics(sess: AuthorizedSession) -> None:
     log.info("push métricas OK (ventana %dh)", snap.get("window_hours"))
 
 
+# Cada cuántas líneas de progreso se hace un POST al cloud (batch para no spamear Firestore).
+PROGRESS_BATCH = int(os.environ.get("PROGRESS_BATCH", "5"))
+
+
+def _progress_emitter(sess: AuthorizedSession, cid: str):
+    """Devuelve un callback `emit(line)` que acumula líneas de log del comando y las postea en
+    lotes a /commands/{id}/progress (D5: logs en vivo). Best-effort: un fallo de red al postear
+    progreso NO interrumpe la ejecución del comando (el resultado final igual se reporta)."""
+    buf: list[str] = []
+
+    def _flush() -> None:
+        if not buf:
+            return
+        try:
+            # Copia: el buffer se vacía a continuación; no compartir la referencia con el POST.
+            sess.post(f"{CLOUD_URL}/commands/{cid}/progress",
+                      json={"lines": list(buf)}, timeout=10)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("no se pudo postear progreso de %s: %s", cid, exc)
+        buf.clear()
+
+    def emit(line: str) -> None:
+        buf.append(line)
+        if len(buf) >= PROGRESS_BATCH:
+            _flush()
+
+    emit.flush = _flush  # type: ignore[attr-defined]
+    return emit
+
+
 def poll_and_execute(sess: AuthorizedSession) -> None:
     r = sess.get(f"{CLOUD_URL}/commands/pending", timeout=15)
     r.raise_for_status()
@@ -69,11 +99,13 @@ def poll_and_execute(sess: AuthorizedSession) -> None:
         cid, ctype, params = cmd["id"], cmd["type"], cmd.get("params", {})
         log.info("comando %s type=%s params=%s issued_by=%s",
                  cid, ctype, params, cmd.get("issued_by"))
+        emit = _progress_emitter(sess, cid)
         try:
             clean = validate_command(ctype, params)  # re-validación defensiva
-            result = executor.execute(ctype, clean)
+            result = executor.execute(ctype, clean, emit=emit)
         except CommandError as exc:
             result = executor.ExecResult(False, "", f"rechazado por catálogo: {exc}")
+        emit.flush()  # vaciar el último lote de progreso antes del resultado
         log.info("comando %s → ok=%s %s", cid, result.ok, result.error or "")
         try:
             rr = sess.post(f"{CLOUD_URL}/commands/{cid}/result",

@@ -30,6 +30,7 @@ from .commands import CommandError, catalog_summary, validate_command
 from .models import (
     METRICS_SCHEMA_VERSION,
     SCHEMA_VERSION,
+    CommandProgress,
     CommandRequest,
     CommandResult,
     MetricsSnapshot,
@@ -93,6 +94,15 @@ def commands_pending(sa: str = Depends(require_bridge)):
     return {"commands": fdb.claim_pending()}
 
 
+@app.post("/commands/{cmd_id}/progress")
+def command_progress(cmd_id: str, prog: CommandProgress, sa: str = Depends(require_bridge)):
+    """D5: el bridge postea líneas de log en vivo mientras ejecuta un comando largo (deploy)."""
+    ratelimit.limit_ingest(sa)
+    if not fdb.append_progress(cmd_id, prog.lines):
+        raise HTTPException(status_code=404, detail="comando inexistente")
+    return {"ok": True}
+
+
 @app.post("/commands/{cmd_id}/result")
 def command_result(cmd_id: str, result: CommandResult, sa: str = Depends(require_bridge)):
     if not fdb.set_result(cmd_id, result.ok, result.output, result.error):
@@ -138,6 +148,16 @@ def api_metrics(p: Principal = Depends(require_dashboard_user)):
 def api_commands(p: Principal = Depends(require_dashboard_user)):
     _require_view_full(p)  # la auditoría sólo para roles con view_full
     return {"commands": fdb.recent_commands()}
+
+
+@app.get("/api/commands/{cmd_id}")
+def api_command(cmd_id: str, p: Principal = Depends(require_dashboard_user)):
+    """D5: el dashboard polea un comando para ver su progreso/estado en vivo durante el deploy."""
+    _require_view_full(p)
+    cmd = fdb.get_command(cmd_id)
+    if not cmd:
+        raise HTTPException(status_code=404, detail="comando inexistente")
+    return {"command": cmd}
 
 
 @app.get("/api/catalog")
