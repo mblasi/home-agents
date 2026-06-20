@@ -126,6 +126,9 @@ function renderVersions(v) {
   const esc = (s) => String(s == null ? "" : s).replace(/[<>&]/g, c => ({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]));
   const ser9 = v.ser9 || {};
   const link = (text, url) => url ? `<a href="${esc(url)}" target="_blank">${esc(text)}</a>` : esc(text);
+  // Botón de deploy contextual por componente (34.8), sólo si el rol puede emitir.
+  const btn = (label, fn) => CAPS.emit
+    ? ` <button onclick="${fn}" style="font-size:11px;padding:1px 6px;margin-left:6px">${label}</button>` : "";
   const repos = Object.entries(ser9).map(([name, i]) => {
     const run = link(i.tag || i.version || "?", i.url);
     const avail = link(i.latest_tag || i.latest_sha || "?", i.latest_url);
@@ -133,7 +136,8 @@ function renderVersions(v) {
       ? ` · <span style="color:#fa0">⬆ disp. ${avail}</span>`
       : ` · <span class="muted">al día</span>`;
     return `<div>${i.behind ? "⚠️" : "🟢"} <b>${esc(name)}</b> ${run}`
-      + `${i.tag && i.version ? ` <span class="muted">(${esc(i.version)})</span>` : ""}${availPart}</div>`;
+      + `${i.tag && i.version ? ` <span class="muted">(${esc(i.version)})</span>` : ""}${availPart}`
+      + btn(i.behind ? "⬆ actualizar" : "deploy", `deployRepo('${esc(name)}')`) + `</div>`;
   }).join("");
   const exp = v.satellite_expected;
   const panels = (v.panels || []).map(p => {
@@ -143,11 +147,36 @@ function renderVersions(v) {
       : ` · <span style="color:#fa0">⬆ disp. ${esc(exp || "?")}</span>`;
     return `<div>${p.up_to_date ? "🟢" : "⚠️"} <b>${esc(p.node_id)}</b> ${ver}${avail}</div>`;
   }).join("");
+  // cloud-bo no está en la matriz SER9 (corre en GCP): botón de deploy aparte (deploy.cloud).
+  const cloud = CAPS.emit
+    ? `<div>☁️ <b>cloud-bo</b> <span class="muted">(GCP Cloud Run)</span>`
+      + btn("deploy", "deployCloud()") + `</div>` : "";
   $("versions").innerHTML =
     `<h3>SER9 (repos)</h3><div class="grid">${repos || "<span class='muted'>sin datos</span>"}</div>`
+    + (cloud ? `<h3>Nube</h3><div class="grid">${cloud}</div>` : "")
     + `<h3>Paneles${v.satellite_expected ? ` <span class="muted">esperado ${esc(v.satellite_expected)}</span>` : ""}</h3>`
     + `<div class="grid">${panels || "<span class='muted'>sin paneles</span>"}</div>`;
 }
+
+// 34.8: deploy contextual por componente desde la matriz de versiones. Mapea el repo
+// SER9 al servicio del motor (umbrella → backoffice) y reusa el emit + streaming de logs.
+const REPO_SERVICE = { core: "core", ear: "ear", umbrella: "backoffice" };
+async function emitDeploy(type, params, label) {
+  if (!confirm(`¿Desplegar ${label}? Reinicia el servicio en producción.`)) return;
+  try {
+    const { command } = await api("/api/commands", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type, params }),
+    });
+    if (command && command.id && CAPS.view_full) streamCommand(command.id);
+    refresh();
+  } catch (e) { alert("error: " + e.message); }
+}
+function deployRepo(repo) {
+  const svc = REPO_SERVICE[repo] || repo;
+  emitDeploy("deploy.release", { services: [svc] }, `${repo} (${svc})`);
+}
+function deployCloud() { emitDeploy("deploy.cloud", { services: ["cloud-bo"] }, "cloud-bo"); }
 
 let CAPS = {};
 
