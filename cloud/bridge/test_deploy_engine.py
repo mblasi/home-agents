@@ -181,3 +181,94 @@ def test_emit_recibe_lineas(state_tmp, monkeypatch):
     lines: list[str] = []
     res = de.run_release(["bridge"], emit=lines.append)
     assert lines == res.log and len(lines) > 0
+
+
+# ── Versionado semver (tag_release) ───────────────────────────────────────────
+
+def test_next_version():
+    assert de._next_version(None, "patch") == "v0.1.0"
+    assert de._next_version((1, 2, 3), "patch") == "v1.2.4"
+    assert de._next_version((1, 2, 3), "minor") == "v1.3.0"
+    assert de._next_version((1, 2, 3), "major") == "v2.0.0"
+
+
+def test_repo_slug_parsing(monkeypatch):
+    cases = {
+        "git@github.com:mblasi/home-agents-core.git": "mblasi/home-agents-core",
+        "https://github.com/mblasi/home-agents.git": "mblasi/home-agents",
+        "git@github.com:mblasi/home-agents-ear": "mblasi/home-agents-ear",
+    }
+    for url, slug in cases.items():
+        monkeypatch.setattr(de, "_run", lambda *a, **k: de.RunResult(True, url))
+        assert de._repo_slug("/x", de._noop_emit) == slug
+
+
+def test_tag_release_disabled_no_tag(monkeypatch):
+    # TAG_RELEASES off + sha sin tag previo → no crea tag.
+    monkeypatch.setattr(de, "TAG_RELEASES", False)
+    monkeypatch.setattr(de, "_run", lambda *a, **k: de.RunResult(True, ""))  # tag --points-at vacío
+    out = de.tag_release("core", "abc1234", de._noop_emit)
+    assert out["tag"] is None and out["created"] is False
+
+
+def test_tag_release_reusa_tag_existente(monkeypatch):
+    # el sha ya tiene un tag semver → lo reusa, no crea otro (aunque TAG_RELEASES on).
+    monkeypatch.setattr(de, "TAG_RELEASES", True)
+
+    def _fake(args, emit, **k):
+        if "--points-at" in args:
+            return de.RunResult(True, "v1.4.0\n")
+        if "get-url" in args:
+            return de.RunResult(True, "git@github.com:mblasi/home-agents-core.git")
+        return de.RunResult(True, "")
+    monkeypatch.setattr(de, "_run", _fake)
+    out = de.tag_release("core", "abc1234", de._noop_emit)
+    assert out["tag"] == "v1.4.0" and out["created"] is False
+    assert out["url"] == "https://github.com/mblasi/home-agents-core/releases/tag/v1.4.0"
+
+
+def test_tag_release_crea_y_pushea(monkeypatch):
+    monkeypatch.setattr(de, "TAG_RELEASES", True)
+    calls = []
+
+    def _fake(args, emit, **k):
+        calls.append(args)
+        if "--points-at" in args:
+            return de.RunResult(True, "")          # sin tag previo en el sha
+        if "--list" in args:
+            return de.RunResult(True, "v0.3.1\nv0.3.0\n")  # último = v0.3.1
+        if "get-url" in args:
+            return de.RunResult(True, "git@github.com:mblasi/home-agents-core.git")
+        return de.RunResult(True, "")
+    monkeypatch.setattr(de, "_run", _fake)
+    out = de.tag_release("core", "deadbee", de._noop_emit)
+    assert out["tag"] == "v0.3.2" and out["created"] is True
+    assert any("tag" in c and "v0.3.2" in c for c in calls)
+    assert any(c[:2] == ["git", "-C"] and "push" in c and "v0.3.2" in c for c in calls)
+
+
+def test_release_registra_tag_en_estado(state_tmp, monkeypatch):
+    monkeypatch.setattr(de, "TAG_RELEASES", True)
+    heads = {_gd("core"): "c0"}
+
+    def _fake(args, emit, **k):
+        if args[0] == "git" and "-C" in args:
+            gd = args[args.index("-C") + 1]
+            if "rev-parse" in args:
+                return de.RunResult(True, heads.get(gd, "c0"))
+            if "checkout" in args:
+                heads[gd] = "c1"
+            if "--points-at" in args:
+                return de.RunResult(True, "")
+            if "--list" in args:
+                return de.RunResult(True, "v1.0.0")
+            if "get-url" in args:
+                return de.RunResult(True, "git@github.com:mblasi/home-agents-core.git")
+        return de.RunResult(True, "")
+    monkeypatch.setattr(de, "_run", _fake)
+    monkeypatch.setattr(de, "_http_ok", lambda *a, **k: True)
+    res = de.run_release(["core"], {"core": "c1"})
+    assert res.repos["core"]["tag"] == "v1.0.1"
+    st = de.load_state()
+    assert st["repos"]["core"]["tag"] == "v1.0.1"
+    assert "v1.0.1" in st["repos"]["core"]["url"]

@@ -38,6 +38,11 @@ STATE_PATH = os.environ.get(
     "DEPLOY_STATE_PATH", os.path.expanduser("~/.local/share/capitan/deploy_state.json"))
 HEALTH_RETRIES = int(os.environ.get("DEPLOY_HEALTH_RETRIES", "15"))
 HEALTH_BACKOFF = float(os.environ.get("DEPLOY_HEALTH_BACKOFF", "2.0"))
+# Versionado formal (FASE 34, D8/34.12): tras un deploy exitoso, crear un tag semver por repo
+# y pushearlo (SSH; el SER9 ya pushea por SSH). GATE de seguridad: off por defecto para no crear
+# tags reales hasta validarlo. El "Release" formal de GitHub (notas) requiere token y se agrega
+# aparte; el tag pusheado ya es un ref inmutable y trazable, y GitHub lo muestra.
+TAG_RELEASES = os.environ.get("DEPLOY_TAG_RELEASES", "false").lower() in ("1", "true", "yes")
 
 LogEmit = Callable[[str], None]
 
@@ -176,6 +181,86 @@ def services_of_repo(repo: str) -> list[str]:
     return [n for n, s in SERVICES.items() if s.repo == repo]
 
 
+# ── Versionado formal (semver + tag) ──────────────────────────────────────────
+
+import re as _re
+
+_SEMVER_TAG = _re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
+
+
+def _repo_slug(git_dir: str, emit: LogEmit) -> Optional[str]:
+    """owner/repo a partir del remote origin (git@github.com:owner/repo.git o https://…)."""
+    r = _run(["git", "-C", git_dir, "remote", "get-url", "origin"], emit, timeout=15)
+    if not r.ok:
+        return None
+    url = r.output.strip()
+    m = _re.search(r"[:/]([^/]+/[^/]+?)(?:\.git)?$", url)
+    return m.group(1) if m else None
+
+
+def _latest_semver(git_dir: str, emit: LogEmit) -> Optional[tuple[int, int, int]]:
+    """Mayor tag vX.Y.Z del repo, o None si no hay ninguno."""
+    r = _run(["git", "-C", git_dir, "tag", "--list", "v*.*.*"], emit, timeout=15)
+    if not r.ok:
+        return None
+    best: Optional[tuple[int, int, int]] = None
+    for line in r.output.splitlines():
+        m = _SEMVER_TAG.match(line.strip())
+        if m:
+            v = (int(m.group(1)), int(m.group(2)), int(m.group(3)))
+            if best is None or v > best:
+                best = v
+    return best
+
+
+def _tag_at(git_dir: str, sha: str, emit: LogEmit) -> Optional[str]:
+    """Tag semver que ya apunta a `sha` (para no re-tagear un sha ya versionado)."""
+    r = _run(["git", "-C", git_dir, "tag", "--points-at", sha], emit, timeout=15)
+    if not r.ok:
+        return None
+    for line in r.output.splitlines():
+        if _SEMVER_TAG.match(line.strip()):
+            return line.strip()
+    return None
+
+
+def _next_version(latest: Optional[tuple[int, int, int]], bump: str) -> str:
+    """Siguiente semver desde `latest` (None = primer release v0.1.0). bump ∈ patch|minor|major."""
+    if latest is None:
+        return "v0.1.0"
+    x, y, z = latest
+    if bump == "major":
+        return f"v{x + 1}.0.0"
+    if bump == "minor":
+        return f"v{x}.{y + 1}.0"
+    return f"v{x}.{y}.{z + 1}"
+
+
+def tag_release(repo_name: str, sha: str, emit: LogEmit, bump: str = "patch") -> dict:
+    """Crea (si TAG_RELEASES) un tag semver para `sha` y lo pushea por SSH. Si el sha ya tiene un
+    tag semver, lo reusa (no re-tagea). Devuelve {tag, url, created}; degradación elegante si el
+    versionado está apagado o el push falla (no rompe el deploy)."""
+    git_dir = REPOS[repo_name].git_dir()
+    slug = _repo_slug(git_dir, emit)
+    url_for = lambda t: (f"https://github.com/{slug}/releases/tag/{t}" if slug else None)
+
+    existing = _tag_at(git_dir, sha, emit)
+    if existing:
+        return {"tag": existing, "url": url_for(existing), "created": False}
+    if not TAG_RELEASES:
+        return {"tag": None, "url": None, "created": False}
+
+    tag = _next_version(_latest_semver(git_dir, emit), bump)
+    if not _run(["git", "-C", git_dir, "tag", "-a", tag, "-m", f"release {tag}", sha], emit).ok:
+        emit(f"  ✗ no se pudo crear el tag {tag}")
+        return {"tag": None, "url": None, "created": False}
+    if not _run(["git", "-C", git_dir, "push", "origin", tag], emit, timeout=60).ok:
+        emit(f"  ✗ no se pudo pushear el tag {tag} (¿credencial?)")
+        return {"tag": tag, "url": url_for(tag), "created": False}
+    emit(f"  ✓ release {repo_name} {tag} → {url_for(tag)}")
+    return {"tag": tag, "url": url_for(tag), "created": True}
+
+
 # ── Estado persistido (matriz de versiones) ───────────────────────────────────
 
 def load_state() -> dict:
@@ -226,14 +311,17 @@ def resolve(services: Optional[list[str]], repo_refs: Optional[dict[str, Optiona
 
 def run_release(services: Optional[list[str]] = None,
                 repo_refs: Optional[dict[str, Optional[str]]] = None,
-                emit: Optional[LogEmit] = None) -> ReleaseResult:
+                emit: Optional[LogEmit] = None,
+                bumps: Optional[dict[str, str]] = None) -> ReleaseResult:
     """Despliega los `services` pedidos pinando sus repos a `repo_refs` (default origin/main).
 
     Flujo: snapshot de la versión de cada repo → pin de todos los repos → por repo, install +
     restart + health-gate de SUS servicios; si alguno falla, rollback de ESE repo a su snapshot
-    y restart de sus servicios (atomicidad por-repo, D7). Los repos sanos quedan desplegados.
+    y restart de sus servicios (atomicidad por-repo, D7). Los repos sanos quedan desplegados y,
+    si TAG_RELEASES, se tagean (semver; `bumps` por repo, default patch).
     `emit` recibe logs incrementales (D5); si None se acumulan en el resultado.
     """
+    bumps = bumps or {}
     svcs, refs = resolve(services, repo_refs)
     result = ReleaseResult(ok=True)
 
@@ -267,10 +355,14 @@ def run_release(services: Optional[list[str]] = None,
 
         if repo_ok:
             ver = REPOS[r].head(_emit)
-            result.repos[r] = {"ok": True, "version": ver, "rolled_back": False}
+            # Versionado formal (D8/34.12): tag semver del sha desplegado (gated por TAG_RELEASES;
+            # reusa el tag si el sha ya estaba versionado). No rompe el deploy si falla.
+            rel = tag_release(r, ver, _emit, bump=bumps.get(r, "patch")) if ver else {}
+            result.repos[r] = {"ok": True, "version": ver, "rolled_back": False,
+                               "tag": rel.get("tag"), "url": rel.get("url")}
             for s in repo_svcs:
                 result.services[s] = {"ok": True, "repo": r}
-            _emit(f"  ✓ {r} desplegado y sano ({ver})")
+            _emit(f"  ✓ {r} desplegado y sano ({ver}{' ' + rel['tag'] if rel.get('tag') else ''})")
         else:
             result.ok = False
             _emit(f"  ↩ rollback {r} → {snapshots[r] or '?'}")
@@ -291,6 +383,8 @@ def run_release(services: Optional[list[str]] = None,
     for r, info in result.repos.items():
         state.setdefault("repos", {})[r] = {
             "version": info["version"],
+            "tag": info.get("tag"),
+            "url": info.get("url"),
             "status": "deployed" if info["ok"] else ("rolled_back" if info.get("restored") else "broken"),
             "ts": time.time()}
     for s, info in result.services.items():
