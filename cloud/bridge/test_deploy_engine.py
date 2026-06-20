@@ -272,3 +272,56 @@ def test_release_registra_tag_en_estado(state_tmp, monkeypatch):
     st = de.load_state()
     assert st["repos"]["core"]["tag"] == "v1.0.1"
     assert "v1.0.1" in st["repos"]["core"]["url"]
+
+
+# ── Driver cloudrun (T4): deploy GCP desde el SER9 ────────────────────────────
+
+class _FakeGcloud:
+    """Mock de _run para gcloud: describe→revisión, deploy/update-traffic ok salvo `fail`."""
+    def __init__(self, revision="rev-1", fail=()):
+        self.revision = revision
+        self.fail = set(fail)
+        self.calls = []
+
+    def __call__(self, args, emit, *, timeout=300):
+        self.calls.append(args)
+        joined = " ".join(args)
+        for f in self.fail:
+            if f in joined:
+                return de.RunResult(False, f"fail:{f}")
+        if "describe" in args:
+            return de.RunResult(True, self.revision)
+        return de.RunResult(True, "ok")
+
+    def did(self, *subs):
+        return any(all(s in " ".join(c) for s in subs) for c in self.calls)
+
+
+def test_cloud_release_ok(monkeypatch):
+    monkeypatch.setattr(de, "HEALTH_RETRIES", 2)
+    monkeypatch.setattr(de, "HEALTH_BACKOFF", 0.0)
+    fake = _FakeGcloud(revision="capitan-cloud-00010")
+    monkeypatch.setattr(de, "_run", fake)
+    monkeypatch.setattr(de, "_http_ok", lambda *a, **k: True)
+    res = de.run_cloud_release(["cloud-bo"])
+    assert res.ok and res.services["cloud-bo"]["ok"] is True
+    assert fake.did("run", "deploy", "capitan-cloud", "--source")
+
+
+def test_cloud_release_health_fail_rollback(monkeypatch):
+    monkeypatch.setattr(de, "HEALTH_RETRIES", 2)
+    monkeypatch.setattr(de, "HEALTH_BACKOFF", 0.0)
+    fake = _FakeGcloud(revision="capitan-cloud-prev")
+    monkeypatch.setattr(de, "_run", fake)
+    monkeypatch.setattr(de, "_http_ok", lambda *a, **k: False)   # health falla siempre
+    res = de.run_cloud_release(["cloud-bo"])
+    assert res.ok is False
+    assert res.services["cloud-bo"]["rolled_back"] is True
+    # rollback a la revisión previa
+    assert fake.did("update-traffic", "capitan-cloud-prev=100")
+
+
+def test_cloud_release_unknown_target():
+    import pytest
+    with pytest.raises(ValueError):
+        de.run_cloud_release(["nope"])

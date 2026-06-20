@@ -16,6 +16,8 @@ CONFIG_TARGETS = ("core", "backoffice")
 # Componentes del motor de deploy (FASE 34). Nombres lógicos del motor (deploy_engine.SERVICES),
 # distintos de las units de SERVICES de arriba.
 DEPLOY_SERVICES = ("core", "ear", "backoffice", "wa", "bridge")
+# Targets de Cloud Run desplegables por el SER9 (driver cloudrun, T4).
+CLOUDRUN_SERVICES = ("cloud-bo",)
 # Un ref git seguro: sha/tag/branch. Alfanumérico + . _ / - (sin espacios ni metacaracteres de
 # shell). El motor igual usa subprocess con lista de args (sin shell), esto es defensa en capas.
 _REF_RE = re.compile(r"^[A-Za-z0-9._/-]{1,100}$")
@@ -87,6 +89,8 @@ CATALOG: dict[str, dict[str, tuple[Callable[[Any], Any], bool]]] = {
                         "core_ref": (_git_ref("core_ref"), False),
                         "ear_ref": (_git_ref("ear_ref"), False),
                         "umbrella_ref": (_git_ref("umbrella_ref"), False)},
+    # T4: deploy de Cloud Run (cloud-bo) desde el SER9. Sin params = todos los cloudrun targets.
+    "deploy.cloud":    {"services": (_str_list("services", CLOUDRUN_SERVICES), False)},
     "logs.tail":       {"service": (_enum("service", SERVICES), True),
                         "lines": (_int_range("lines", 1, 500), False)},
     "config.reload":   {"target": (_enum("target", CONFIG_TARGETS), True)},
