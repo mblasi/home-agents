@@ -3064,6 +3064,41 @@ Arquitectura (un motor, dos invocadores):
                   → FAIL: rollback al snapshot (registra evento sobre los refs versionados)
 ```
 
+DECISIONES CONSOLIDADAS (2026-06-20, al tomar la fase — amplían el alcance de arriba):
+  D1. SER9 = ejecutor UNIVERSAL. TODO el deploy (de cualquier componente, en cualquier
+      dominio) se dispara como comando del backoffice CLOUD y lo ejecuta el SER9 al polearlo
+      (egress-only). No hay deploy directo desde la notebook fuera del flujo de comandos. Razón:
+      desde fuera de casa la notebook NO tiene ruta a la LAN (SER9/paneles); el único plano de
+      control común es el cloud-bo. El `scripts/deploy.sh` local queda como wrapper fino para
+      cuando Claude opera DESDE la LAN, invocando el mismo motor.
+  D2. El motor tiene UN driver por tipo de target (misma interfaz: snapshot→deploy→health→
+      rollback→registro de versión):
+        - driver `ser9-service` (core, wa, backoffice-local, ear/audio_server, bridge):
+          git pin ref → install si cambió requirements → systemctl restart → health-gate
+          (/health) → rollback = checkout del ref del snapshot.
+        - driver `panel` (satellite.py/satellite_ui.py por NSPanel): el motor (en la LAN)
+          hace el push VERIFICADO (checksum+readback) → restart vía supervisor → health =
+          el nodo re-registra en audio_server con su versión → rollback = push del ref previo.
+          Absorbe la Etapa E (deploy a paneles robusto) y los footguns de pkill/supervisor.
+        - driver `cloudrun` (cloud-bo, oauth-app/meli): `gcloud run deploy --source` (egress
+          a GCP) → health-gate = curl a la URL pública → rollback = `gcloud run services
+          update-traffic` a la revisión previa (Cloud Run conserva revisiones).
+  D3. El SER9 requiere credencial gcloud con rol run.admin (+ acceso al build) para el driver
+      cloudrun. Sigue siendo EGRESS-ONLY (llama a las APIs de Google, saliente). Aprovisionar.
+  D4. Circularidad de la cloud (desplegar cloud-bo y romperla = perder el canal de comandos):
+      se mitiga con health-gate + rollback automático a la revisión previa de Cloud Run que el
+      propio SER9 dispara (no depende de la cloud para revertir). Escape hatch documentado:
+      `gcloud run deploy` manual desde la notebook si el rollback automático también falla.
+  D5. Feedback rico con LOGS EN VIVO (requisito de UX): el modelo de comandos pasa de
+      fire-and-result a PROGRESO INCREMENTAL — el motor emite líneas de log; el bridge las
+      postea append-only (Firestore) por comando; el cloud-bo las polea y las muestra en
+      streaming durante el deploy. La consola local tail-ea el log del motor directo. Aplica a
+      deploys disparados desde cloud-bo Y desde la consola local.
+  D6. Visualización de versión (requisito de UX): la versión corriendo de CADA componente, con
+      LINK a la versión tageada en GitHub (release), se muestra en LOS DOS backoffices (local y
+      cloud). Es la matriz dispositivo×componente→versión de 34.14, con deep-link al release.
+```
+
 #### Etapa A - Contrato del release
 - [ ] 34.1  Extender el comando tipado a `deploy.release` (o ampliar `deploy.run`) en
             `cloud/app/commands.py`: aceptar `core_ref` y `ear_ref` opcionales (default =
