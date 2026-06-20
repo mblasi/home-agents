@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -1887,6 +1888,25 @@ async def panels_set_area(name: str, request: Request):
     area_id = str(form.get("area_id", "")).strip()
     _core("/panels", method="POST", json={"name": name, "area_id": area_id})
     return HTMLResponse('<span class="text-xs text-emerald-400">✓ guardado</span>')
+
+
+# ── Deploy / Versiones (FASE 34 T5 — 34.7/34.14) ──────────────────────────────
+
+@app.get("/deploy", response_class=HTMLResponse)
+def deploy_page(request: Request):
+    """Matriz de versiones dispositivo×componente (corre + última disponible + rezago) leyendo
+    la misma fuente que el snapshot del bridge. Read-only: el deploy se OPERA desde el cloud-bo
+    (egress-only); acá es visibilidad local (LAN)."""
+    versions: dict = {}
+    try:
+        _bridge = os.path.join(os.path.dirname(__file__), "..", "cloud", "bridge")
+        if _bridge not in sys.path:
+            sys.path.insert(0, _bridge)
+        import snapshot as _snap
+        versions = _snap._versions(_snap._nodes())
+    except Exception:
+        pass
+    return _render(request, "deploy.html", "deploy", versions=versions)
 
 
 # ── Ambientes / Rooms (FASE 16.7) — fuente de verdad = áreas de HAOS ──────────

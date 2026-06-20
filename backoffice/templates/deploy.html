@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Deploy / Versiones{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-bold">Deploy / Versiones</h1>
+</div>
+
+<p class="text-sm text-gray-400 mb-6">
+  Versión que corre vs. última disponible por componente. El deploy se <b>opera desde el
+  backoffice en la nube</b> (egress-only); esta vista es de visibilidad en la LAN.
+</p>
+
+{% macro verlink(text, url) -%}
+  {%- if url %}<a href="{{ url }}" target="_blank" class="text-sky-400 hover:underline">{{ text }}</a>{% else %}{{ text }}{% endif -%}
+{%- endmacro %}
+
+{# ── SER9 (repos) ── #}
+<h2 class="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-2">SER9 (repos)</h2>
+<div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden mb-6">
+  <table class="w-full text-sm">
+    <thead class="bg-gray-800/50 text-gray-400 text-xs uppercase tracking-wider">
+      <tr><th class="text-left px-4 py-2">Componente</th><th class="text-left px-4 py-2">Corre</th>
+          <th class="text-left px-4 py-2">Disponible</th><th class="text-left px-4 py-2">Estado</th></tr>
+    </thead>
+    <tbody>
+      {% for name, i in (versions.ser9 or {}).items() %}
+      <tr class="border-t border-gray-800">
+        <td class="px-4 py-2 font-medium text-gray-200">{{ name }}</td>
+        <td class="px-4 py-2 font-mono text-xs">
+          {{ verlink(i.tag or i.version or "?", i.url) }}
+          {% if i.tag and i.version %}<span class="text-gray-600">({{ i.version }})</span>{% endif %}
+        </td>
+        <td class="px-4 py-2 font-mono text-xs">{{ verlink(i.latest_tag or i.latest_sha or "?", i.latest_url) }}</td>
+        <td class="px-4 py-2">
+          {% if i.behind %}<span class="text-amber-400">⬆ actualizar</span>
+          {% else %}<span class="text-emerald-400">🟢 al día</span>{% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="px-4 py-3 text-gray-600 italic">sin datos</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{# ── Paneles ── #}
+<h2 class="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-2">
+  Paneles {% if versions.satellite_expected %}<span class="text-gray-600 font-mono normal-case">esperado {{ versions.satellite_expected }}</span>{% endif %}
+</h2>
+<div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+  <table class="w-full text-sm">
+    <thead class="bg-gray-800/50 text-gray-400 text-xs uppercase tracking-wider">
+      <tr><th class="text-left px-4 py-2">Panel</th><th class="text-left px-4 py-2">Versión</th>
+          <th class="text-left px-4 py-2">Estado</th></tr>
+    </thead>
+    <tbody>
+      {% for p in (versions.panels or []) %}
+      <tr class="border-t border-gray-800">
+        <td class="px-4 py-2 font-medium text-gray-200">{{ p.node_id }}</td>
+        <td class="px-4 py-2 font-mono text-xs">{{ verlink(p.version or "—", p.url) }}</td>
+        <td class="px-4 py-2">
+          {% if p.up_to_date %}<span class="text-emerald-400">🟢 al día</span>
+          {% else %}<span class="text-amber-400">⬆ rezagado</span>{% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="3" class="px-4 py-3 text-gray-600 italic">sin paneles</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
