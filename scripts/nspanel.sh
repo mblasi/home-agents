@@ -362,6 +362,8 @@ SCRIPT
     # dispara start-ha.sh y el panel arranca sin sshd/satélite (parte de #602).
     adb_cmd shell dumpsys deviceidle whitelist +com.termux >/dev/null 2>&1 || true
     adb_cmd shell su -c 'dumpsys deviceidle whitelist +com.termux' >/dev/null 2>&1 || true
+    # El am start de BootActivity deja su UI (docs de Termux:Boot) al frente → volver al dashboard.
+    sleep 1; adb_cmd shell am start -n "$HA_COMPANION" >/dev/null 2>&1
     echo "  ✓ Termux:Boot registrado + batería sin optimizar"
 
     echo "\n[9/9] Registrar el panel en la DB (vía el core)"
@@ -406,6 +408,8 @@ cmd_converge() {
     adb connect "$NSPANEL_ADB" >/dev/null 2>&1
     adb_cmd shell am start -n "com.termux.boot/.BootActivity" >/dev/null 2>&1
     adb_cmd shell su -c 'dumpsys deviceidle whitelist +com.termux' >/dev/null 2>&1 || true
+    # BootActivity deja su UI (docs de Termux:Boot) al frente → volver al dashboard de HA.
+    sleep 1; adb_cmd shell am start -n "$HA_COMPANION" >/dev/null 2>&1
     echo "  ✓ listo. Reiniciá para validar el arranque autónomo:"
     echo "     NSPANEL_IP=$ip bash scripts/nspanel.sh reboot"
 }
