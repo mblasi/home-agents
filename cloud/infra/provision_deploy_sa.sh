@@ -58,23 +58,37 @@ else
   _retry gcloud iam service-accounts describe "$DEPLOY_SA_EMAIL" >/dev/null 2>&1 || true
 fi
 
-echo "== Roles a nivel proyecto (permiso mínimo para deploy + rollback) =="
+echo "== Roles a nivel proyecto (deploy + build + rollback de Cloud Run desde source) =="
+# Verificados con un deploy real de `gcloud run deploy --source` desde el SER9 (FASE 34 T4a):
+#  - run.admin               : deploy de servicios + update-traffic (rollback a revisión previa)
+#  - cloudbuild.builds.editor: build remoto del source en Cloud Build
+#  - artifactregistry.writer : push de la imagen
+#  - storage.admin           : `--source` sube el tarball al bucket de staging
+#    (run-sources-<project>-<region>) y necesita storage.buckets.list a nivel PROYECTO; el
+#    binding por-bucket no alcanza.
+#  - logging.viewer          : leer logs del build
 for ROLE in \
   roles/run.admin \
   roles/cloudbuild.builds.editor \
-  roles/artifactregistry.writer ; do
+  roles/artifactregistry.writer \
+  roles/storage.admin \
+  roles/logging.viewer ; do
   _retry gcloud projects add-iam-policy-binding "$PROJECT" \
     --member="serviceAccount:${DEPLOY_SA_EMAIL}" \
     --role="$ROLE" --condition=None >/dev/null
   echo "   + $ROLE"
 done
 
-echo "== actAs sobre las runtime SA de los servicios desplegados =="
-# Cloud Run deploy requiere que el deployer pueda 'actuar como' la runtime SA del servicio.
-_retry gcloud iam service-accounts add-iam-policy-binding "$RUNTIME_SA_EMAIL" \
-  --member="serviceAccount:${DEPLOY_SA_EMAIL}" \
-  --role="roles/iam.serviceAccountUser" >/dev/null
-echo "   + actAs ${RUNTIME_SA_EMAIL}"
+echo "== actAs sobre las runtime SA + la compute SA del build =="
+# Cloud Run deploy requiere actuar como la runtime SA del servicio Y como la SA que Cloud Build
+# usa para el build (la default compute SA, salvo que se configure otra).
+PROJECT_NUMBER="$(gcloud projects describe "$PROJECT" --format='value(projectNumber)')"
+for ACT_SA in "$RUNTIME_SA_EMAIL" "${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"; do
+  _retry gcloud iam service-accounts add-iam-policy-binding "$ACT_SA" \
+    --member="serviceAccount:${DEPLOY_SA_EMAIL}" \
+    --role="roles/iam.serviceAccountUser" >/dev/null
+  echo "   + actAs ${ACT_SA}"
+done
 if [[ -n "$OAUTH_RUNTIME_SA" ]]; then
   _retry gcloud iam service-accounts add-iam-policy-binding \
     "${OAUTH_RUNTIME_SA}@${PROJECT}.iam.gserviceaccount.com" \
@@ -82,15 +96,6 @@ if [[ -n "$OAUTH_RUNTIME_SA" ]]; then
     --role="roles/iam.serviceAccountUser" >/dev/null
   echo "   + actAs ${OAUTH_RUNTIME_SA}@${PROJECT}.iam.gserviceaccount.com"
 fi
-
-echo "== Storage del bucket de staging de Cloud Build =="
-# `gcloud run deploy --source` sube el source a un bucket de staging gestionado por Cloud Build.
-STAGING_BUCKET="${PROJECT}_cloudbuild"
-gcloud storage buckets add-iam-policy-binding "gs://${STAGING_BUCKET}" \
-  --member="serviceAccount:${DEPLOY_SA_EMAIL}" \
-  --role="roles/storage.admin" >/dev/null 2>&1 \
-  && echo "   + storage.admin sobre gs://${STAGING_BUCKET}" \
-  || echo "   · gs://${STAGING_BUCKET} aún no existe (lo crea el primer build); re-correr tras el 1er deploy"
 
 echo "== Key JSON (para el SER9) =="
 if [[ -f "$KEY_OUT" ]]; then
