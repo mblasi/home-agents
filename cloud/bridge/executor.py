@@ -89,6 +89,22 @@ def _deploy_release(p: dict, emit=None) -> ExecResult:
     return _run_engine(p.get("services"), repo_refs, emit)
 
 
+def _deploy_cloud(p: dict, emit=None) -> ExecResult:
+    """FASE 34 T4: deploy de Cloud Run (cloud-bo) desde el SER9 vía el motor (driver cloudrun)."""
+    import deploy_engine
+    targets = p.get("services") or list(deploy_engine.CLOUDRUN_TARGETS)
+    lines: list[str] = []
+
+    def _emit(line: str) -> None:
+        lines.append(line)
+        if emit:
+            emit(line)
+
+    res = deploy_engine.run_cloud_release(targets, emit=_emit)
+    return ExecResult(res.ok, "\n".join(lines),
+                      "" if res.ok else "deploy cloud con fallos (ver rollback en el log)")
+
+
 def _config_reload(p: dict) -> ExecResult:
     if p["target"] == "core":
         try:
@@ -126,6 +142,7 @@ HANDLERS = {
     "logs.tail": _logs_tail,
     "deploy.run": _deploy_run,
     "deploy.release": _deploy_release,
+    "deploy.cloud": _deploy_cloud,
     "config.reload": _config_reload,
     "wakeword.retrain": _wakeword_retrain,
     "voice.reenroll": _voice_reenroll,
@@ -133,7 +150,7 @@ HANDLERS = {
 
 # Comandos largos que emiten progreso EN VIVO (D5): el handler acepta un callback `emit` y va
 # reportando líneas mientras corre (deploy). El resto es fire-and-result (sólo resultado final).
-STREAMING = {"deploy.run", "deploy.release"}
+STREAMING = {"deploy.run", "deploy.release", "deploy.cloud"}
 
 
 def execute(cmd_type: str, params: dict, emit=None) -> ExecResult:

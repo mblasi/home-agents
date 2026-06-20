@@ -97,3 +97,18 @@ def test_deploy_release_services_invalidos():
 def test_deploy_release_param_desconocido_rechazado():
     with pytest.raises(CommandError):
         validate_command("deploy.release", {"wa_ref": "x"})
+
+
+# ── deploy.cloud (T4): targets de Cloud Run ───────────────────────────────────
+
+def test_deploy_cloud_sin_params():
+    assert validate_command("deploy.cloud", {}) == {}
+
+
+def test_deploy_cloud_services_validos():
+    assert validate_command("deploy.cloud", {"services": ["cloud-bo"]}) == {"services": ["cloud-bo"]}
+
+
+def test_deploy_cloud_target_invalido():
+    with pytest.raises(CommandError):
+        validate_command("deploy.cloud", {"services": ["core"]})   # core no es target cloudrun

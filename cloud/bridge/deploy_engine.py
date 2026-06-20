@@ -396,6 +396,97 @@ def run_release(services: Optional[list[str]] = None,
     return result
 
 
+# ── Driver cloudrun (GCP, FASE 34 T4 / D2) ────────────────────────────────────
+# El SER9 despliega Cloud Run con `gcloud run deploy --source` (egress a Google, saliente),
+# usando la SA de deploy (D9: GOOGLE_APPLICATION_CREDENTIALS apunta a la key en el SER9).
+# Health-gate = curl a la URL pública. Rollback = update-traffic a la revisión previa (Cloud Run
+# conserva revisiones). NO pasa por el bridge para sí mismo (circularidad, D4): el deploy del
+# cloud-bo lo dispara igual el SER9, y si rompe, el rollback a la revisión previa lo hace el SER9.
+
+GCLOUD = os.environ.get("GCLOUD_BIN", "gcloud")
+GCP_PROJECT = os.environ.get("GCP_PROJECT", "capitan-495518")
+
+
+@dataclass
+class CloudRunTarget:
+    """Servicio de Cloud Run desplegable desde el SER9. `source` es el dir (relativo a REPO_DIR)
+    que contiene el Dockerfile; `health_url` es la URL pública para el health-gate."""
+    name: str
+    service: str
+    source: str
+    region: str
+    health_url: str
+
+    def _src(self) -> str:
+        return os.path.join(REPO_DIR, self.source)
+
+    def active_revision(self, emit: LogEmit) -> Optional[str]:
+        r = _run([GCLOUD, "run", "services", "describe", self.service,
+                  "--project", GCP_PROJECT, "--region", self.region,
+                  "--format=value(status.latestReadyRevisionName)"], emit, timeout=60)
+        return r.output.strip() if r.ok and r.output.strip() else None
+
+    def deploy(self, emit: LogEmit) -> bool:
+        return _run([GCLOUD, "run", "deploy", self.service, "--source", self._src(),
+                     "--project", GCP_PROJECT, "--region", self.region, "--quiet"],
+                    emit, timeout=600).ok
+
+    def health(self, emit: LogEmit) -> bool:
+        for _ in range(HEALTH_RETRIES):
+            if _http_ok(self.health_url):
+                emit(f"  ✓ health OK ({self.health_url})")
+                return True
+            time.sleep(HEALTH_BACKOFF)
+        emit(f"  ✗ health NO responde ({self.health_url})")
+        return False
+
+    def rollback(self, revision: Optional[str], emit: LogEmit) -> bool:
+        if not revision:
+            emit("  ✗ sin revisión previa para revertir")
+            return False
+        emit(f"  ↩ rollback {self.name} → {revision}")
+        return _run([GCLOUD, "run", "services", "update-traffic", self.service,
+                     "--project", GCP_PROJECT, "--region", self.region,
+                     f"--to-revisions={revision}=100", "--quiet"], emit, timeout=120).ok
+
+
+CLOUDRUN_TARGETS: dict[str, CloudRunTarget] = {
+    "cloud-bo": CloudRunTarget(
+        "cloud-bo", "capitan-cloud", "cloud", "southamerica-east1",
+        os.environ.get("CLOUD_BO_URL",
+                       "https://capitan-cloud-606511873514.southamerica-east1.run.app") + "/"),
+}
+
+
+def run_cloud_release(targets: list[str], emit: Optional[LogEmit] = None) -> ReleaseResult:
+    """Despliega targets de Cloud Run (cloud-bo, …) por-target con health-gate y rollback a la
+    revisión previa si falla. Atomicidad por-target (D7). Reusa ReleaseResult (campo `services`)."""
+    result = ReleaseResult(ok=True)
+
+    def _emit(line: str) -> None:
+        result.log.append(line)
+        if emit:
+            emit(line)
+
+    for name in targets:
+        if name not in CLOUDRUN_TARGETS:
+            raise ValueError(f"target cloudrun desconocido: {name!r} (conocidos: {sorted(CLOUDRUN_TARGETS)})")
+        t = CLOUDRUN_TARGETS[name]
+        prev = t.active_revision(_emit)
+        _emit(f"=== deploy cloudrun {name} ({t.service}) — revisión previa {prev or '?'} ===")
+        ok = t.deploy(_emit) and t.health(_emit)
+        if ok:
+            result.services[name] = {"ok": True, "revision": t.active_revision(_emit)}
+            _emit(f"  ✓ {name} desplegado y sano")
+        else:
+            result.ok = False
+            rb = t.rollback(prev, _emit)
+            restored = rb and t.health(_emit)
+            result.services[name] = {"ok": False, "rolled_back": rb, "restored": restored}
+            _emit(f"  {'↩ revertido' if restored else '✗ rollback NO sano'} en {name}")
+    return result
+
+
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
 def _parse_refs(items: list[str]) -> dict[str, Optional[str]]:
