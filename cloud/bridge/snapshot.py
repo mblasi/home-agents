@@ -212,11 +212,16 @@ def _versions(nodes: list[dict]) -> dict:
         pass
     expected = (_get(f"{AUDIO_URL}/satellite/version") or {}).get("version")
     out["satellite_expected"] = (expected or "")[:12] or None
+    # El código del satélite (satellite.py/ui) vive en el repo ear → el panel linkea al commit de
+    # ear que lo provee (el que corre el SER9). El hash del panel es md5 de los archivos (no un
+    # sha git), así que el link de referencia es el de ear.
+    ear_url = (out["ser9"].get("ear") or {}).get("url")
     for n in nodes:
         v = n.get("version")
         out["panels"].append({
             "node_id": n.get("node_id"), "version": v,
             "up_to_date": bool(v and expected and expected[:12] == v),
+            "url": ear_url,
         })
     return out
 

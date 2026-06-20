@@ -137,10 +137,11 @@ function renderVersions(v) {
   }).join("");
   const exp = v.satellite_expected;
   const panels = (v.panels || []).map(p => {
+    const ver = link(p.version || "—", p.url);
     const avail = p.up_to_date
       ? ` · <span class="muted">al día</span>`
       : ` · <span style="color:#fa0">⬆ disp. ${esc(exp || "?")}</span>`;
-    return `<div>${p.up_to_date ? "🟢" : "⚠️"} <b>${esc(p.node_id)}</b> ${esc(p.version) || "—"}${avail}</div>`;
+    return `<div>${p.up_to_date ? "🟢" : "⚠️"} <b>${esc(p.node_id)}</b> ${ver}${avail}</div>`;
   }).join("");
   $("versions").innerHTML =
     `<h3>SER9 (repos)</h3><div class="grid">${repos || "<span class='muted'>sin datos</span>"}</div>`
