@@ -3169,7 +3169,7 @@ DECISIONES CONSOLIDADAS (2026-06-20, al tomar la fase — amplían el alcance de
             egress-only vía snapshot, y (b) backoffice interno (LAN, FASE 12) leyendo el estado
             local del SER9. Mostrar versión actual corriendo, último deploy, resultado y si
             hubo rollback. Auditoría reusa la de FASE 33 (quién emitió, cuándo).
-- [ ] 34.13 Satélites NSPanel bajo el motor único (cierra el gap multi-dispositivo): el motor
+- [x] 34.13 Satélites NSPanel bajo el motor único (cierra el gap multi-dispositivo): el motor
             (o un sub-comando `deploy.satellites`) despliega `satellite.py`/`satellite_ui.py` a
             los paneles registrados con pin de ref (no el `scp` suelto de `nspanel.sh`), reusando
             su transporte; registra la versión desplegada por panel. El satélite AUTO-REPORTA su
