@@ -70,6 +70,8 @@
         <button type="submit">Emitir</button>
       </form>
       <p id="emit-msg" class="muted"></p>
+      <pre id="cmd-log" class="hidden" style="background:#111;color:#cfc;padding:8px;
+        border-radius:6px;max-height:320px;overflow:auto;font-size:12px;white-space:pre-wrap"></pre>
     </section>
 
     <section class="card hidden" id="audit-card">
@@ -219,16 +221,42 @@ $("emit").onsubmit = async (e) => {
   try { params = $("cmd-params").value ? JSON.parse($("cmd-params").value) : {}; }
   catch { $("emit-msg").textContent = "params JSON inválido"; return; }
   try {
-    await api("/api/commands", {
+    const { command } = await api("/api/commands", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ type: $("cmd-type").value, params }),
     });
     $("emit-msg").textContent = "comando encolado";
     $("cmd-params").value = "";
+    if (command && command.id && CAPS.view_full) streamCommand(command.id);
     refresh();
   } catch (e) { $("emit-msg").textContent = "error: " + e.message; }
 };
+
+// D5: polea el progreso del comando (logs en vivo del deploy) y lo muestra en streaming hasta
+// que termina (done/error). Reusa /api/commands/{id} (gated por view_full, igual que la auditoría).
+async function streamCommand(id) {
+  const log = $("cmd-log");
+  log.textContent = ""; show("cmd-log");
+  for (let i = 0; i < 600; i++) {   // ~10 min de techo
+    let cmd;
+    try { ({ command: cmd } = await api("/api/commands/" + id)); }
+    catch { break; }
+    if (cmd) {
+      const lines = cmd.progress || [];
+      log.textContent = lines.join("\n");
+      log.scrollTop = log.scrollHeight;
+      if (cmd.status === "done" || cmd.status === "error") {
+        const r = cmd.result || {};
+        log.textContent += "\n\n" + (cmd.status === "done"
+          ? (r.ok ? "✓ OK" : "✗ con fallos") : "✗ error: " + (r.error || ""));
+        refresh();
+        return;
+      }
+    }
+    await new Promise(r => setTimeout(r, 1500));
+  }
+}
 
 let timer = null;
 auth.onAuthStateChanged(async (user) => {
