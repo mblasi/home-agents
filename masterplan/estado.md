@@ -3006,7 +3006,12 @@ Objetivo: Desplegar al SER9 desde cualquier lado (fuera de la LAN) de forma segu
           dashboard cloud lo emite, el SER9 lo polea y lo ejecuta como un release CD
           (pin de ref por submodule → snapshot → deploy atómico → health-gate →
           rollback automático si falla), registra la versión desplegada y la reporta.
-Estado:   Pendiente.
+Estado:   EN CURSO — motor único operativo y LIVE en el SER9. Hechas: 34.1 (contrato
+          deploy.release), 34.3-34.6 (motor: pin/health/rollback), 34.9 (invocadores: executor
+          + deploy.sh sobre el motor). 34.12 parcial (tags semver implementados, gated off por
+          DEPLOY_TAG_RELEASES; falta activar + Release formal con token GH). Prep permisos gcloud
+          de la deploy SA hecho (D9). Pendientes: logs en vivo (D5), drivers panel+cloudrun
+          (34.13), visibilidad en BO (34.7/34.14/34.8), tests e2e + docs (34.10/34.11).
 Deps:     FASE 33 (bridge egress-only + allowlist tipado + auth/audit/RBAC — COMPLETA,
           ya existe el comando `deploy.run` que esta fase eleva a CD real),
           FASE 21 (SER9 estable — COMPLETA), FASE 12 (backoffice — COMPLETA).
@@ -3118,7 +3123,7 @@ DECISIONES CONSOLIDADAS (2026-06-20, al tomar la fase — amplían el alcance de
 ```
 
 #### Etapa A - Contrato del release
-- [ ] 34.1  Extender el comando tipado a `deploy.release` (o ampliar `deploy.run`) en
+- [x] 34.1  Extender el comando tipado a `deploy.release` (o ampliar `deploy.run`) en
             `cloud/app/commands.py`: aceptar `core_ref` y `ear_ref` opcionales (default =
             HEAD remoto de main), validados como sha/tag/branch con un validador estricto
             (rechazar refs arbitrarios/inyección); mantener `restart_wa`. Tests del catálogo.
@@ -3128,20 +3133,20 @@ DECISIONES CONSOLIDADAS (2026-06-20, al tomar la fase — amplían el alcance de
             verdad) y subconjunto reportado en el snapshot a la nube.
 
 #### Etapa B - Motor de deploy en el SER9 (único backend: atómico + reversible)
-- [ ] 34.3  Crear el MOTOR de deploy como artefacto ÚNICO que corre en el SER9 (script/
+- [x] 34.3  Crear el MOTOR de deploy como artefacto ÚNICO que corre en el SER9 (script/
             módulo, p.ej. `scripts/deploy_engine.sh` o `cloud/bridge/deploy_engine.py`),
             invocable por CLI con args tipados (refs por submodule, restart_wa). Es el único
             lugar con lógica de deploy; ningún frontend la duplica. Snapshot pre-deploy:
             capturar el ref/commit actual de cada submodule (y del umbrella) ANTES de tocar
             nada, para revertir exactamente a ese estado.
-- [ ] 34.4  Deploy con pin (en el motor): `git fetch` + `checkout` del ref pedido por
+- [x] 34.4  Deploy con pin (en el motor): `git fetch` + `checkout` del ref pedido por
             submodule (en lugar del `pull` ciego a main); reinstalar requirements sólo si
             cambiaron; restart de servicios. Lock de deploy (un único release a la vez) e
             idempotencia.
-- [ ] 34.5  Health-gate post-deploy (en el motor): tras el restart, verificar `/health` de
+- [x] 34.5  Health-gate post-deploy (en el motor): tras el restart, verificar `/health` de
             core y backoffice (y readiness del propio bridge) con timeout + retries antes de
             declarar éxito. Reusar la lógica del smoke test de `scripts/deploy.sh`.
-- [ ] 34.6  Rollback automático (en el motor): si el health-gate falla, revertir a los refs
+- [x] 34.6  Rollback automático (en el motor): si el health-gate falla, revertir a los refs
             del snapshot, reinstalar, reiniciar y re-chequear; reportar `FAILED + rolled-back`
             con el detalle de cada paso. Tras un rollback el sistema queda en el último estado
             sano.
@@ -3173,7 +3178,7 @@ DECISIONES CONSOLIDADAS (2026-06-20, al tomar la fase — amplían el alcance de
 - [ ] 34.8  Panel de deploy en el dashboard cloud (RBAC: sólo admin emite): elegir ref/tag,
             disparar el release, ver progreso/resultado/rollback. Reusa el panel de acciones
             y el gate de capacidades de FASE 33; el frontend oculta la acción a no-admin.
-- [ ] 34.9  Invocadores sobre el motor único (cierra el principio de unificación). Las dos
+- [x] 34.9  Invocadores sobre el motor único (cierra el principio de unificación). Las dos
             rutas invocan el MISMO motor (34.3-34.6); ninguna reimplementa nada:
             (a) REMOTO — el `executor` del bridge (`cloud/bridge/executor.py`) deja de hacer
                 `git pull` propio y pasa a invocar el motor con los refs de `deploy.release`;
