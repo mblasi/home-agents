@@ -132,6 +132,85 @@ scp_panel() { scp -P "$NSPANEL_SSH_PORT" -o HostKeyAlgorithms=+ssh-rsa -o Pubkey
     -o StrictHostKeyChecking=no "$@"; }
 pkg_installed() { adb_cmd shell pm list packages 2>/dev/null | grep -q "package:$1"; }
 
+# Escritura VERIFICADA de un archivo al panel (16.24/FASE34 T4b): scp + readback de sha256, con
+# reintentos. Reemplaza el `ssh "cat > file" <<EOF` ciego, que se truncaba si la conexión se
+# cortaba (causa de #602: start-ha.sh quedó en 0 bytes y el panel no arrancaba nada al boot).
+put_verified() {
+    local lf="$1" rf="$2" n=0 want got
+    want="$(sha256sum "$lf" | cut -d' ' -f1)"
+    while [ "$n" -lt 3 ]; do
+        scp_panel "$lf" "${TERMUX_USER}@${NSPANEL_IP}:$rf" >/dev/null 2>&1
+        got="$(ssh_panel "sha256sum '$rf' 2>/dev/null | cut -d' ' -f1" 2>/dev/null)"
+        [ "$got" = "$want" ] && return 0
+        n=$((n + 1)); echo "    · reintento $n ($rf: checksum no coincide)" >&2; sleep 2
+    done
+    echo "    ✗ FALLÓ escribir $rf verificado" >&2; return 1
+}
+
+# Genera los scripts de arranque del nodo (satellite.env, voice-node.sh, start-ha.sh) en archivos
+# LOCALES y los instala VERIFICADOS, con permisos y limpieza de basura (boot.sh viejo). Deja el
+# panel en el estado de arranque CANÓNICO. Usado por provision y por converge (idempotente).
+# Args: <node_id> <room> <audio_url>
+write_node_scripts() {
+    local node_id="$1" room="$2" audio_url="$3"
+    local tmp; tmp="$(mktemp -d)"
+    trap "rm -rf '$tmp'" RETURN
+
+    cat > "$tmp/satellite.env" <<EOF
+AUDIO_SERVER_URL=$audio_url
+NODE_ID=$node_id
+ROOM=$room
+WAKEWORD_MODEL=/data/data/com.termux/files/home/wakeword/capitan.onnx
+MELSPEC_MODEL=/data/data/com.termux/files/home/wakeword/melspectrogram.onnx
+EMBEDDING_MODEL=/data/data/com.termux/files/home/wakeword/embedding_model.onnx
+WAKEWORD_THRESH=0.8
+WAKEWORD_FRAMES_REQ=2
+COMMAND_SECS=5
+SAMPLE_RATE=16000
+EOF
+
+    cat > "$tmp/voice-node.sh" <<'EOF'
+#!/data/data/com.termux/files/usr/bin/bash
+# Supervisor del nodo de voz: relanza satellite.py si crashea (audio HAL no listo tras boot,
+# etc.). Para reiniciar el satélite sin perder el supervisor: pkill -f satellite.py (este script
+# no matchea ese patrón). Para frenar todo: pkill -f voice-node.sh primero.
+export PATH=/data/data/com.termux/files/usr/bin:$PATH
+termux-wake-lock 2>/dev/null
+while true; do
+  echo "[boot] arrancando satellite $(date)" >> ~/.satellite.log
+  python3.13 ~/satellite.py >> ~/.satellite.log 2>&1
+  echo "[boot] satellite salió rc=$? — reintento en 5s" >> ~/.satellite.log
+  sleep 5
+done
+EOF
+
+    cat > "$tmp/start-ha.sh" <<'EOF'
+#!/data/data/com.termux/files/usr/bin/bash
+export PATH=/data/data/com.termux/files/usr/bin:$PATH
+termux-wake-lock
+
+# SSH para acceso remoto
+sshd
+
+# HA Companion (dashboard táctil)
+sleep 10
+am start -n io.homeassistant.companion.android.minimal/io.homeassistant.companion.android.launch.LaunchActivity
+
+# Nodo de voz bajo supervisor (auto-reinicio si crashea). Script aparte para que
+# `pkill -f satellite.py` mate solo el python y no al supervisor.
+sleep 15
+setsid nohup bash ~/voice-node.sh >/dev/null 2>&1 </dev/null &
+EOF
+
+    ssh_panel "mkdir -p ~/.config ~/.termux/boot" 2>/dev/null
+    put_verified "$tmp/satellite.env"  "/data/data/com.termux/files/home/.config/satellite.env" || return 1
+    put_verified "$tmp/voice-node.sh"  "/data/data/com.termux/files/home/voice-node.sh" || return 1
+    put_verified "$tmp/start-ha.sh"    "/data/data/com.termux/files/home/.termux/boot/start-ha.sh" || return 1
+    # permisos + limpiar boot scripts viejos (boot.sh) que no arrancan el nodo
+    ssh_panel "chmod +x ~/voice-node.sh ~/.termux/boot/start-ha.sh; rm -f ~/.termux/boot/boot.sh" 2>/dev/null
+    echo "  ✓ scripts de arranque canónicos (verificados por checksum)"
+}
+
 # Provisioning completo de un panel nuevo (16.24). Idempotente: saltea lo ya hecho.
 # Uso: nspanel.sh provision <name> <room> [ip]
 cmd_provision() {
@@ -274,55 +353,16 @@ SCRIPT
         && echo "  ✓ satellite.py + ui" || { echo "  ✗ falló la copia de satellite.py — abortando"; exit 1; }
     [[ -f "$REPO/ear/assets/wakeword_ack.wav" ]] && { scp_panel "$REPO/ear/assets/wakeword_ack.wav" "${TERMUX_USER}@${ip}:~/assets/" && echo "  ✓ ack wav"; } || true
 
-    echo "\n[7/9] satellite.env (node=$NODE_ID room=$room)"
-    ssh_panel "cat > ~/.config/satellite.env" <<EOF
-AUDIO_SERVER_URL=$AUDIO_URL
-NODE_ID=$NODE_ID
-ROOM=$room
-WAKEWORD_MODEL=/data/data/com.termux/files/home/wakeword/capitan.onnx
-MELSPEC_MODEL=/data/data/com.termux/files/home/wakeword/melspectrogram.onnx
-EMBEDDING_MODEL=/data/data/com.termux/files/home/wakeword/embedding_model.onnx
-WAKEWORD_THRESH=0.8
-WAKEWORD_FRAMES_REQ=2
-COMMAND_SECS=5
-SAMPLE_RATE=16000
-EOF
-    echo "  ✓ satellite.env"
+    echo "\n[7/9] Scripts de arranque (satellite.env + supervisor + boot, verificados)"
+    write_node_scripts "$NODE_ID" "$room" "$AUDIO_URL" || { echo "  ✗ scripts de arranque"; exit 1; }
 
-    echo "\n[8/9] Supervisor del nodo de voz + boot script"
-    # Supervisor en un script aparte (no inline en el boot): su cmdline NO contiene
-    # "satellite.py", así `pkill -f satellite.py` mata solo el python y deja vivo el
-    # supervisor → reiniciar el satélite no deja el nodo sin auto-reinicio.
-    ssh_panel "cat > ~/voice-node.sh" <<'EOF'
-#!/data/data/com.termux/files/usr/bin/bash
-# Supervisor del nodo de voz: relanza satellite.py si crashea (audio HAL no listo tras
-# boot, etc.). Para reiniciar el satélite sin perder el supervisor: pkill -f satellite.py
-# (este script no matchea ese patrón). Para frenar todo: pkill -f voice-node.sh primero.
-export PATH=/data/data/com.termux/files/usr/bin:$PATH
-termux-wake-lock 2>/dev/null
-while true; do
-  echo "[boot] arrancando satellite $(date)" >> ~/.satellite.log
-  python3.13 ~/satellite.py >> ~/.satellite.log 2>&1
-  echo "[boot] satellite salió rc=$? — reintento en 5s" >> ~/.satellite.log
-  sleep 5
-done
-EOF
-    ssh_panel "chmod +x ~/voice-node.sh" 2>/dev/null
-    ssh_panel "cat > ~/.termux/boot/start-ha.sh" <<'EOF'
-#!/data/data/com.termux/files/usr/bin/bash
-export PATH=/data/data/com.termux/files/usr/bin:$PATH
-termux-wake-lock
-sshd
-sleep 10
-monkey -p com.termux.gui -c android.intent.category.LAUNCHER 1
-am start -n io.homeassistant.companion.android.minimal/io.homeassistant.companion.android.launch.LaunchActivity
-sleep 15
-# Nodo de voz bajo supervisor (auto-reinicio). setsid → sobrevive el cierre de la sesión.
-setsid nohup bash ~/voice-node.sh >/dev/null 2>&1 </dev/null &
-EOF
-    ssh_panel "chmod +x ~/.termux/boot/start-ha.sh" 2>/dev/null
+    echo "\n[8/9] Termux:Boot (arranque automático)"
     adb_cmd shell am start -n "com.termux.boot/.BootActivity" >/dev/null 2>&1
-    echo "  ✓ boot script + Termux:Boot registrado"
+    # Eximir a Termux de la optimización de batería: si Android lo suspende, Termux:Boot no
+    # dispara start-ha.sh y el panel arranca sin sshd/satélite (parte de #602).
+    adb_cmd shell dumpsys deviceidle whitelist +com.termux >/dev/null 2>&1 || true
+    adb_cmd shell su -c 'dumpsys deviceidle whitelist +com.termux' >/dev/null 2>&1 || true
+    echo "  ✓ Termux:Boot registrado + batería sin optimizar"
 
     echo "\n[9/9] Registrar el panel en la DB (vía el core)"
     local CORE="${CORE_URL:-http://192.168.68.132:8765}"
@@ -338,6 +378,36 @@ EOF
     echo "FALTA (manual, en HA): crear usuario '$HA_USER' (sin guion) + asignarle el dashboard del ambiente."
     echo "Después reiniciá el panel — satellite + overlay arrancan solos por Termux:Boot:"
     echo "  NSPANEL_IP=$ip bash scripts/nspanel.sh reboot"
+}
+
+# Converge un panel YA aprovisionado al estado CANÓNICO (sin reinstalar apps/deps): reescribe el
+# código del nodo + los scripts de arranque VERIFICADOS, fija Termux:Boot + batería, y deja el
+# panel listo para arrancar todo solo al reboot. Idempotente. Corrige paneles con setup viejo o
+# archivos truncados (la causa de #602). Uso: nspanel.sh converge <node_id> <room> [ip]
+cmd_converge() {
+    local node_id="${1:-}" room="${2:-}" ip="${3:-$NSPANEL_IP}"
+    if [[ -z "$node_id" || -z "$room" ]]; then
+        echo "Uso: nspanel.sh converge <node_id> <room> [ip]"; exit 1
+    fi
+    NSPANEL_IP="$ip"; NSPANEL_ADB="${ip}:5555"
+    local REPO; REPO="$(cd "$(dirname "$0")/.." && pwd)"
+    local AUDIO_URL="${AUDIO_SERVER_URL:-http://192.168.68.132:8766}"
+    echo "=== Converge $node_id (room=$room, ip=$ip) al estado canónico ==="
+    if ! ssh_panel "echo ok" 2>/dev/null | grep -q ok; then
+        echo "  ✗ sin SSH a $ip. Iniciá sshd: NSPANEL_IP=$ip bash scripts/nspanel.sh start-sshd"; exit 1
+    fi
+    echo "[1/3] código del nodo (satellite.py + ui, verificado)"
+    put_verified "$REPO/ear/satellite.py"    "/data/data/com.termux/files/home/satellite.py"    || exit 1
+    put_verified "$REPO/ear/satellite_ui.py" "/data/data/com.termux/files/home/satellite_ui.py" || exit 1
+    echo "  ✓ satellite.py + ui"
+    echo "[2/3] scripts de arranque (verificados)"
+    write_node_scripts "$node_id" "$room" "$AUDIO_URL" || exit 1
+    echo "[3/3] Termux:Boot + batería"
+    adb connect "$NSPANEL_ADB" >/dev/null 2>&1
+    adb_cmd shell am start -n "com.termux.boot/.BootActivity" >/dev/null 2>&1
+    adb_cmd shell su -c 'dumpsys deviceidle whitelist +com.termux' >/dev/null 2>&1 || true
+    echo "  ✓ listo. Reiniciá para validar el arranque autónomo:"
+    echo "     NSPANEL_IP=$ip bash scripts/nspanel.sh reboot"
 }
 
 cmd_help() {
@@ -363,6 +433,10 @@ Comandos:
   provision <name> <room> [ip]  Bootstrap COMPLETO de un panel nuevo (idempotente):
                    apps, deps, modelos, satellite, boot script, registro en panels.yaml.
                    Prereqs físicos: habilitar ADB + setear password SSH (passwd).
+  converge <node_id> <room> [ip]  Lleva un panel YA aprovisionado al estado CANÓNICO
+                   (sin reinstalar apps/deps): reescribe satellite + scripts de arranque
+                   VERIFICADOS por checksum, fija Termux:Boot + batería. Corrige paneles
+                   con setup viejo o archivos truncados (#602). Idempotente.
   help             Mostrar esta ayuda
 
 Ejemplos:
@@ -387,6 +461,7 @@ case "${1:-help}" in
     install-base)  cmd_install_base ;;
     packages)      cmd_packages ;;
     provision)     cmd_provision "${2:-}" "${3:-}" "${4:-}" ;;
+    converge)      cmd_converge "${2:-}" "${3:-}" "${4:-}" ;;
     help|--help|-h) cmd_help ;;
     *)
         echo "Comando desconocido: $1"

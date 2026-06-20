@@ -3216,26 +3216,23 @@ Estado tras la sesión: ambos paneles quedaron con el mismo mecanismo (voice-nod
 script canónico) y el mismo satellite.py, y ambos reportan IP al audio_server. Pero todo el
 procedimiento fue manual y sin red de seguridad.
 
-Trabajo a formalizar como tareas (Etapa E) al tomar la fase:
-  E.1  `nspanel.sh update <panel>`: hot-update VERIFICADO del código del nodo (satellite.py +
-       satellite_ui.py + voice-node.sh) con verificación de integridad (líneas/checksum +
-       readback), restart vía el supervisor (`pkill -f satellite.py` → relanza), y confirmación
-       de re-registro. Idempotente. Reemplaza el scp+pkill manual. Uno o todos los paneles.
-  E.2  El satélite reporta su VERSIÓN de código (hash de satellite.py) en el heartbeat; el
-       audio_server la expone en `GET /nodes`, visible en backoffice/cloud y comparable contra
-       el repo → certeza de qué corre en cada panel. Cierra la matriz dispositivo×componente.
-  E.3  Robustez de arranque: asegurar que Termux:Boot dispare start-ha.sh tras reboot
-       (battery-optimization/permisos), supervisor único con wake-lock, y health-check del nodo
-       (audio_server marca offline + alerta si un panel deja de reportar). [issue #602]
-  E.4  Convergencia de provisioning: `nspanel.sh` lleva CUALQUIER panel al estado canónico
-       (mismo voice-node.sh/start-ha.sh/deps), detectando y corrigiendo setups viejos (pieza). [issue #602]
-
-BUG abierto [issue #602] — arranque no convergente comedor vs pieza: el comedor (instalado a
-mano) bootea a HA Companion limpio y con sshd accesible desde el momento 1; la pieza (provision
-sistémico) abre el dashboard de fábrica primero, a veces no llega a HA Companion, y sshd no
-arranca solo (hay que abrir Termux por ADB y tipear sshd). El provisioning sistémico NO replica
-lo que se logró a mano en el comedor (permiso de Termux:Boot, battery-optimization, app por
-defecto/supresión del launcher de fábrica). Diagnóstico y fix en E.3/E.4.
+Etapa E (T4b) — HECHO 2026-06-21 (escritura verificada + convergencia + #602 resuelto):
+  E.1 ✓ Escritura VERIFICADA por checksum (put_verified: scp + readback de sha256 con reintentos)
+       en `scripts/nspanel.sh`, reemplazando el `ssh "cat > file" <<EOF` ciego que truncaba.
+  E.3 ✓ Robustez de arranque: causa de #602 hallada = el `start-ha.sh` de la pieza quedó en
+       0 bytes (heredoc truncado) → Termux:Boot lo ejecutaba pero no arrancaba nada. start-ha.sh
+       canónico (wake-lock+sshd+HA+supervisor) + Termux:Boot + dumpsys deviceidle whitelist
+       (batería). Validado: la pieza arranca TODO sola al reboot (sshd+supervisor+satellite).
+  E.4 ✓ `nspanel.sh converge <node_id> <room> [ip]`: lleva CUALQUIER panel al estado canónico
+       (satellite + scripts de arranque verificados, Termux:Boot+batería), idempotente; corrige
+       setups viejos/truncados. provision refactorizado para usar el mismo write_node_scripts.
+       Aplicado a comedor y pieza.
+  E.2 (pendiente, va con T5/matriz): el satélite reporta su VERSIÓN (hash) en el heartbeat →
+       audio_server la expone en GET /nodes → matriz dispositivo×componente.
+  Pendiente T4b-motor: integrar el deploy de paneles al MOTOR único (comando deploy.satellites
+       que invoca la convergencia) para operarlo desde el cloud-bo como los otros drivers.
+  NOTA: el TERMUX_USER difiere por panel (comedor u0_a113, pieza u0_a53, según apps previas en
+       cada Android); se pasa por env TERMUX_USER. A futuro: detectarlo automáticamente.
 ```
 
 #### Etapa D - Tests y documentación
