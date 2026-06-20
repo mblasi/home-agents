@@ -325,3 +325,15 @@ def test_cloud_release_unknown_target():
     import pytest
     with pytest.raises(ValueError):
         de.run_cloud_release(["nope"])
+
+
+def test_cloud_deploy_forces_to_latest(monkeypatch):
+    # tras el deploy, despinea el tráfico → --to-latest (si no, un rollback previo deja la
+    # revisión nueva sin tráfico). Regresión del bug T5.
+    monkeypatch.setattr(de, "HEALTH_RETRIES", 2)
+    monkeypatch.setattr(de, "HEALTH_BACKOFF", 0.0)
+    fake = _FakeGcloud()
+    monkeypatch.setattr(de, "_run", fake)
+    monkeypatch.setattr(de, "_http_ok", lambda *a, **k: True)
+    de.run_cloud_release(["cloud-bo"])
+    assert fake.did("update-traffic", "--to-latest")

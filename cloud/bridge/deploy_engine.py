@@ -427,9 +427,16 @@ class CloudRunTarget:
         return r.output.strip() if r.ok and r.output.strip() else None
 
     def deploy(self, emit: LogEmit) -> bool:
-        return _run([GCLOUD, "run", "deploy", self.service, "--source", self._src(),
+        if not _run([GCLOUD, "run", "deploy", self.service, "--source", self._src(),
                      "--project", GCP_PROJECT, "--region", self.region, "--quiet"],
-                    emit, timeout=600).ok
+                    emit, timeout=600).ok:
+            return False
+        # Forzar tráfico a la última revisión: tras un rollback el servicio queda con el tráfico
+        # PINEADO a una revisión vieja (update-traffic --to-revisions), y `deploy` NO lo mueve
+        # solo → la revisión nueva quedaría sin tráfico. --to-latest despinea y sirve la nueva.
+        return _run([GCLOUD, "run", "services", "update-traffic", self.service,
+                     "--project", GCP_PROJECT, "--region", self.region, "--to-latest", "--quiet"],
+                    emit, timeout=120).ok
 
     def health(self, emit: LogEmit) -> bool:
         for _ in range(HEALTH_RETRIES):
