@@ -22,6 +22,8 @@ fi
 ARGS+=("$@")
 
 echo "=== Deploy home-agents → capitan-lxc (motor FASE 34) ==="
+# Versionado semver activo por defecto en el deploy local (igual que el bridge). Se puede
+# desactivar para un deploy puntual con DEPLOY_TAG_RELEASES=false bash scripts/deploy.sh.
 ssh capitan-lxc \
-  "cd ~/workspace/home-agents && ~/home-agents-env/bin/python cloud/bridge/deploy_engine.py ${ARGS[*]}"
+  "cd ~/workspace/home-agents && DEPLOY_TAG_RELEASES=${DEPLOY_TAG_RELEASES:-true} ~/home-agents-env/bin/python cloud/bridge/deploy_engine.py ${ARGS[*]}"
 echo "=== Deploy completo (health-gate y rollback los maneja el motor) ==="

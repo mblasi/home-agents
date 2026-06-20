@@ -55,31 +55,38 @@ def _logs_tail(p: dict) -> ExecResult:
     return _run(["journalctl", "--user", "-u", p["service"], "-n", lines, "--no-pager"], timeout=15)
 
 
-def _run_engine(services, repo_refs) -> ExecResult:
+def _run_engine(services, repo_refs, emit=None) -> ExecResult:
     """Invoca el MOTOR único de deploy (FASE 34). El executor NO reimplementa lógica de deploy:
     sólo traduce comando→args, corre el motor in-process (el bridge corre EN el SER9) y reporta
-    el log incremental + el ok/rollback. Ver deploy_engine.run_release / D1, D7."""
+    el log incremental + el ok/rollback. `emit` (D5): callback de progreso en vivo — cada línea
+    del motor se reenvía al cloud mientras el deploy corre. Ver deploy_engine.run_release / D1."""
     import deploy_engine
     lines: list[str] = []
-    res = deploy_engine.run_release(services, repo_refs or None, emit=lines.append)
+
+    def _emit(line: str) -> None:
+        lines.append(line)
+        if emit:
+            emit(line)
+
+    res = deploy_engine.run_release(services, repo_refs or None, emit=_emit)
     err = "" if res.ok else "deploy con fallos (ver rollback en el log)"
     return ExecResult(res.ok, "\n".join(lines), err)
 
 
-def _deploy_run(p: dict) -> ExecResult:
+def _deploy_run(p: dict, emit=None) -> ExecResult:
     """Compat: deploy.run = release de los servicios default a HEAD de main (+ wa si restart_wa)."""
     import deploy_engine
     services = list(deploy_engine.DEFAULT_SERVICES) + (["wa"] if p.get("restart_wa") else [])
-    return _run_engine(services, None)
+    return _run_engine(services, None, emit)
 
 
-def _deploy_release(p: dict) -> ExecResult:
+def _deploy_release(p: dict, emit=None) -> ExecResult:
     """FASE 34: release con pin de ref por repo. `services` acota qué desplegar (default del
     motor si se omite); core_ref/ear_ref/umbrella_ref pinean cada repo (default origin/main)."""
     repo_refs = {repo: p[key] for repo, key in
                  (("core", "core_ref"), ("ear", "ear_ref"), ("umbrella", "umbrella_ref"))
                  if p.get(key)}
-    return _run_engine(p.get("services"), repo_refs)
+    return _run_engine(p.get("services"), repo_refs, emit)
 
 
 def _config_reload(p: dict) -> ExecResult:
@@ -124,10 +131,17 @@ HANDLERS = {
     "voice.reenroll": _voice_reenroll,
 }
 
+# Comandos largos que emiten progreso EN VIVO (D5): el handler acepta un callback `emit` y va
+# reportando líneas mientras corre (deploy). El resto es fire-and-result (sólo resultado final).
+STREAMING = {"deploy.run", "deploy.release"}
 
-def execute(cmd_type: str, params: dict) -> ExecResult:
-    """Despacha al handler concreto. El tipo ya fue validado contra el catálogo."""
+
+def execute(cmd_type: str, params: dict, emit=None) -> ExecResult:
+    """Despacha al handler concreto. El tipo ya fue validado contra el catálogo. `emit`, si se
+    pasa, recibe líneas de progreso en vivo para los comandos de STREAMING."""
     handler = HANDLERS.get(cmd_type)
     if handler is None:
         return ExecResult(False, "", f"sin handler para {cmd_type!r}")
+    if cmd_type in STREAMING:
+        return handler(params, emit)
     return handler(params)

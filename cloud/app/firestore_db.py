@@ -96,6 +96,7 @@ def enqueue_command(cmd_type: str, params: dict, issued_by: str) -> dict:
         "issued_at": now.isoformat(),
         "status": "pending",
         "result": None,
+        "progress": [],   # D5: líneas de log en vivo (append-only, capadas en append_progress)
         "ttl_at": now + timedelta(hours=COMMAND_TTL_HOURS),
     }
     db().collection("commands").document(cmd["id"]).set(cmd)
@@ -146,3 +147,31 @@ def recent_commands(limit: int = 50) -> list[dict]:
     col = db().collection("commands")
     q = col.order_by("issued_at", direction=firestore.Query.DESCENDING).limit(limit)
     return [snap.to_dict() for snap in q.stream()]
+
+
+# Tope de líneas de progreso por comando (evita docs Firestore enormes; el deploy típico
+# emite decenas de líneas). Si se excede, se conservan las últimas.
+PROGRESS_MAX_LINES = 800
+
+
+def append_progress(cmd_id: str, lines: list[str]) -> bool:
+    """Añade líneas de log al progreso del comando (D5: logs en vivo). Único writer = el bridge
+    que ejecuta ESE comando, así leer→extender→escribir es seguro. Capa a PROGRESS_MAX_LINES."""
+    if not lines:
+        return True
+    ref = db().collection("commands").document(cmd_id)
+    snap = ref.get()
+    if not snap.exists:
+        return False
+    cur = snap.to_dict().get("progress") or []
+    cur.extend(str(l)[:500] for l in lines)
+    if len(cur) > PROGRESS_MAX_LINES:
+        cur = cur[-PROGRESS_MAX_LINES:]
+    ref.update({"progress": cur})
+    return True
+
+
+def get_command(cmd_id: str) -> dict | None:
+    """Un comando por id (para que el dashboard polee su progreso/estado en vivo)."""
+    snap = db().collection("commands").document(cmd_id).get()
+    return snap.to_dict() if snap.exists else None
