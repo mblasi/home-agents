@@ -639,12 +639,12 @@ Foco:     Planificación activa (itinerarios, qué llevar, visa, clima en destin
 ### FASE 8 - Migración a Servidor Dedicado
 ```
 Objetivo: Mover toda la inferencia a hardware dedicado y escalar a modelos más potentes
-Estado:   EN CURSO — la MIGRACIÓN de servicios (home-agents + Ollama) de la laptop al SER9
+Estado:   EN CURSO — la MIGRACIÓN de servicios (home-agents + Ollama) de la laptop al Brain
           está DONE (vía FASE 21: Proxmox + LXC, Ollama con GPU ROCm, laptop como dev/cliente).
           PENDIENTE: un servidor REALMENTE dedicado (GPU NVIDIA potente) para correr un modelo
           grande (qwen 14b/32b/72b, Whisper large-v3 GPU) que reemplace al qwen2.5:7b actual.
 Laptop:   Ya es cliente/satélite + entorno de desarrollo.
-Nota:     El SER9 (Beelink, iGPU 780M/ROCm) alcanza para los servicios y el 7b, pero NO para
+Nota:     El Brain (Beelink, iGPU 780M/ROCm) alcanza para los servicios y el 7b, pero NO para
           modelos grandes — por eso la Etapa D (escalado de modelos) sigue abierta.
 ```
 
@@ -696,7 +696,7 @@ Nota:     El SER9 (Beelink, iGPU 780M/ROCm) alcanza para los servicios y el 7b, 
 - [ ] 8.28 Alertas si un servicio cae (notificación por WhatsApp vía FASE 3.5)
 - [ ] 8.29 Backup automático de modelos fine-tuneados y configuraciones
 - [ ] 8.30 Wake-on-LAN desde laptop (servidor puede estar en suspend fuera de horario)
-- [ ] 8.31 Auto power-on del SER9 tras corte de luz: setear en BIOS "Restore AC Power Loss"
+- [ ] 8.31 Auto power-on del Brain tras corte de luz: setear en BIOS "Restore AC Power Loss"
 - [ ] 8.32  Investigar por qué sin internet no se accede a HAOS en la LAN
            = Power On (no Last State) para que Proxmox levante solo. Verificar que VM 100
            (HAOS) y LXC 101 (capitan-lxc) tengan onboot=1. Complementa 8.25 (UPS): sin BIOS,
@@ -1318,7 +1318,7 @@ Stack:    ytmusicapi (OAuth), yt-dlp (stream resolver), HAOS media_player servic
 
 ```
 Objetivo: Distribuir la interfaz de voz por toda la casa. Los NSPanel Pro (Android, Termux)
-          son los únicos puntos de captura y reproducción de audio. El ear corre en el SER9
+          son los únicos puntos de captura y reproducción de audio. El ear corre en el Brain
           como servidor de audio puro (sin hardware local): recibe audio de los NSPanels,
           corre STT+TTS, delega al core, devuelve el WAV de respuesta.
           La laptop queda 100% desarrollo sin servicios.
@@ -1326,10 +1326,10 @@ Estado:   EN CURSO (22/30 — pipeline nodo+voice-id+enrollment+paneles+observab
           Pendientes: 16.6/16.7/16.9-16.12 (multi-nodo/room routing, diferibles hasta tener más
           paneles) y 16.13/16.14 (RPi — ⏸ POSTERGADAS hasta comprar el hardware).)
 Deps:     FASE 1 (STT, TTS, Piper), FASE 3 (core/server.py, /process),
-          FASE 21 (SER9 operativo — COMPLETA), FASE 2.5 (speaker_id), FASE 12 (backoffice)
+          FASE 21 (Brain operativo — COMPLETA), FASE 2.5 (speaker_id), FASE 12 (backoffice)
 Hardware: NSPanel Pro — Android 8.1, sounddevice/PortAudio, mic (pcmC0D0c) + speaker (pcmC0D0p).
           Termux + Python instalados. HA Companion como dashboard. ADB over WiFi.
-          SER9 LXC — ear como servidor HTTP/WebSocket, STT+TTS sin /dev/snd local.
+          Brain LXC — ear como servidor HTTP/WebSocket, STT+TTS sin /dev/snd local.
 Nota:     Completa también 21.21 (decisión ear). Ver Anexo A.2 (origen).
 ```
 
@@ -1372,7 +1372,7 @@ Nota:     Completa también 21.21 (decisión ear). Ver Anexo A.2 (origen).
 La Etapa A se implementó con HTTP (el fallback de 16.1), no WebSocket — más simple
 y robusto para el MVP. Arquitectura real en producción:
 
-NSPanel Pro (Termux)                      SER9 LXC
+NSPanel Pro (Termux)                      Brain LXC
   ear/satellite.py                          ear/audio_server.py (:8766)
   - openWakeWord (capitan.onnx)             - faster-whisper STT
   - graba comando post-wake-word            - strip wake word prefix
@@ -1469,7 +1469,7 @@ Hardware: Raspberry Pi 5 (4GB+) + pantalla oficial 7" o 10" + ReSpeaker 4-mic ha
             Raspberry Pi OS Lite (64-bit), seeed-voicecard driver, Piper TTS, Chromium en
             kiosk mode (`/etc/xdg/autostart/kiosk.desktop` apuntando a DISPLAY_URL),
             rotación de pantalla si montaje vertical, systemd service `capitan-satellite.service`
-            con auto-reconexión al SER9. Verificación end-to-end: wake word → STT → LLM →
+            con auto-reconexión al Brain. Verificación end-to-end: wake word → STT → LLM →
             TTS local → respuesta audible + dashboard HA visible.
 
 #### Etapa E — Mejora continua de wake word en nodos (coherencia con flujo existente)
@@ -1486,7 +1486,7 @@ Flujo existente: core/wakeword_trainer.py (positivos TTS+reales, negativos está
 - [x] 16.15 Métricas TP/FP orgánicas desde nodos: `audio_server.py` registra TP cuando el STT
             produce texto válido y FP cuando devuelve vacío/ruido tras un comando de nodo.
             Escribe en el mismo `wakeword_metrics.json` que lee el backoffice (audio_server
-            corre en el SER9, co-ubicado con el core). Coherente con `_update_wakeword_metrics`
+            corre en el Brain, co-ubicado con el core). Coherente con `_update_wakeword_metrics`
             de listen.py. El backoffice muestra las métricas de nodos sin cambios.
 - [x] 16.16 Captura orgánica de muestras (gated): el nodo envía junto al comando el audio
             de la wake word que disparó la detección (el buffer pre-comando). `audio_server`:
@@ -1519,7 +1519,7 @@ Principio de diseño: el NODO es agnóstico al usuario — solo captura y emite 
           El nodo no necesita cambios — solo el audio_server agrega el paso de identificación.
 Objetivo: que los comandos de los nodos se personalicen por usuario (hoy van como 'guest').
 Infra existente: ear/speaker_id.py (resemblyzer/GE2E, threshold 0.75), embeddings por
-          usuario en ~/.local/share/capitan/embeddings/<uid>.npy (ya migrados al SER9),
+          usuario en ~/.local/share/capitan/embeddings/<uid>.npy (ya migrados al Brain),
           onboarding paso 'frases_speaker_id' que genera el embedding.
 ```
 
@@ -2003,13 +2003,13 @@ Estado:   COMPLETA
 
 ---
 
-### FASE 21 - Consolidación en SER9 (Paso Intermedio)
+### FASE 21 - Consolidación en Brain (Paso Intermedio)
 ```
 Objetivo: Mover toda la infraestructura de producción a la Beelink SER9 Pro.
           La laptop queda como entorno de desarrollo puro (sin servicios corriendo).
           Misma restricción de modelo 7B que la configuración actual.
-          HAOS migra desde el PC viejo dedicado al SER9.
-Estado:   COMPLETA (23/23 — consolidación en SER9 realizada: audio_server en LXC, NSPanels como I/O de audio, laptop dev-only; decisión 21.21 implementada vía FASE 16)
+          HAOS migra desde el PC viejo dedicado al Brain.
+Estado:   COMPLETA (23/23 — consolidación en Brain realizada: audio_server en LXC, NSPanels como I/O de audio, laptop dev-only; decisión 21.21 implementada vía FASE 16)
 Hardware: Beelink SER9 Pro — AMD Ryzen AI 7 HX 255, 32GB DDR5, Radeon 780M (RDNA 3)
 Stack:    Proxmox VE → VM HAOS + LXC Ubuntu privilegiado (core + backoffice + wa + Ollama)
 Nota:     Stepping stone a FASE 8 (servidor con GPU discreta). No escala modelos: sigue en 7B.
@@ -2018,7 +2018,7 @@ Nota:     Stepping stone a FASE 8 (servidor con GPU discreta). No escala modelos
 #### Arquitectura objetivo
 
 ```
-SER9 (Proxmox VE)
+Brain (Proxmox VE)
 ├── VM: HAOS                     — imagen oficial, bridge LAN → IP real (192.168.68.101)
 └── LXC Ubuntu privilegiado      — todos los servicios home-agents
     ├── core                     — FastAPI :8765
@@ -2035,7 +2035,7 @@ y /dev/snd (audio ALSA, si corre el ear) sea directo y sin complejidad de IOMMU 
 
 #### Etapa A — Proxmox y red
 
-- [x] 21.1  Instalar Proxmox VE en el SER9 (ISO oficial, bare metal).
+- [x] 21.1  Instalar Proxmox VE en el Brain (ISO oficial, bare metal).
             IP estática en la interfaz física del host PVE.
             Hostname: `capitan`, accesible como `capitan.local` (mDNS) o por IP fija.
 - [x] 21.2  Crear bridge `vmbr0` sobre la interfaz física.
@@ -2111,7 +2111,7 @@ y /dev/snd (audio ALSA, si corre el ear) sea directo y sin complejidad de IOMMU 
 
 #### Etapa F — Ear (decisión tomada)
 
-- [x] 21.21 **Decisión**: el ear corre en el LXC del SER9 como servidor de audio — SIN hardware
+- [x] 21.21 **Decisión**: el ear corre en el LXC del Brain como servidor de audio — SIN hardware
             de audio local (no mic, no speaker, no /dev/snd). Es un proceso servidor que:
             - Recibe audio (WAV/chunks) desde los NSPanel Pro vía WebSocket o HTTP
             - Corre STT (faster-whisper) sobre ese audio
@@ -2127,7 +2127,7 @@ y /dev/snd (audio ALSA, si corre el ear) sea directo y sin complejidad de IOMMU 
 - [x] 21.22 Crear `scripts/deploy.sh` en el repo umbrella:
             ```bash
             #!/usr/bin/env zsh
-            # Deploy home-agents al LXC de producción en el SER9.
+            # Deploy home-agents al LXC de producción en el Brain.
             set -e
             ssh capitan "
               cd ~/workspace/home-agents &&
@@ -2156,7 +2156,7 @@ ssh capitan "sudo systemctl stop ollama && curl -fsSL https://ollama.ai/install.
 # home-agents (core + backoffice)
 bash scripts/deploy.sh   # desde la laptop, tras mergear PR a main
 
-# ear — si está en el LXC del SER9
+# ear — si está en el LXC del Brain
 ssh capitan "cd ~/workspace/home-agents && git pull --recurse-submodules && systemctl --user restart capitan"
 
 # ear — si está en la laptop (opción B de 21.21)
@@ -2821,18 +2821,18 @@ Deps:     FASE 9 (coordinador), FASE 24 (tracing).
 
 ---
 
-### FASE 31 - Optimización de Performance LLM en SER9
+### FASE 31 - Optimización de Performance LLM en Brain
 
 ```
-Objetivo: Explorar palancas de mejora de latencia LLM en el SER9 (Beelink, Radeon 780M gfx1103).
+Objetivo: Explorar palancas de mejora de latencia LLM en el Brain (Beelink, Radeon 780M gfx1103).
           Baseline actual: 27.5s CPU-only, 13.3s ROCm con HSA_OVERRIDE_GFX_VERSION=11.0.0.
           Target: reducir latencia warm por debajo de 5s sin cambiar el modelo.
 Estado:   COMPLETA (5/5 — Vulkan/ROCm, keepalive, iGPU, benchmark de quantización: se mantiene q4_k_m)
-Deps:     FASE 21 (SER9 operativo con LXC — COMPLETA)
+Deps:     FASE 21 (Brain operativo con LXC — COMPLETA)
 Hardware: Beelink SER9 Pro — Ryzen AI 7 HX 255, 32GB DDR5, Radeon 780M (RDNA 3 / gfx1103)
 ```
 
-- [x] 31.1  Vulkan backend: benchmarkar `OLLAMA_GPU_BACKEND=vulkan` vs ROCm en SER9.
+- [x] 31.1  Vulkan backend: benchmarkar `OLLAMA_GPU_BACKEND=vulkan` vs ROCm en Brain.
             La 780M tiene soporte Vulkan nativo y estable — puede superar el ROCm parcial.
             Medir latencia warm con ambos backends. Documentar ganador en NOTAS.
 - [x] 31.2  Warm LLM keepalive: configurar `OLLAMA_KEEP_ALIVE` para evitar descarga del
@@ -2844,7 +2844,7 @@ Hardware: Beelink SER9 Pro — Ryzen AI 7 HX 255, 32GB DDR5, Radeon 780M (RDNA 3
 - [x] 31.4  Benchmark warm vs cold: medir latencia warm (modelo ya cargado) vs cold para
             entender el real bottleneck. Si warm < 3s, el problema es solo el cold start.
 - [x] 31.5  Quantización alternativa: benchmarkar qwen2.5:7b con distintas quantizaciones
-            (q4_0 vs q4_k_m vs q5_k_m) en SER9 para encontrar el mejor balance velocidad/calidad.
+            (q4_0 vs q4_k_m vs q5_k_m) en Brain para encontrar el mejor balance velocidad/calidad.
             Resultado (warm, prompt domótica, GPU ROCm): q4_k_m 1.68s/12.8 tok/s (actual) ·
             q4_0 1.35s/16.2 tok/s · q5_k_m 1.41s/15.3 tok/s. q4_0 ~20% más rápido y mantiene el
             formato ACTION en el caso simple, pero es el quant de menor calidad (riesgo en
@@ -2862,13 +2862,13 @@ Objetivo: Reemplazar los JSON files en ~/.local/share/capitan/ por una base de d
           estructurada (SQLite). Elimina problemas de concurrencia, mejora queries,
           facilita backup y migración entre servidores.
 Estado:   COMPLETA (32.1-32.6: esquema + db.py + migración + módulos migrados a SQLite +
-          backup. Validado en producción contra datos reales del SER9: el core lee y escribe
+          backup. Validado en producción contra datos reales del Brain: el core lee y escribe
           de capitan.db; los JSON migrados se movieron a un backup (_pre_db_backup_*). Quedan
           como archivos por diseño: embeddings .npy, wakeword_samples, wa-session, traces JSONL,
           wakeword_metrics. Los **paneles** también se completaron a la DB (tabla `panels`, core
           expone `GET/POST/DELETE /panels`; backoffice/scripts/provisioning lo consumen;
           `panels.yaml` removido).)
-Deps:     FASE 21 (SER9 estable — COMPLETA)
+Deps:     FASE 21 (Brain estable — COMPLETA)
 Motivación: actualmente los datos (usuarios, intents, conversaciones, portfolios,
             contextos, routines, etc.) son ~30 archivos JSON sin esquema formal,
             sin transacciones, sin índices. Migración costosa pero necesaria para escalar.
@@ -2901,22 +2901,22 @@ Motivación: actualmente los datos (usuarios, intents, conversaciones, portfolio
 ### FASE 33 - Backoffice en la nube (acceso remoto seguro, egress-only)
 
 ```
-Objetivo: Tener un backoffice accesible desde internet SIN exponer el SER9 ni HAOS.
-          La nube nunca inicia conexiones hacia la casa: el SER9 empuja estado para
+Objetivo: Tener un backoffice accesible desde internet SIN exponer el Brain ni HAOS.
+          La nube nunca inicia conexiones hacia la casa: el Brain empuja estado para
           dibujar el dashboard y POLEA una cola de comandos para ejecutar acciones de
           administración (patrón command / executor). Plataforma: Google Cloud.
 Estado:   COMPLETA — cloud + bridge + login consistente (roster email→rol) + RBAC, y SSO
           del backoffice local (reusa el Google sign-in de la nube) + RBAC local. Verificado e2e.
 Deps:     FASE 12 (backoffice local — COMPLETA, fuente de datos y UI a reusar),
-          FASE 21 (SER9 estable — COMPLETA), FASE 32 (datos en SQLite — COMPLETA).
-Principio de seguridad: el SER9 sólo hace conexiones SALIENTES (HTTPS) a la nube.
+          FASE 21 (Brain estable — COMPLETA), FASE 32 (datos en SQLite — COMPLETA).
+Principio de seguridad: el Brain sólo hace conexiones SALIENTES (HTTPS) a la nube.
           Cero port-forwarding, cero inbound, HAOS/core nunca tocan internet. La
           superficie de ataque en la casa es nula; si la nube cae, el sistema local
           sigue operando y el backoffice local (LAN) sigue disponible.
 Arquitectura:
-          [SER9 LXC] --push estado-->  [Cloud Run + Firestore]  <--dashboard-- [navegador]
-          [SER9 LXC] --poll comandos->  (cola en Firestore)     <--emite cmd-- [navegador]
-          [SER9 LXC] --post resultado-> (estado del comando)
+          [Brain LXC] --push estado-->  [Cloud Run + Firestore]  <--dashboard-- [navegador]
+          [Brain LXC] --poll comandos->  (cola en Firestore)     <--emite cmd-- [navegador]
+          [Brain LXC] --post resultado-> (estado del comando)
 Stack GCP elegido: Cloud Run (web + API, scale-to-zero), Firestore (snapshot de
           estado + cola de comandos), Identity Platform/Firebase Auth (login del
           dashboard, restringido al email del usuario), Secret Manager (credenciales),
@@ -2937,7 +2937,7 @@ Stack GCP elegido: Cloud Run (web + API, scale-to-zero), Firestore (snapshot de
             servicio, redeploy, ver logs, recargar config, reentrenar wake word, re-enrolar voz,
             etc. Cada comando es un tipo cerrado con parámetros validados. NUNCA shell arbitrario.
 - [x] 33.4  Definir autenticación en ambas direcciones: dashboard vía Identity Platform
-            restringido al email del usuario; bridge del SER9 vía token OIDC de Service Account
+            restringido al email del usuario; bridge del Brain vía token OIDC de Service Account
             (sin API keys embebidas si se puede). Definir rotación de credenciales.
 
 #### Etapa B - Servicio en la nube (Cloud Run + Firestore)
@@ -2953,7 +2953,7 @@ Stack GCP elegido: Cloud Run (web + API, scale-to-zero), Firestore (snapshot de
 - [x] 33.9  IaC reproducible (script gcloud): `infra/provision.sh` (Cloud Run, Firestore,
             TTL, SAs) + `infra/setup_firebase.sh` (Identity Platform/Firebase Auth).
 
-#### Etapa C - Bridge / executor en el SER9
+#### Etapa C - Bridge / executor en el Brain
 > Desplegado en capitan-lxc: `cloud/bridge/` + systemd `capitan-bridge.service`.
 - [x] 33.10 Daemon `cloud_bridge.py` (systemd unit en el LXC): push periódico del snapshot
             de estado a `/ingest/state`, reusando datos que ya escriben core/backoffice.
@@ -2970,7 +2970,7 @@ Stack GCP elegido: Cloud Run (web + API, scale-to-zero), Firestore (snapshot de
 - [x] 33.15 Auditoría visible en el dashboard: quién emitió cada comando, cuándo y resultado.
 - [x] 33.16 Mantener dentro del free tier de GCP (Cloud Run scale-to-zero, cuota de Firestore);
             alerta de presupuesto. (budget USD 5, alertas 50/90/100%)
-- [x] 33.17 Failover: si la nube cae, el SER9 sigue operando local y el bridge reintenta; si el
+- [x] 33.17 Failover: si la nube cae, el Brain sigue operando local y el bridge reintenta; si el
             bridge cae, el backoffice local en LAN (FASE 12) sigue disponible. (verificado e2e)
 
 #### Etapa E - Login consistente con gestión de usuarios + RBAC
@@ -2997,39 +2997,39 @@ Stack GCP elegido: Cloud Run (web + API, scale-to-zero), Firestore (snapshot de
 - [x] 33.24 RBAC en el backoffice local: admin escribe; familiar/adolescente read-only (bloqueo
             de POST/PATCH/DELETE/PUT por middleware); roles sin acceso rechazados. Tests.
 
-### FASE 34 - Deploy remoto al SER9 (CD sobre el bridge egress-only)
+### FASE 34 - Deploy remoto al Brain (CD sobre el bridge egress-only)
 
 ```
-Objetivo: Desplegar al SER9 desde cualquier lado (fuera de la LAN) de forma segura,
+Objetivo: Desplegar al Brain desde cualquier lado (fuera de la LAN) de forma segura,
           versionada y reversible, SIN abrir un solo puerto entrante en la casa. El
           deploy es un comando tipado más en el allowlist del bridge (FASE 33): el
-          dashboard cloud lo emite, el SER9 lo polea y lo ejecuta como un release CD
+          dashboard cloud lo emite, el Brain lo polea y lo ejecuta como un release CD
           (pin de ref por submodule → snapshot → deploy atómico → health-gate →
           rollback automático si falla), registra la versión desplegada y la reporta.
-Estado:   EN CURSO — motor único operativo y LIVE en el SER9. Hechas: 34.1 (contrato
+Estado:   EN CURSO — motor único operativo y LIVE en el Brain. Hechas: 34.1 (contrato
           deploy.release), 34.3-34.6 (motor: pin/health/rollback), 34.9 (invocadores: executor
           + deploy.sh sobre el motor), 34.12 (versionado semver: tag+push por repo, ACTIVO —
           v0.1.0 en core/ear/umbrella; falta sólo el GitHub Release formal con notas = token GH),
           y LOGS EN VIVO (D5) end-to-end: el motor emite progreso → bridge lo postea por lotes →
           la nube lo acumula → el cloud-bo lo muestra en streaming (executor emit, /commands/
           {id}/progress, /api/commands/{id}, frontend). T4a driver cloudrun ACTIVADO+probado
-          (deploy del cloud-bo desde el SER9 + rollback a revisión previa); gcloud en el SER9.
+          (deploy del cloud-bo desde el Brain + rollback a revisión previa); gcloud en el Brain.
           T4b: #602 resuelto, provisioning robusto (converge + escritura verificada por checksum),
           satélites bajo el motor (34.13: auto-update por pull + reportan versión). T5 parcial:
-          MATRIZ DE VERSIONES en el snapshot + cloud-bo (34.7/34.14) — por repo del SER9 la versión
+          MATRIZ DE VERSIONES en el snapshot + cloud-bo (34.7/34.14) — por repo del Brain la versión
           que corre (sha+tag+link al release GH) y la ÚLTIMA disponible (origin/main + tag, fetch
           throttled) con flag `behind`; por panel versión vs esperada (up_to_date). Prep permisos
           gcloud (D9). Pendientes: matriz en BACKOFFICE LOCAL (34.7/34.14), panel de deploy admin
           en cloud (34.8), tests e2e + docs (34.10/34.11).
 Deps:     FASE 33 (bridge egress-only + allowlist tipado + auth/audit/RBAC — COMPLETA,
           ya existe el comando `deploy.run` que esta fase eleva a CD real),
-          FASE 21 (SER9 estable — COMPLETA), FASE 12 (backoffice — COMPLETA).
-Principio de seguridad: se hereda intacto el modelo de FASE 33 — el SER9 sólo hace
+          FASE 21 (Brain estable — COMPLETA), FASE 12 (backoffice — COMPLETA).
+Principio de seguridad: se hereda intacto el modelo de FASE 33 — el Brain sólo hace
           conexiones SALIENTES. El deploy NO es un canal nuevo: es un tipo de comando
-          más en la cola que el SER9 ya polea. Cero inbound, cero port-forwarding, cero
+          más en la cola que el Brain ya polea. Cero inbound, cero port-forwarding, cero
           SSH expuesto. Descartado VPN/Tailscale + SSH por abrir canal entrante.
 Principio de unificación de backend (CIMIENTO, no cleanup posterior): existe UN solo
-          motor de deploy que corre en el SER9 (snapshot → pin de ref → install →
+          motor de deploy que corre en el Brain (snapshot → pin de ref → install →
           restart → health-gate → rollback). Ese motor es el ÚNICO backend de deploy.
           Hay UN solo frontend de deploy: el dashboard cloud egress-only (FASE 33), para
           operar el deploy de forma REMOTA. En LOCAL no hay frontend/UI interno: el
@@ -3037,7 +3037,7 @@ Principio de unificación de backend (CIMIENTO, no cleanup posterior): existe UN
           vía `scripts/deploy.sh` / la skill `deploy`. Es decir, dos invocadores del
           mismo motor:
             - Remoto: dashboard cloud egress-only → comando `deploy.release` → el bridge
-                      executor NO reimplementa deploy, sólo invoca el motor en el SER9.
+                      executor NO reimplementa deploy, sólo invoca el motor en el Brain.
             - Local:  Claude → `scripts/deploy.sh` (wrapper fino que invoca el motor por
                       SSH). No es una "UI": es el operador humano/Claude llamando al motor.
           Regla: ninguna lógica de deploy (pin/install/restart/health/rollback) puede
@@ -3057,21 +3057,21 @@ Punto de partida (gap a cerrar): hoy `deploy.run` (cloud/bridge/executor.py) hac
           restart deja el sistema roto, no versiona en GitHub y no registra/muestra qué
           versión quedó corriendo por componente.
 Alcance multi-dispositivo (segundo gap): el componente `ear` NO corre en un solo lugar.
-          `audio_server.py` corre en el SER9 LXC; `satellite.py`/`satellite_ui.py` corren en
+          `audio_server.py` corre en el Brain LXC; `satellite.py`/`satellite_ui.py` corren en
           CADA NSPanel (comedor, etc.) vía Termux, desplegados por un mecanismo APARTE y no
           trazado (`scripts/nspanel.sh` hace `scp` del satellite a cada panel; el hot-update
           es scp + pkill, fuera de `deploy.sh`). El motor de deploy no toca los paneles. Por
           eso la versión correcta a modelar no es "ref por componente" sino una MATRIZ
-          `dispositivo × componente → versión` (SER9: core/backoffice/wa/audio_server; cada
+          `dispositivo × componente → versión` (Brain: core/backoffice/wa/audio_server; cada
           NSPanel: satellite), donde un panel puede quedar rezagado sin que nada lo registre.
           Camino egress-only: el satélite ya se registra contra `audio_server` (cuyo estado
           ya viaja al snapshot), así que reporta su versión al registrarse → snapshot → nube.
 Arquitectura (un motor, dos invocadores):
           REMOTO (frontend): [dashboard cloud] --deploy.release(refs)--> [Firestore]
-                             [SER9 bridge] --poll--> executor (sin lógica propia) ─┐
+                             [Brain bridge] --poll--> executor (sin lógica propia) ─┐
           LOCAL (sin UI):    [Claude/laptop] --SSH--> scripts/deploy.sh (wrapper) ─┤
                                                                                    ▼
-                                            [MOTOR DE DEPLOY en el SER9]
+                                            [MOTOR DE DEPLOY en el Brain]
               snapshot ref actual → fetch+checkout ref pedido → install → restart
               → health-gate (/health core+backoffice)
                   → OK:   tag + GitHub Release por componente → registra versión desplegada
@@ -3079,10 +3079,10 @@ Arquitectura (un motor, dos invocadores):
 ```
 
 DECISIONES CONSOLIDADAS (2026-06-20, al tomar la fase — amplían el alcance de arriba):
-  D1. SER9 = ejecutor UNIVERSAL. TODO el deploy (de cualquier componente, en cualquier
-      dominio) se dispara como comando del backoffice CLOUD y lo ejecuta el SER9 al polearlo
+  D1. Brain = ejecutor UNIVERSAL. TODO el deploy (de cualquier componente, en cualquier
+      dominio) se dispara como comando del backoffice CLOUD y lo ejecuta el Brain al polearlo
       (egress-only). No hay deploy directo desde la notebook fuera del flujo de comandos. Razón:
-      desde fuera de casa la notebook NO tiene ruta a la LAN (SER9/paneles); el único plano de
+      desde fuera de casa la notebook NO tiene ruta a la LAN (Brain/paneles); el único plano de
       control común es el cloud-bo. El `scripts/deploy.sh` local queda como wrapper fino para
       cuando Claude opera DESDE la LAN, invocando el mismo motor.
   D2. El motor tiene UN driver por tipo de target (misma interfaz: snapshot→deploy→health→
@@ -3097,11 +3097,11 @@ DECISIONES CONSOLIDADAS (2026-06-20, al tomar la fase — amplían el alcance de
         - driver `cloudrun` (cloud-bo, oauth-app/meli): `gcloud run deploy --source` (egress
           a GCP) → health-gate = curl a la URL pública → rollback = `gcloud run services
           update-traffic` a la revisión previa (Cloud Run conserva revisiones).
-  D3. El SER9 requiere credencial gcloud con rol run.admin (+ acceso al build) para el driver
+  D3. El Brain requiere credencial gcloud con rol run.admin (+ acceso al build) para el driver
       cloudrun. Sigue siendo EGRESS-ONLY (llama a las APIs de Google, saliente). Aprovisionar.
   D4. Circularidad de la cloud (desplegar cloud-bo y romperla = perder el canal de comandos):
       se mitiga con health-gate + rollback automático a la revisión previa de Cloud Run que el
-      propio SER9 dispara (no depende de la cloud para revertir). Escape hatch documentado:
+      propio Brain dispara (no depende de la cloud para revertir). Escape hatch documentado:
       `gcloud run deploy` manual desde la notebook si el rollback automático también falla.
   D5. Feedback rico con LOGS EN VIVO (requisito de UX): el modelo de comandos pasa de
       fire-and-result a PROGRESO INCREMENTAL — el motor emite líneas de log; el bridge las
@@ -3120,15 +3120,15 @@ DECISIONES CONSOLIDADAS (2026-06-20, al tomar la fase — amplían el alcance de
   D9. El driver cloudrun usa una SA de deploy DEDICADA (separada de runtime y bridge SA), con
       permiso mínimo: run.admin (deploy + update-traffic/rollback), cloudbuild.builds.editor,
       artifactregistry.writer, iam.serviceAccountUser (actuar como la runtime SA), storage sobre
-      el bucket de staging de Cloud Build. Key JSON en el SER9 (egress-only). Script idempotente:
+      el bucket de staging de Cloud Build. Key JSON en el Brain (egress-only). Script idempotente:
       cloud/infra/provision_deploy_sa.sh. (Confirmado 2026-06-20.)
-      ACTIVADO Y PROBADO (2026-06-21, T4a): driver cloudrun deploya el cloud-bo desde el SER9
+      ACTIVADO Y PROBADO (2026-06-21, T4a): driver cloudrun deploya el cloud-bo desde el Brain
       end-to-end (build en Cloud Build → deploy → health → ok), y el rollback automático a la
       revisión previa quedó validado (en intentos fallidos por permisos, el cloud-bo se restauró
-      sano solo). Hecho: gcloud CLI instalado en el SER9; SA capitan-deployer con run.admin +
+      sano solo). Hecho: gcloud CLI instalado en el Brain; SA capitan-deployer con run.admin +
       cloudbuild.builds.editor + artifactregistry.writer + storage.admin + logging.viewer
       (proyecto) + actAs sobre runtime SA del cloud-bo y la default compute SA del build; key JSON
-      en ~/.config/capitan/deployer-key.json del SER9 + SA activada en gcloud (root). Permisos
+      en ~/.config/capitan/deployer-key.json del Brain + SA activada en gcloud (root). Permisos
       reproducibles en cloud/infra/provision_deploy_sa.sh. FALTA: capitan-oauth como 2º target
       (otra región us-east1 + env vars/secrets); driver panel (34.13 T4b).
 ```
@@ -3140,11 +3140,11 @@ DECISIONES CONSOLIDADAS (2026-06-20, al tomar la fase — amplían el alcance de
             (rechazar refs arbitrarios/inyección); mantener `restart_wa`. Tests del catálogo.
 - [ ] 34.2  Definir el contrato de "release" como dato versionado: refs desplegados por
             submodule + commit del umbrella, timestamp, quién lo emitió, resultado y estado
-            del health-gate, y si hubo rollback. Persistencia local en el SER9 (fuente de
+            del health-gate, y si hubo rollback. Persistencia local en el Brain (fuente de
             verdad) y subconjunto reportado en el snapshot a la nube.
 
-#### Etapa B - Motor de deploy en el SER9 (único backend: atómico + reversible)
-- [x] 34.3  Crear el MOTOR de deploy como artefacto ÚNICO que corre en el SER9 (script/
+#### Etapa B - Motor de deploy en el Brain (único backend: atómico + reversible)
+- [x] 34.3  Crear el MOTOR de deploy como artefacto ÚNICO que corre en el Brain (script/
             módulo, p.ej. `scripts/deploy_engine.sh` o `cloud/bridge/deploy_engine.py`),
             invocable por CLI con args tipados (refs por submodule, restart_wa). Es el único
             lugar con lógica de deploy; ningún frontend la duplica. Snapshot pre-deploy:
@@ -3167,13 +3167,13 @@ DECISIONES CONSOLIDADAS (2026-06-20, al tomar la fase — amplían el alcance de
             El tag/release es la fuente de verdad de "qué versión está corriendo" (ref inmutable).
             El rollback registra un evento sobre esos refs versionados. Esta versión por
             componente la consumen los dos frontends (34.7). Requiere credencial de GitHub para
-            el motor en el SER9 (egress-only; el SER9 ya hace sólo conexiones salientes).
+            el motor en el Brain (egress-only; el Brain ya hace sólo conexiones salientes).
 
 #### Etapa C - Visibilidad y operación
-- [ ] 34.7  Registrar la versión desplegada por componente (core/ear/umbrella → release de
+- [x] 34.7  Registrar la versión desplegada por componente (core/ear/umbrella → release de
             GitHub + estado del release) y exponerla en LOS DOS frontends: (a) dashboard cloud
             egress-only vía snapshot, y (b) backoffice interno (LAN, FASE 12) leyendo el estado
-            local del SER9. Mostrar versión actual corriendo, último deploy, resultado y si
+            local del Brain. Mostrar versión actual corriendo, último deploy, resultado y si
             hubo rollback. Auditoría reusa la de FASE 33 (quién emitió, cuándo).
 - [x] 34.13 Satélites NSPanel bajo el motor único (cierra el gap multi-dispositivo): el motor
             (o un sub-comando `deploy.satellites`) despliega `satellite.py`/`satellite_ui.py` a
@@ -3181,14 +3181,16 @@ DECISIONES CONSOLIDADAS (2026-06-20, al tomar la fase — amplían el alcance de
             su transporte; registra la versión desplegada por panel. El satélite AUTO-REPORTA su
             versión (ref/tag corriendo) al registrarse en `audio_server`. Tests con scp/ssh
             mockeados. (Hereda el modelo egress-only y los footguns de pkill/supervisor del panel.)
-- [ ] 34.14 Matriz `dispositivo × componente → versión` en LOS DOS frontends: en vez de "versión
-            de core", una tabla por dispositivo (SER9: core/backoffice/wa/audio_server; cada
+- [x] 34.14 Matriz `dispositivo × componente → versión` en LOS DOS frontends: en vez de "versión
+            de core", una tabla por dispositivo (Brain: core/backoffice/wa/audio_server; cada
             NSPanel: satellite) con la versión corriendo, si está rezagada vs. el release vigente,
             y último deploy/rollback por dispositivo. La versión por panel llega vía snapshot
             (audio_server → bridge). Reusa el panel de versiones de 34.7.
-- [ ] 34.8  Panel de deploy en el dashboard cloud (RBAC: sólo admin emite): elegir ref/tag,
-            disparar el release, ver progreso/resultado/rollback. Reusa el panel de acciones
-            y el gate de capacidades de FASE 33; el frontend oculta la acción a no-admin.
+- [x] 34.8  Panel de deploy en el dashboard cloud (RBAC: sólo admin emite): botón de deploy
+            contextual por componente en la matriz de versiones (repo Brain → deploy.release;
+            cloud-bo → deploy.cloud; '⬆ actualizar' cuando behind). Reusa el gate CAPS.emit y
+            el streaming de logs (streamCommand) de FASE 33; el frontend oculta la acción a
+            no-admin. El form admin genérico (select+JSON) se conserva para pin de refs y wa/bridge.
 - [x] 34.9  Invocadores sobre el motor único (cierra el principio de unificación). Las dos
             rutas invocan el MISMO motor (34.3-34.6); ninguna reimplementa nada:
             (a) REMOTO — el `executor` del bridge (`cloud/bridge/executor.py`) deja de hacer
@@ -3240,6 +3242,24 @@ Etapa E (T4b) — HECHO 2026-06-21 (escritura verificada + convergencia + #602 r
   NOTA: el TERMUX_USER difiere por panel (comedor u0_a113, pieza u0_a53, según apps previas en
        cada Android); se pasa por env TERMUX_USER. A futuro: detectarlo automáticamente.
 ```
+
+#### Etapa F - Matriz de targets unificada + compartimentación física
+- [ ] 34.15 Matriz de TARGETS unificada (operatoria): en vez de mostrar repos/services/cloudrun/
+            paneles como abstracciones separadas, una sola lista de "targets desplegables" (core,
+            audio_server, backoffice, cloud-bo, un panel por NSPanel), cada uno con versión que
+            corre + última disponible + un botón "Actualizar" que elige el comando solo
+            (deploy.release / deploy.cloud / deploy.satellites). Registro único `TARGETS` en el
+            motor, consumido por el snapshot y los dos frontends. wa/bridge quedan en "avanzado".
+- [ ] 34.16 `deploy.satellites` (force pull de paneles): el panel ya auto-actualiza cada
+            MODEL_SYNC_SECS; el comando marca el nodo (`POST /nodes/{id}/update` en audio_server)
+            y el próximo heartbeat le devuelve `update:true` → corre `_check_code_update()` fuera
+            de ciclo. node_id '*'/'all' → todos. Cierra el botón de deploy por panel en la matriz.
+- [ ] 34.17 (FUTURO) Compartimentación física por unidad deployable: extraer `backoffice/`,
+            `cloud/` (bo+bridge, acoplados por el contrato `app.commands`) y `wa/` del umbrella a
+            submodules propios, cada uno con su línea de versión. NO 1:1 estricto por target:
+            cloud-bo+bridge y audio_server+satélite están acoplados por código y van juntos.
+            umbrella queda con scripts/masterplan/docs/infra (orquestación, no runtime). Trabajo
+            grande y casi irreversible (repos GH nuevos, CI, paths de deploy) → tanda aparte.
 
 #### Etapa D - Tests y documentación
 - [ ] 34.10 Tests: validación del comando con refs (`cloud/tests`); executor con snapshot /
@@ -3420,7 +3440,7 @@ Estado:   Pendiente.
 Deps:     FASE 33 (backoffice cloud + bridge egress-only + RBAC — COMPLETA, base a extender),
           FASE 35 (dashboards de métricas — COMPLETA, ya viven en el cloud),
           FASE 34 (deploy remoto — la sección Deploy del sidebar consume su versión reportada).
-Principio de seguridad: se hereda intacto el modelo egress-only de FASE 33. El SER9 sólo
+Principio de seguridad: se hereda intacto el modelo egress-only de FASE 33. El Brain sólo
           hace conexiones SALIENTES. Toda sección nueva se alimenta por snapshot-push
           (cloud/bridge/snapshot.py → POST /ingest/state) o por comando-poll (allowlist
           tipado de cloud/app/commands.py). Cero inbound. Nunca salen de la LAN: .env,
@@ -3500,18 +3520,18 @@ Mapa de paridad local→cloud (qué se incluye y bajo qué gate):
             presentación por parámetro (`kind`/`label`/`choices`/`min`/`max`/`default`) sin
             cambiar `validate_command`. RBAC aplicado por endpoint.
 
-#### Etapa D - Bridge / executor (SER9)
+#### Etapa D - Bridge / executor (Brain)
 - [ ] 37.7  `cloud/bridge/snapshot.py`: emitir los campos nuevos reusando datos que ya computan
             core/backoffice (sin PII en claro; sólo conteos). No reimplementar lógica.
 - [ ] 37.8  `cloud/bridge/executor.py`: implementar `agent.toggle`, `panel.reboot`,
             `proactive.run` (tipo→función concreta, sin eval; auditoría como los existentes),
-            invocando las APIs/scripts del SER9 ya existentes.
+            invocando las APIs/scripts del Brain ya existentes.
 
 #### Etapa F - Logs del satélite por panel (ambos backoffices)
 - [ ] 37.10 Ver los logs del satélite de CADA panel en LOS DOS backoffices (local LAN + cloud
             egress-only). El log vive en el panel (`~/.satellite.log` en Termux). Mecanismo único
             reutilizable "traer N líneas del satélite del panel X" (ssh a Termux:8022 desde el
-            SER9, o relay vía `audio_server`), invocado por: (a) backoffice local con selector de
+            Brain, o relay vía `audio_server`), invocado por: (a) backoffice local con selector de
             panel en `/logs` (fetch directo, está en la LAN), y (b) cloud vía comando tipado
             (extender `logs.tail` con `node_id` opcional, o `logs.satellite`) → bridge ejecuta el
             fetch → resultado al panel Logs (37.4/37.6). Sin duplicar la lógica de fetch entre

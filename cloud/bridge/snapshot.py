@@ -1,4 +1,4 @@
-"""Construcción del snapshot de estado (SER9 → nube). FASE 33 (33.10).
+"""Construcción del snapshot de estado (Brain → nube). FASE 33 (33.10).
 
 Reusa datos que ya producen core (:8765) y audio_server (:8766) + /tmp/capitan.
 Best-effort y resiliente: cada fuente está envuelta en try/except y nunca propaga
@@ -164,7 +164,7 @@ _last_fetch = 0.0
 
 def _maybe_fetch(repos, de) -> None:
     """git fetch de los repos para conocer la ÚLTIMA versión disponible (origin/main + tags), con
-    throttle (no en cada snapshot). Egress-only: el SER9 sólo hace una conexión saliente a GitHub."""
+    throttle (no en cada snapshot). Egress-only: el Brain sólo hace una conexión saliente a GitHub."""
     global _last_fetch
     import time
     if time.time() - _last_fetch < _FETCH_INTERVAL:
@@ -175,53 +175,73 @@ def _maybe_fetch(repos, de) -> None:
                 de._noop_emit, timeout=60)
 
 
+def _repo_git_info(de, repo) -> dict:
+    """sha+tag+link que CORRE y la ÚLTIMA disponible (origin/main + mayor tag semver) de un repo."""
+    gd = repo.git_dir()
+    sha = repo.head(de._noop_emit)
+    tag = de._tag_at(gd, sha, de._noop_emit) if sha else None
+    slug = de._repo_slug(gd, de._noop_emit)
+    r = de._run(["git", "-C", gd, "rev-parse", "--short", "origin/main"], de._noop_emit, timeout=15)
+    latest_sha = r.output.strip() if r.ok and r.output.strip() else None
+    lv = de._latest_semver(gd, de._noop_emit)
+    latest_tag = ("v%d.%d.%d" % lv) if lv else None
+
+    def _gh(ref, is_tag):  # link a release si es tag, al commit si es sha — siempre hay link
+        if not slug or not ref:
+            return None
+        return (f"https://github.com/{slug}/releases/tag/{ref}" if is_tag
+                else f"https://github.com/{slug}/commit/{ref}")
+
+    return {"sha": sha, "tag": tag, "url": _gh(tag or sha, bool(tag)),
+            "latest_sha": latest_sha, "latest_tag": latest_tag,
+            "latest_url": _gh(latest_tag or latest_sha, bool(latest_tag))}
+
+
 def _versions(nodes: list[dict]) -> dict:
-    """Matriz de versiones dispositivo×componente (FASE 34 T5 / 34.7/34.14): por repo del SER9
-    (core/ear/umbrella) el sha+tag+link al release de GitHub que CORRE y la ÚLTIMA disponible
-    (origin/main + último tag) con flag `behind` para detectar rezago → disparar update; y por
-    panel la versión reportada (heartbeat) vs la esperada (la que sirve el audio_server). Best-effort."""
-    out: dict = {"ser9": {}, "panels": [], "satellite_expected": None}
+    """Matriz de TARGETS desplegables (34.15): UNA lista plana de cosas que corren — services del
+    Brain (core/audio_server/backoffice), Cloud Run (cloud-bo) y un satélite por panel. Cada target
+    lleva la versión que corre, la última disponible (origin/main + tag) con flag `behind`, links a
+    GitHub, y el comando+params que lo despliega (el frontend sólo emite). Best-effort; nunca lanza."""
+    out: dict = {"targets": [], "satellite_expected": None}
+    ear_url = None
     try:
         import deploy_engine as de
         _maybe_fetch(de.REPOS, de)
-        for name, repo in de.REPOS.items():
-            gd = repo.git_dir()
-            sha = repo.head(de._noop_emit)
-            tag = de._tag_at(gd, sha, de._noop_emit) if sha else None
-            slug = de._repo_slug(gd, de._noop_emit)
-            # última disponible: origin/main + mayor tag semver conocido (tras el fetch)
-            r = de._run(["git", "-C", gd, "rev-parse", "--short", "origin/main"],
-                        de._noop_emit, timeout=15)
-            latest_sha = r.output.strip() if r.ok and r.output.strip() else None
-            lv = de._latest_semver(gd, de._noop_emit)
-            latest_tag = ("v%d.%d.%d" % lv) if lv else None
-
-            def _gh(ref, is_tag):  # link a release si es tag, al commit si es sha — siempre hay link
-                if not slug or not ref:
-                    return None
-                return (f"https://github.com/{slug}/releases/tag/{ref}" if is_tag
-                        else f"https://github.com/{slug}/commit/{ref}")
-
-            out["ser9"][name] = {
-                "version": sha, "tag": tag, "url": _gh(tag or sha, bool(tag)),
-                "latest_sha": latest_sha, "latest_tag": latest_tag,
-                "latest_url": _gh(latest_tag or latest_sha, bool(latest_tag)),
-                "behind": bool(latest_sha and sha and latest_sha != sha),
-            }
+        info = {name: _repo_git_info(de, repo) for name, repo in de.REPOS.items()}
+        ear_url = info.get("ear", {}).get("url")
+        cloud_state = de.load_state().get("cloud", {})
+        for t in de.TARGETS:
+            ri = info.get(t.repo, {})
+            if t.kind == "cloudrun":
+                cs = cloud_state.get(t.id, {})
+                run_ver, run_url = cs.get("tag") or cs.get("version"), cs.get("url")
+                run_sha = cs.get("version")
+            else:
+                run_ver, run_url, run_sha = ri.get("tag") or ri.get("sha"), ri.get("url"), ri.get("sha")
+            out["targets"].append({
+                "id": t.id, "label": t.label, "where": t.where, "kind": t.kind,
+                "advanced": t.advanced,
+                "version": run_ver, "url": run_url,
+                "latest": ri.get("latest_tag") or ri.get("latest_sha"), "latest_url": ri.get("latest_url"),
+                "behind": bool(run_sha and ri.get("latest_sha") and run_sha != ri["latest_sha"]),
+                "command": t.command, "params": t.params,
+            })
     except Exception:
         pass
     expected = (_get(f"{AUDIO_URL}/satellite/version") or {}).get("version")
     out["satellite_expected"] = (expected or "")[:12] or None
-    # El código del satélite (satellite.py/ui) vive en el repo ear → el panel linkea al commit de
-    # ear que lo provee (el que corre el SER9). El hash del panel es md5 de los archivos (no un
-    # sha git), así que el link de referencia es el de ear.
-    ear_url = (out["ser9"].get("ear") or {}).get("url")
+    # Satélites: un target dinámico por panel. La versión es md5 de satellite.py/ui (no un sha git),
+    # así que el link de referencia es el commit de ear que provee ese código. deploy.satellites
+    # fuerza el pull del nodo.
     for n in nodes:
         v = n.get("version")
-        out["panels"].append({
-            "node_id": n.get("node_id"), "version": v,
-            "up_to_date": bool(v and expected and expected[:12] == v),
-            "url": ear_url,
+        out["targets"].append({
+            "id": f"panel:{n.get('node_id')}", "label": n.get("node_id"),
+            "where": "NSPanel", "kind": "satellite", "advanced": False,
+            "version": (v or "")[:8] or None, "url": ear_url,
+            "latest": (expected or "")[:8] or None, "latest_url": ear_url,
+            "behind": bool(v and expected and expected[:12] != v),
+            "command": "deploy.satellites", "params": {"node_id": n.get("node_id")},
         })
     return out
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Provisiona la SA de DEPLOY para el driver cloudrun del motor de deploy (FASE 34, D9).
-# El SER9 la usa para desplegar Cloud Run (cloud-bo + oauth-app) y revertir revisiones.
-# Idempotente: se puede correr varias veces. Egress-only: el SER9 llama a las APIs de
+# El Brain la usa para desplegar Cloud Run (cloud-bo + oauth-app) y revertir revisiones.
+# Idempotente: se puede correr varias veces. Egress-only: el Brain llama a las APIs de
 # Google (saliente); no abre nada en casa.
 #
 # Permiso MÍNIMO para `gcloud run deploy --source` + rollback:
@@ -11,7 +11,7 @@
 #   - iam.serviceAccountUser  : actuar como la runtime SA de cada servicio al desplegarlo
 #   - storage.admin (acotado) : bucket de staging que usa Cloud Build para el source
 #
-# Tras correrlo: copiar la key JSON generada al SER9 y apuntar GOOGLE_APPLICATION_CREDENTIALS
+# Tras correrlo: copiar la key JSON generada al Brain y apuntar GOOGLE_APPLICATION_CREDENTIALS
 # del entorno del motor a ese archivo (ver instrucciones al final).
 set -euo pipefail
 
@@ -53,13 +53,13 @@ if gcloud iam service-accounts describe "$DEPLOY_SA_EMAIL" >/dev/null 2>&1; then
   echo "   · ya existe."
 else
   gcloud iam service-accounts create "$DEPLOY_SA" \
-    --display-name="Capitán deployer (SER9) — deploy Cloud Run, permiso mínimo"
+    --display-name="Capitán deployer (Brain) — deploy Cloud Run, permiso mínimo"
   # Esperar a que la SA propague antes de referenciarla en los bindings.
   _retry gcloud iam service-accounts describe "$DEPLOY_SA_EMAIL" >/dev/null 2>&1 || true
 fi
 
 echo "== Roles a nivel proyecto (deploy + build + rollback de Cloud Run desde source) =="
-# Verificados con un deploy real de `gcloud run deploy --source` desde el SER9 (FASE 34 T4a):
+# Verificados con un deploy real de `gcloud run deploy --source` desde el Brain (FASE 34 T4a):
 #  - run.admin               : deploy de servicios + update-traffic (rollback a revisión previa)
 #  - cloudbuild.builds.editor: build remoto del source en Cloud Build
 #  - artifactregistry.writer : push de la imagen
@@ -97,7 +97,7 @@ if [[ -n "$OAUTH_RUNTIME_SA" ]]; then
   echo "   + actAs ${OAUTH_RUNTIME_SA}@${PROJECT}.iam.gserviceaccount.com"
 fi
 
-echo "== Key JSON (para el SER9) =="
+echo "== Key JSON (para el Brain) =="
 if [[ -f "$KEY_OUT" ]]; then
   echo "   · $KEY_OUT ya existe — no se regenera (borralo para rotar)."
 else
@@ -108,7 +108,7 @@ fi
 
 cat <<EOF
 
-=== Listo. Próximo paso en el SER9 ===
+=== Listo. Próximo paso en el Brain ===
 1) Copiar la key al LXC (fuera del repo):
      scp $KEY_OUT capitan-lxc:~/.config/capitan/deployer-key.json
 2) En el entorno del motor (bridge.env / unit del bridge) exportar:

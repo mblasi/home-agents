@@ -1,6 +1,6 @@
 #!/usr/bin/env zsh
 # Wrapper FINO sobre el MOTOR único de deploy (FASE 34). NO reimplementa lógica: invoca
-# cloud/bridge/deploy_engine.py en el SER9 por SSH. Toda la lógica de deploy (snapshot, pin de
+# cloud/bridge/deploy_engine.py en el Brain por SSH. Toda la lógica de deploy (snapshot, pin de
 # ref, install, restart, health-gate, rollback) vive en el motor; este script sólo lo llama.
 # Es el invocador LOCAL (cuando Claude opera desde la LAN); el invocador REMOTO es el comando
 # deploy.release del cloud-bo, que corre el MISMO motor. Ver D1/D9 en masterplan/estado.md.

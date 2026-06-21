@@ -31,7 +31,7 @@ Beyond reactive commands, the system also runs **proactively**: each agent perio
 │       │ POST /process-audio (WAV)   ◄── follow-up turns: if agent asks  │
 │       │ X-Needs-Reply → reopen mic WITHOUT re-wake (conversation_id)     │
 │  ┌────▼──────────────────────────────────────────────────────────┐     │
-│  │ AUDIO SERVER :8766 (SER9) — STT (faster-whisper) + voice-id    │     │
+│  │ AUDIO SERVER :8766 (Brain) — STT (faster-whisper) + voice-id    │     │
 │  │ speaker_id gate (TV/guest → drop) → core → Piper TTS → WAV     │     │
 │  └────┬──────────────────────────────────────────────────────────┘     │
 │  WhatsApp audio/text ──────────────────────────────────────┐           │

@@ -8,7 +8,7 @@ _Última actualización: 2026-06-11_
 
 ## Visión general
 
-home-agents es una red de agentes de IA que corre en el **SER9** (Beelink SER9 Pro — Ryzen AI 7, Proxmox VE; core + backoffice + WA + audio_server en un LXC, HAOS en una VM, Ollama con GPU ROCm). La laptop quedó como entorno de desarrollo. No hay dependencias de servicios externos de pago ni telemetría; el perímetro de red es la LAN local. Los nodos de voz son NSPanel Pro.
+home-agents es una red de agentes de IA que corre en el **Brain** (Beelink SER9 Pro — Ryzen AI 7, Proxmox VE; core + backoffice + WA + audio_server en un LXC, HAOS en una VM, Ollama con GPU ROCm). La laptop quedó como entorno de desarrollo. No hay dependencias de servicios externos de pago ni telemetría; el perímetro de red es la LAN local. Los nodos de voz son NSPanel Pro.
 
 El sistema combina tres capacidades:
 
@@ -23,14 +23,14 @@ El sistema combina tres capacidades:
 ### ear (home-agents-ear) — capa de audio
 
 Arquitectura distribuida: **nodos** (NSPanel Pro) capturan el wake word y graban el comando;
-el **audio_server** (en el SER9, co-ubicado con el core) hace STT/TTS y resuelve voice-id.
+el **audio_server** (en el Brain, co-ubicado con el core) hace STT/TTS y resuelve voice-id.
 El nodo es agnóstico al usuario: solo graba y manda audio crudo.
 
 | Archivo | Función |
 |---------|---------|
 | `satellite.py` | Nodo NSPanel: wake word (openWakeWord) → graba comando → POST /process-audio → reproduce respuesta. Duck de volumen (18.2), pull del modelo (16.17), enrollment inline (16.21). |
 | `satellite_ui.py` | Indicador visual overlay (Termux:GUI): barra de estado del pipeline (18.3). |
-| `audio_server.py` | FastAPI `:8766` en el SER9: STT (faster-whisper) + TTS (Piper) + voice-id (speaker_id) + canal de enrollment + registry de nodos. |
+| `audio_server.py` | FastAPI `:8766` en el Brain: STT (faster-whisper) + TTS (Piper) + voice-id (speaker_id) + canal de enrollment + registry de nodos. |
 | `speaker_id.py` | Voice-ID por embeddings (resemblyzer/GE2E). Perfiles en `embeddings/<uid>.npy`. |
 | `tts.py` | Piper TTS (voz `es_AR-daniela-high`). |
 | `listen.py` | Pipeline local de la laptop (DEPRECADO — reemplazado por satellite+audio_server). |
@@ -39,7 +39,7 @@ El nodo es agnóstico al usuario: solo graba y manda audio crudo.
 **Pipeline de audio (nodo → server):**
 ```
 [NSPanel] mic → openWakeWord → graba COMMAND_SECS → POST /process-audio (WAV)
-   [audio_server SER9] → normaliza RMS → faster-whisper (vad+confianza) → strip wake word
+   [audio_server Brain] → normaliza RMS → faster-whisper (vad+confianza) → strip wake word
        → voice-id: speaker_id.identify → gate REQUIRE_KNOWN_SPEAKER (TV/guest → 204)
        → POST core /process → respuesta → Piper TTS → WAV
 [NSPanel] reproduce WAV. Falsos positivos (STT vacío / agent unknown+guest) → 204 + hard negative.
@@ -115,7 +115,7 @@ samples de audio, y `panels.yaml` (config del repo leída por backoffice/scripts
 
 ### cloud (backoffice en la nube) — FASE 33
 
-Backoffice accesible desde internet **sin exponer el SER9 ni HAOS**, con principio
+Backoffice accesible desde internet **sin exponer el Brain ni HAOS**, con principio
 egress-only: la nube nunca inicia conexiones hacia la casa. Patrón command/executor por
 inversión de control.
 
@@ -359,7 +359,7 @@ usuario/asistente al LLM.
 - **Desenlace del turno visible + feedback de STT dudoso:** `/process-audio` emite
   `X-Status` en toda respuesta (`ok | low-confidence | no-speech | unknown-voice |
   core-unknown`); el satellite lo logea en el panel (antes el motivo del 204 solo se veía
-  en el audio_server del SER9). Si el STT descarta un comando por baja confianza
+  en el audio_server del Brain). Si el STT descarta un comando por baja confianza
   (anti-alucinación) pero el voice-id reconoce al hablante, el server NO calla: sintetiza
   "no te entendí, repetí" con `needs_reply` (reabre el mic). Voz guest con STT dudoso →
   204 mudo + hard negative (probable TV). `_transcribe` devuelve `(texto, motivo)`.
@@ -718,7 +718,7 @@ a la API del core (mismo origen, autenticado). El backoffice cloud muestra una s
 métricas equivalente en su dashboard, leyendo `GET /api/metrics` con RBAC (`filter_metrics`:
 sin `view_full` → sólo resúmenes y series, sin detalle por modelo/agente ni reentrenamientos).
 
-**Push al cloud (FASE 35.5, egress-only).** El bridge del SER9 (FASE 33) arma agregados con
+**Push al cloud (FASE 35.5, egress-only).** El bridge del Brain (FASE 33) arma agregados con
 `metrics_snapshot.build_metrics_snapshot` (desde la API del core) y los empuja a
 `POST /ingest/metrics` cada `METRICS_PUSH_INTERVAL` (300s), con la misma auth OIDC de la SA
 y rate limiting que el resto del bridge. La nube los guarda en Firestore (`metrics/current`

@@ -223,10 +223,10 @@ cmd_provision() {
     local HA_USER="nspanel${name}"
     local REPO="$(cd "$(dirname "$0")/.." && pwd)"
     local AUDIO_URL="${AUDIO_SERVER_URL:-http://192.168.68.132:8766}"
-    # el panel es un satélite: debe apuntar al audio server del SER9, nunca a su propio localhost
+    # el panel es un satélite: debe apuntar al audio server del Brain, nunca a su propio localhost
     case "$AUDIO_URL" in
         *127.0.0.1*|*localhost*)
-            echo "✗ AUDIO_SERVER_URL apunta a localhost ($AUDIO_URL) — debe ser la IP del SER9."
+            echo "✗ AUDIO_SERVER_URL apunta a localhost ($AUDIO_URL) — debe ser la IP del Brain."
             echo "  Desseteá AUDIO_SERVER_URL del entorno o usá http://192.168.68.132:8766"
             exit 1;;
     esac

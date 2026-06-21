@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""cloud_bridge.py — bridge/executor del SER9 hacia el backoffice en la nube.
+"""cloud_bridge.py — bridge/executor del Brain hacia el backoffice en la nube.
 
 FASE 33 Etapa C. Conexiones SALIENTES únicamente (control por inversión):
   - push periódico del snapshot de estado    → POST /ingest/state          (33.10)

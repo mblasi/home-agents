@@ -1,9 +1,9 @@
-"""Construcción del snapshot de métricas (SER9 → nube). FASE 35.5.
+"""Construcción del snapshot de métricas (Brain → nube). FASE 35.5.
 
 Lee los agregados ya calculados por el core (API de métricas de FASE 35.3) y los empaqueta
 para el push al backoffice cloud. Best-effort y resiliente: cada fuente va envuelta en
 try/except y nunca propaga — un snapshot parcial es mejor que ninguno. El cálculo pesado
-vive en el SER9; la nube sólo almacena y muestra.
+vive en el Brain; la nube sólo almacena y muestra.
 """
 from __future__ import annotations
 

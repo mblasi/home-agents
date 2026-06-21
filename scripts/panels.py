@@ -18,7 +18,7 @@ import os
 import sys
 import urllib.request
 
-# Core que sirve el registro de paneles (DB). Default: SER9.
+# Core que sirve el registro de paneles (DB). Default: Brain.
 _CORE_URL = os.environ.get("CORE_URL", "http://192.168.68.132:8765")
 
 

@@ -112,3 +112,19 @@ def test_deploy_cloud_services_validos():
 def test_deploy_cloud_target_invalido():
     with pytest.raises(CommandError):
         validate_command("deploy.cloud", {"services": ["core"]})   # core no es target cloudrun
+
+
+# ── deploy.satellites (34.16): force pull de paneles ──────────────────────────
+
+def test_deploy_satellites_sin_params():
+    assert validate_command("deploy.satellites", {}) == {}
+
+
+def test_deploy_satellites_node_id():
+    assert validate_command("deploy.satellites", {"node_id": "comedor"}) == {"node_id": "comedor"}
+    assert validate_command("deploy.satellites", {"node_id": "*"}) == {"node_id": "*"}
+
+
+def test_deploy_satellites_param_desconocido():
+    with pytest.raises(CommandError):
+        validate_command("deploy.satellites", {"nodo": "comedor"})

@@ -1,4 +1,4 @@
-Dispará el reentrenamiento del modelo de wake word en el SER9 y reportá el progreso acá.
+Dispará el reentrenamiento del modelo de wake word en el Brain y reportá el progreso acá.
 
 El retrain combina las muestras positivas de "Capitán" de todos los usuarios + los negativos
 (genéricos + los capturados orgánicamente de los nodos) → un nuevo `capitan.onnx`. Los nodos
@@ -24,6 +24,6 @@ ssh capitan-lxc "curl -s http://localhost:8765/wakeword/train/status 2>/dev/null
 Reportar al usuario: cantidad de muestras usadas, métricas (n_positive, n_negative, duration),
 y recordar que los nodos bajan el modelo nuevo solo en ≤10 min (o al reiniciar el satellite).
 
-Si falla con un módulo faltante (torch, onnxscript, etc.), instalarlo en el venv del SER9
+Si falla con un módulo faltante (torch, onnxscript, etc.), instalarlo en el venv del Brain
 (`~/home-agents-env/bin/pip install <módulo>`) y reintentar — el entorno de training ya quedó
 configurado en la sesión donde se implementó esto.

@@ -1,4 +1,4 @@
-Mostrá el estado de todos los servicios de home-agents en el SER9.
+Mostrá el estado de todos los servicios de home-agents en el Brain.
 
 Incluye: estado de cada servicio systemd, health del core, accesibilidad del backoffice, estado de HAOS, y uso de recursos del LXC.
 

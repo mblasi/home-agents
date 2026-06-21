@@ -1,6 +1,6 @@
-# cloud/bridge/ — Bridge/executor del SER9 (FASE 33 Etapa C)
+# cloud/bridge/ — Bridge/executor del Brain (FASE 33 Etapa C)
 
-Daemon que corre en el LXC del SER9 (no en la nube). Hace **sólo conexiones
+Daemon que corre en el LXC del Brain (no en la nube). Hace **sólo conexiones
 salientes** hacia el servicio Cloud Run (`cloud/`):
 
 - `cloud_bridge.py` — loop: push del snapshot (`/ingest/state`) cada `PUSH_INTERVAL`

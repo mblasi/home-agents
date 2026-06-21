@@ -120,49 +120,39 @@ async function api(path, opts = {}) {
 
 function dot(ok) { return ok ? "🟢" : "🔴"; }
 
-// Matriz de versiones (FASE 34 T5): repos del SER9 con link al release de GitHub + paneles
-// con su versión y si están al día respecto del código que sirve el SER9.
+// Matriz de versiones (FASE 34 T5): repos del Brain con link al release de GitHub + paneles
+// con su versión y si están al día respecto del código que sirve el Brain.
+// Matriz unificada de TARGETS (34.15): una fila por cosa que corre, un botón que elige el
+// comando solo. El snapshot ya trae version/latest/behind + command+params por target.
+let TARGETS_BY_ID = {};
+const WHERE_ICON = { Brain: "🖥️", GCP: "☁️", NSPanel: "📟" };
 function renderVersions(v) {
   const esc = (s) => String(s == null ? "" : s).replace(/[<>&]/g, c => ({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]));
-  const ser9 = v.ser9 || {};
   const link = (text, url) => url ? `<a href="${esc(url)}" target="_blank">${esc(text)}</a>` : esc(text);
-  // Botón de deploy contextual por componente (34.8), sólo si el rol puede emitir.
-  const btn = (label, fn) => CAPS.emit
-    ? ` <button onclick="${fn}" style="font-size:11px;padding:1px 6px;margin-left:6px">${label}</button>` : "";
-  const repos = Object.entries(ser9).map(([name, i]) => {
-    const run = link(i.tag || i.version || "?", i.url);
-    const avail = link(i.latest_tag || i.latest_sha || "?", i.latest_url);
-    const availPart = i.behind
-      ? ` · <span style="color:#fa0">⬆ disp. ${avail}</span>`
-      : ` · <span class="muted">al día</span>`;
-    return `<div>${i.behind ? "⚠️" : "🟢"} <b>${esc(name)}</b> ${run}`
-      + `${i.tag && i.version ? ` <span class="muted">(${esc(i.version)})</span>` : ""}${availPart}`
-      + btn(i.behind ? "⬆ actualizar" : "deploy", `deployRepo('${esc(name)}')`) + `</div>`;
-  }).join("");
-  const exp = v.satellite_expected;
-  const panels = (v.panels || []).map(p => {
-    const ver = link(p.version || "—", p.url);
-    const avail = p.up_to_date
-      ? ` · <span class="muted">al día</span>`
-      : ` · <span style="color:#fa0">⬆ disp. ${esc(exp || "?")}</span>`;
-    return `<div>${p.up_to_date ? "🟢" : "⚠️"} <b>${esc(p.node_id)}</b> ${ver}${avail}</div>`;
-  }).join("");
-  // cloud-bo no está en la matriz SER9 (corre en GCP): botón de deploy aparte (deploy.cloud).
-  const cloud = CAPS.emit
-    ? `<div>☁️ <b>cloud-bo</b> <span class="muted">(GCP Cloud Run)</span>`
-      + btn("deploy", "deployCloud()") + `</div>` : "";
+  const btn = (label, id) => CAPS.emit
+    ? ` <button onclick="deployTarget('${esc(id)}')" style="font-size:11px;padding:1px 6px;margin-left:6px">${label}</button>` : "";
+  TARGETS_BY_ID = {};
+  const all = v.targets || [];
+  all.forEach(t => { TARGETS_BY_ID[t.id] = t; });
+  const row = (t) => {
+    const run = link(t.version || "—", t.url);
+    const avail = t.behind
+      ? `<span style="color:#fa0">⬆ ${link(t.latest || "?", t.latest_url)}</span>`
+      : `<span class="muted">al día</span>`;
+    return `<div>${t.behind ? "⚠️" : "🟢"} ${WHERE_ICON[t.where] || ""} <b>${esc(t.label)}</b> `
+      + `<span class="muted">${esc(t.where)}</span> ${run} · ${avail}`
+      + btn(t.behind ? "⬆ actualizar" : "deploy", t.id) + `</div>`;
+  };
+  const main = all.filter(t => !t.advanced).map(row).join("");
+  const adv  = all.filter(t => t.advanced).map(row).join("");
   $("versions").innerHTML =
-    `<h3>SER9 (repos)</h3><div class="grid">${repos || "<span class='muted'>sin datos</span>"}</div>`
-    + (cloud ? `<h3>Nube</h3><div class="grid">${cloud}</div>` : "")
-    + `<h3>Paneles${v.satellite_expected ? ` <span class="muted">esperado ${esc(v.satellite_expected)}</span>` : ""}</h3>`
-    + `<div class="grid">${panels || "<span class='muted'>sin paneles</span>"}</div>`;
+    `<div class="grid">${main || "<span class='muted'>sin datos</span>"}</div>`
+    + (adv ? `<details style="margin-top:8px"><summary class="muted" style="cursor:pointer">avanzado (wa · bridge)</summary>`
+             + `<div class="grid" style="margin-top:4px">${adv}</div></details>` : "");
 }
 
-// 34.8: deploy contextual por componente desde la matriz de versiones. Mapea el repo
-// SER9 al servicio del motor (umbrella → backoffice) y reusa el emit + streaming de logs.
-const REPO_SERVICE = { core: "core", ear: "ear", umbrella: "backoffice" };
 async function emitDeploy(type, params, label) {
-  if (!confirm(`¿Desplegar ${label}? Reinicia el servicio en producción.`)) return;
+  if (!confirm(`¿Desplegar ${label}? Reinicia / actualiza el target en producción.`)) return;
   try {
     const { command } = await api("/api/commands", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -172,18 +162,18 @@ async function emitDeploy(type, params, label) {
     refresh();
   } catch (e) { alert("error: " + e.message); }
 }
-function deployRepo(repo) {
-  const svc = REPO_SERVICE[repo] || repo;
-  emitDeploy("deploy.release", { services: [svc] }, `${repo} (${svc})`);
+function deployTarget(id) {
+  const t = TARGETS_BY_ID[id];
+  if (!t) return;
+  emitDeploy(t.command, t.params, t.label);
 }
-function deployCloud() { emitDeploy("deploy.cloud", { services: ["cloud-bo"] }, "cloud-bo"); }
 
 let CAPS = {};
 
 async function refresh() {
   try {
     const { state } = await api("/api/state");
-    if (!state) { $("updated").textContent = "sin datos del SER9 todavía"; return; }
+    if (!state) { $("updated").textContent = "sin datos del Brain todavía"; return; }
     $("updated").textContent = "snapshot: " + (state.ts || "?");
     $("services").innerHTML = Object.entries(state.services || {})
       .map(([k, v]) => `<div>${dot(v.up)} <b>${k}</b> <span class="muted">${v.detail || ""}</span></div>`).join("");
@@ -331,7 +321,7 @@ auth.onAuthStateChanged(async (user) => {
   }
   idToken = await user.getIdToken();
   $("useremail").textContent = user.email;
-  // Autorización + capacidades RBAC (rol resuelto contra el roster del SER9).
+  // Autorización + capacidades RBAC (rol resuelto contra el roster del Brain).
   let me;
   try { me = await api("/api/me"); }
   catch (e) {
