@@ -3437,7 +3437,7 @@ Objetivo: Llevar el backoffice cloud (FASE 33) de una única página SPA con tar
           el backoffice cloud debe ser mobile-friendly (responsive, mobile-first), ya que
           el acceso remoto egress-only es típicamente desde el celular — toda sección,
           sidebar y formulario de comandos debe funcionar y ser usable en pantalla chica.
-Estado:   EN CURSO (2/13 — hecho 37.1, 37.2; pendientes 37.3-37.12).
+Estado:   EN CURSO (3/13 — hecho 37.1-37.3; pendientes 37.4-37.12).
 Deps:     FASE 33 (backoffice cloud + bridge egress-only + RBAC — COMPLETA, base a extender),
           FASE 35 (dashboards de métricas — COMPLETA, ya viven en el cloud),
           FASE 34 (deploy remoto — la sección Deploy del sidebar consume su versión reportada).
@@ -3506,7 +3506,7 @@ PREMISA TRANSVERSAL DE UX (comandos): TODO lo relativo a comandos invocables —
             con validadores existentes. Tests de RBAC y de catálogo.
 
 #### Etapa B - Frontend reestructurado (sidebar + secciones)
-- [ ] 37.3  Base SPA con sidebar (Monitoreo/Sistema/Administración), router por hash y links
+- [x] 37.3  Base SPA con sidebar (Monitoreo/Sistema/Administración), router por hash y links
             gated por caps (`access`/`view_full`/`view_pii`/`emit`); el sidebar oculta lo no
             permitido y el router rechaza navegación a vistas sin capacidad.
 - [ ] 37.4  Secciones: Resumen, Servicios, Métricas, Alertas, Logs, Agentes, Actividad, Wake
