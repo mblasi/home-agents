@@ -7,84 +7,157 @@
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-<header>
+
+<!-- Login (sin sesión) -->
+<section id="login" class="card login-card">
   <h1>Capitán <span class="muted">· nube</span></h1>
-  <div id="userbox" class="hidden">
-    <span id="useremail" class="muted"></span>
-    <button id="signout">salir</button>
-  </div>
-</header>
+  <p>Backoffice remoto. Acceso restringido a: <code>{{ allowed_emails }}</code></p>
+  <button id="signin">Ingresar con Google</button>
+  <p id="login-error" class="error hidden"></p>
+</section>
 
-<main>
-  <section id="login" class="card">
-    <p>Backoffice remoto. Acceso restringido a: <code>{{ allowed_emails }}</code></p>
-    <button id="signin">Ingresar con Google</button>
-    <p id="login-error" class="error hidden"></p>
-  </section>
+<!-- App (con sesión) -->
+<div id="app" class="hidden">
+  <div id="scrim" class="scrim"></div>
 
-  <div id="app" class="hidden">
-    <p class="muted" id="updated"></p>
+  <aside id="sidebar" class="sidebar">
+    <div class="brand">
+      <button id="nav-close" class="icon-btn only-mobile" aria-label="cerrar menú">✕</button>
+      Capitán <span class="muted">· nube</span>
+    </div>
+    <nav id="nav"></nav>
+  </aside>
 
-    <section class="card">
-      <h2>Servicios</h2>
-      <div id="services" class="grid"></div>
-    </section>
-
-    <section class="card">
-      <h2>Latencias (ms)</h2>
-      <div id="latency" class="grid"></div>
-    </section>
-
-    <section class="card">
-      <h2>Agentes</h2>
-      <div id="agents" class="grid"></div>
-    </section>
-
-    <section class="card">
-      <h2>Versiones desplegadas</h2>
-      <div id="versions"></div>
-    </section>
-
-    <section class="card">
-      <h2>Últimos comandos de voz</h2>
-      <table id="recent"><tbody></tbody></table>
-    </section>
-
-    <section class="card" id="metrics-card">
-      <h2>Métricas <span class="muted" id="metrics-window"></span></h2>
-      <div id="metrics-empty" class="muted hidden">sin métricas todavía</div>
-      <div id="metrics-body" class="hidden">
-        <h3>Voz</h3>
-        <div id="m-voice-summary" class="grid"></div>
-        <canvas id="m-voice-chart" height="80"></canvas>
-        <h3>LLM / Agentes</h3>
-        <div id="m-llm-summary" class="grid"></div>
-        <canvas id="m-llm-chart" height="80"></canvas>
-        <div id="m-tables">
-          <table id="m-models"><thead><tr><th>modelo</th><th>llamadas</th><th>lat ms</th><th>tokens</th></tr></thead><tbody></tbody></table>
-          <table id="m-agents"><thead><tr><th>agente</th><th>steps</th><th>aciertos</th><th>lat ms</th></tr></thead><tbody></tbody></table>
-        </div>
+  <div class="content">
+    <header class="topbar">
+      <button id="nav-open" class="icon-btn only-mobile" aria-label="abrir menú">☰</button>
+      <h1 id="section-title">Resumen</h1>
+      <div id="userbox" class="userbox">
+        <span id="useremail" class="muted"></span>
+        <button id="signout">salir</button>
       </div>
-    </section>
+    </header>
 
-    <section class="card hidden" id="actions-card">
-      <h2>Acciones admin</h2>
-      <form id="emit">
-        <select id="cmd-type"></select>
-        <input id="cmd-params" placeholder='params JSON, ej {"service":"capitan-core"}'>
-        <button type="submit">Emitir</button>
-      </form>
-      <p id="emit-msg" class="muted"></p>
-      <pre id="cmd-log" class="hidden" style="background:#111;color:#cfc;padding:8px;
-        border-radius:6px;max-height:320px;overflow:auto;font-size:12px;white-space:pre-wrap"></pre>
-    </section>
+    <main>
+      <p class="muted updated-line" id="updated"></p>
 
-    <section class="card hidden" id="audit-card">
-      <h2>Auditoría de comandos admin</h2>
-      <table id="audit"><tbody></tbody></table>
-    </section>
+      <!-- ── Resumen ─────────────────────────────────────────── -->
+      <section class="view" data-view="resumen">
+        <div class="grid" id="summary-tiles"></div>
+        <div class="card">
+          <h2>Alertas recientes</h2>
+          <ul id="summary-alerts" class="alerts-list"></ul>
+        </div>
+      </section>
+
+      <!-- ── Servicios ───────────────────────────────────────── -->
+      <section class="view" data-view="servicios">
+        <div class="card">
+          <h2>Servicios</h2>
+          <div id="services" class="grid"></div>
+        </div>
+        <div class="card">
+          <h2>Latencias (ms)</h2>
+          <div id="latency" class="grid"></div>
+        </div>
+      </section>
+
+      <!-- ── Métricas ────────────────────────────────────────── -->
+      <section class="view" data-view="metricas">
+        <div class="card" id="metrics-card">
+          <h2>Métricas <span class="muted" id="metrics-window"></span></h2>
+          <div id="metrics-empty" class="muted hidden">sin métricas todavía</div>
+          <div id="metrics-body" class="hidden">
+            <h3>Voz</h3>
+            <div id="m-voice-summary" class="grid"></div>
+            <canvas id="m-voice-chart" height="80"></canvas>
+            <h3>LLM / Agentes</h3>
+            <div id="m-llm-summary" class="grid"></div>
+            <canvas id="m-llm-chart" height="80"></canvas>
+            <div id="m-tables">
+              <table id="m-models"><thead><tr><th>modelo</th><th>llamadas</th><th>lat ms</th><th>tokens</th></tr></thead><tbody></tbody></table>
+              <table id="m-agents"><thead><tr><th>agente</th><th>steps</th><th>aciertos</th><th>lat ms</th></tr></thead><tbody></tbody></table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Alertas (datos en 37.6) ─────────────────────────── -->
+      <section class="view" data-view="alertas">
+        <div class="card"><h2>Alertas</h2><ul id="alerts-list" class="alerts-list"></ul></div>
+      </section>
+
+      <!-- ── Logs (37.6) ─────────────────────────────────────── -->
+      <section class="view" data-view="logs">
+        <div class="card placeholder"><h2>Logs</h2>
+          <p class="muted">Sección en preparación (37.6): traer N líneas de un servicio o satélite por comando tipado.</p>
+        </div>
+      </section>
+
+      <!-- ── Actividad ───────────────────────────────────────── -->
+      <section class="view" data-view="actividad">
+        <div class="card">
+          <h2>Últimos comandos de voz</h2>
+          <table id="recent"><tbody></tbody></table>
+        </div>
+      </section>
+
+      <!-- ── Agentes ─────────────────────────────────────────── -->
+      <section class="view" data-view="agentes">
+        <div class="card"><h2>Agentes</h2><div id="agents" class="grid"></div></div>
+      </section>
+
+      <!-- ── Wake word (37.4) ────────────────────────────────── -->
+      <section class="view" data-view="wakeword">
+        <div class="card" id="wakeword-card"><h2>Wake word</h2>
+          <div id="wakeword-body" class="grid"></div>
+        </div>
+      </section>
+
+      <!-- ── Paneles (37.4) ──────────────────────────────────── -->
+      <section class="view" data-view="paneles">
+        <div class="card placeholder"><h2>Paneles</h2>
+          <p class="muted">Sección en preparación (37.4): estado y reboot por panel.</p>
+        </div>
+      </section>
+
+      <!-- ── Deploy ──────────────────────────────────────────── -->
+      <section class="view" data-view="deploy">
+        <div class="card"><h2>Deploy · versiones desplegadas</h2><div id="versions"></div></div>
+      </section>
+
+      <!-- ── Usuarios ────────────────────────────────────────── -->
+      <section class="view" data-view="usuarios">
+        <div class="card">
+          <h2>Usuarios</h2>
+          <table id="users"><thead><tr><th>usuario</th><th>rol</th><th>pendientes</th><th>email</th></tr></thead><tbody></tbody></table>
+        </div>
+      </section>
+
+      <!-- ── Acciones (UI de comandos: overhaul en 37.5) ─────── -->
+      <section class="view" data-view="acciones">
+        <div class="card" id="actions-card">
+          <h2>Acciones admin</h2>
+          <form id="emit">
+            <select id="cmd-type"></select>
+            <input id="cmd-params" placeholder='params JSON, ej {"service":"capitan-core"}'>
+            <button type="submit">Emitir</button>
+          </form>
+          <p id="emit-msg" class="muted"></p>
+          <pre id="cmd-log" class="hidden cmd-log"></pre>
+        </div>
+      </section>
+
+      <!-- ── Auditoría ───────────────────────────────────────── -->
+      <section class="view" data-view="auditoria">
+        <div class="card">
+          <h2>Auditoría de comandos admin</h2>
+          <table id="audit"><tbody></tbody></table>
+        </div>
+      </section>
+    </main>
   </div>
-</main>
+</div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -104,6 +177,73 @@ const $ = (id) => document.getElementById(id);
 const show = (id) => $(id).classList.remove("hidden");
 const hide = (id) => $(id).classList.add("hidden");
 
+// ── Taxonomía del sidebar (paridad con el backoffice local) ───────────────────
+// cap: capacidad mínima para ver la sección. El sidebar oculta lo no permitido y el
+// router rechaza navegar a una vista sin capacidad.
+const SECTIONS = [
+  { group: "Monitoreo", items: [
+    { id: "resumen",   label: "Resumen",   cap: "access" },
+    { id: "servicios", label: "Servicios", cap: "access" },
+    { id: "metricas",  label: "Métricas",  cap: "access" },
+    { id: "alertas",   label: "Alertas",   cap: "access" },
+    { id: "logs",      label: "Logs",      cap: "emit" },
+    { id: "actividad", label: "Actividad", cap: "access" },
+  ]},
+  { group: "Sistema", items: [
+    { id: "agentes",  label: "Agentes",   cap: "access" },
+    { id: "wakeword", label: "Wake word", cap: "access" },
+    { id: "paneles",  label: "Paneles",   cap: "access" },
+    { id: "deploy",   label: "Deploy",    cap: "access" },
+  ]},
+  { group: "Administración", items: [
+    { id: "usuarios",  label: "Usuarios",  cap: "view_full" },
+    { id: "acciones",  label: "Acciones",  cap: "emit" },
+    { id: "auditoria", label: "Auditoría", cap: "view_full" },
+  ]},
+];
+const SECTION_BY_ID = {};
+SECTIONS.forEach(g => g.items.forEach(s => { SECTION_BY_ID[s.id] = s; }));
+const allowedSection = (id) => {
+  const s = SECTION_BY_ID[id];
+  return s && CAPS[s.cap];
+};
+
+let CAPS = {};
+
+function renderNav() {
+  $("nav").innerHTML = SECTIONS.map(g => {
+    const links = g.items.filter(s => CAPS[s.cap]).map(s =>
+      `<a href="#${s.id}" data-link="${s.id}">${s.label}</a>`).join("");
+    return links ? `<div class="nav-group">${g.group}</div>${links}` : "";
+  }).join("");
+}
+
+function firstAllowed() {
+  for (const g of SECTIONS) for (const s of g.items) if (CAPS[s.cap]) return s.id;
+  return null;
+}
+
+// ── Router por hash ───────────────────────────────────────────────────────────
+function route() {
+  let id = (location.hash || "").replace("#", "");
+  if (!allowedSection(id)) id = firstAllowed();
+  if (!id) return;
+  document.querySelectorAll(".view").forEach(v =>
+    v.classList.toggle("active", v.dataset.view === id));
+  document.querySelectorAll("#nav a").forEach(a =>
+    a.classList.toggle("current", a.dataset.link === id));
+  $("section-title").textContent = SECTION_BY_ID[id].label;
+  closeDrawer();
+}
+window.addEventListener("hashchange", route);
+
+// ── Drawer móvil ──────────────────────────────────────────────────────────────
+const openDrawer = () => $("app").classList.add("drawer-open");
+const closeDrawer = () => $("app").classList.remove("drawer-open");
+$("nav-open").onclick = openDrawer;
+$("nav-close").onclick = closeDrawer;
+$("scrim").onclick = closeDrawer;
+
 $("signin").onclick = () => auth.signInWithPopup(provider).catch(e => {
   $("login-error").textContent = e.message; show("login-error");
 });
@@ -118,26 +258,24 @@ async function api(path, opts = {}) {
   return r.json();
 }
 
+const esc = (s) => String(s == null ? "" : s).replace(/[<>&]/g, c => ({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]));
 function dot(ok) { return ok ? "🟢" : "🔴"; }
 
-// Matriz de versiones (FASE 34 T5): repos del Brain con link al release de GitHub + paneles
-// con su versión y si están al día respecto del código que sirve el Brain.
 // Matriz unificada de TARGETS (34.15): una fila por cosa que corre, un botón que elige el
 // comando solo. El snapshot ya trae version/latest/behind + command+params por target.
 let TARGETS_BY_ID = {};
 const WHERE_ICON = { Brain: "🖥️", GCP: "☁️", NSPanel: "📟" };
 function renderVersions(v) {
-  const esc = (s) => String(s == null ? "" : s).replace(/[<>&]/g, c => ({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]));
   const link = (text, url) => url ? `<a href="${esc(url)}" target="_blank">${esc(text)}</a>` : esc(text);
   const btn = (label, id) => CAPS.emit
-    ? ` <button onclick="deployTarget('${esc(id)}')" style="font-size:11px;padding:1px 6px;margin-left:6px">${label}</button>` : "";
+    ? ` <button class="mini" onclick="deployTarget('${esc(id)}')">${label}</button>` : "";
   TARGETS_BY_ID = {};
   const all = v.targets || [];
   all.forEach(t => { TARGETS_BY_ID[t.id] = t; });
   const row = (t) => {
     const run = link(t.version || "—", t.url);
     const avail = t.behind
-      ? `<span style="color:#fa0">⬆ ${link(t.latest || "?", t.latest_url)}</span>`
+      ? `<span class="warn">⬆ ${link(t.latest || "?", t.latest_url)}</span>`
       : `<span class="muted">al día</span>`;
     return `<div>${t.behind ? "⚠️" : "🟢"} ${WHERE_ICON[t.where] || ""} <b>${esc(t.label)}</b> `
       + `<span class="muted">${esc(t.where)}</span> ${run} · ${avail}`
@@ -147,8 +285,8 @@ function renderVersions(v) {
   const adv  = all.filter(t => t.advanced).map(row).join("");
   $("versions").innerHTML =
     `<div class="grid">${main || "<span class='muted'>sin datos</span>"}</div>`
-    + (adv ? `<details style="margin-top:8px"><summary class="muted" style="cursor:pointer">avanzado (wa · bridge)</summary>`
-             + `<div class="grid" style="margin-top:4px">${adv}</div></details>` : "");
+    + (adv ? `<details class="advanced"><summary class="muted">avanzado (wa · bridge)</summary>`
+             + `<div class="grid">${adv}</div></details>` : "");
 }
 
 async function emitDeploy(type, params, label) {
@@ -168,39 +306,82 @@ function deployTarget(id) {
   emitDeploy(t.command, t.params, t.label);
 }
 
-let CAPS = {};
+function renderSummary(state) {
+  const svc = Object.values(state.services || {});
+  const up = svc.filter(s => s.up).length;
+  const agents = state.agents || [];
+  const act = agents.filter(a => a.active).length;
+  const c = state.counts || {};
+  const ww = state.wakeword || {};
+  const tile = (n, label, cls) => `<div class="tile ${cls||""}"><b>${n}</b><span>${label}</span></div>`;
+  $("summary-tiles").innerHTML =
+    tile(`${up}/${svc.length || 0}`, "servicios up", up === svc.length ? "ok" : "warn") +
+    tile(`${act}/${agents.length}`, "agentes activos") +
+    tile(c.conversations ?? "—", "conversaciones") +
+    tile(c.intents ?? "—", "intenciones") +
+    tile(c.goals ?? "—", "goals") +
+    tile(c.routines ?? "—", "rutinas") +
+    tile(ww.false_positives_24h ?? "—", "falsos pos. 24h") +
+    tile((state.alerts || []).length, "alertas", (state.alerts||[]).length ? "warn" : "");
+  const alerts = state.alerts || [];
+  $("summary-alerts").innerHTML = alerts.length
+    ? alerts.map(a => `<li>${esc(a)}</li>`).join("")
+    : `<li class="muted">sin alertas</li>`;
+  $("alerts-list").innerHTML = $("summary-alerts").innerHTML;
+}
+
+function renderWakeword(ww) {
+  const st = ww.status || "idle";
+  const stIcon = { running: "🟡", done: "🟢", error: "🔴" }[st] || "⚪";
+  const nodes = (ww.nodes || []).map(n =>
+    `<div>${dot(n.online)} <b>${esc(n.id)}</b> <span class="muted">${esc(n.ip || "")}</span></div>`).join("");
+  $("wakeword-body").innerHTML =
+    `<div>${stIcon} entrenamiento <b>${esc(st)}</b></div>`
+    + `<div><b>${ww.false_positives_24h ?? "—"}</b> falsos pos. 24h</div>`
+    + (nodes || `<div class="muted">sin nodos</div>`);
+}
+
+function renderUsers(users) {
+  $("users").querySelector("tbody").innerHTML = (users || []).map(u =>
+    `<tr><td><b>${esc(u.name)}</b></td><td>${esc(u.role)}</td>`
+    + `<td>${u.intents_pending || 0}</td><td class="muted">${esc(u.email || "—")}</td></tr>`).join("")
+    || `<tr><td class="muted" colspan="4">sin usuarios</td></tr>`;
+}
 
 async function refresh() {
   try {
     const { state } = await api("/api/state");
     if (!state) { $("updated").textContent = "sin datos del Brain todavía"; return; }
     $("updated").textContent = "snapshot: " + (state.ts || "?");
+    renderSummary(state);
     $("services").innerHTML = Object.entries(state.services || {})
-      .map(([k, v]) => `<div>${dot(v.up)} <b>${k}</b> <span class="muted">${v.detail || ""}</span></div>`).join("");
+      .map(([k, v]) => `<div>${dot(v.up)} <b>${k}</b> <span class="muted">${esc(v.detail || "")}</span></div>`).join("");
     const L = state.latency || {};
     $("latency").innerHTML = ["stt_ms", "llm_ms", "haos_ms"]
       .map(k => `<div><b>${k.replace("_ms","").toUpperCase()}</b> ${L[k] ?? "—"}</div>`).join("");
     $("agents").innerHTML = (state.agents || [])
-      .map(a => `<div>${dot(a.active)} <b>${a.id}</b>${a.proactive ? " ⚡" : ""}</div>`).join("");
+      .map(a => `<div>${dot(a.active)} <b>${esc(a.id)}</b>${a.proactive ? " ⚡" : ""}</div>`).join("");
+    renderWakeword(state.wakeword || {});
     renderVersions(state.versions || {});
+    renderUsers(state.users_summary);
     $("recent").querySelector("tbody").innerHTML = (state.recent_commands || [])
-      .map(c => `<tr><td>${dot(c.ok)}</td><td>${c.text}</td><td class="muted">${c.agent}</td><td class="muted">${c.latency_ms ?? "—"}ms</td></tr>`).join("");
+      .map(c => `<tr><td>${dot(c.ok)}</td><td>${esc(c.text) || "<span class='muted'>—</span>"}</td><td class="muted">${esc(c.agent)}</td><td class="muted">${c.latency_ms ?? "—"}ms</td></tr>`).join("");
   } catch (e) { $("updated").textContent = "error: " + e.message; }
   loadMetrics();
   if (!CAPS.view_full) return;  // adolescente: sin auditoría
   try {
     const { commands } = await api("/api/commands");
-    const st = (s) => s === "done" ? "🟢" : s === "error" ? "🔴" : s === "running" ? "🟡" : "⚪";
+    const stIcon = (s) => s === "done" ? "🟢" : s === "error" ? "🔴" : s === "running" ? "🟡" : "⚪";
     $("audit").querySelector("tbody").innerHTML = commands
       .map(c => {
         const r = c.result || {};
         const res = c.status === "pending" || c.status === "running" ? ""
           : (r.ok ? (r.output || "ok") : ("error: " + (r.error || ""))).slice(0, 80);
-        return `<tr><td>${st(c.status)} ${c.status}</td><td><b>${c.type}</b></td>`
-          + `<td class="muted">${JSON.stringify(c.params)}</td>`
-          + `<td class="muted">${c.issued_by}</td>`
-          + `<td class="muted">${c.issued_at}</td>`
-          + `<td class="muted">${res}</td></tr>`;
+        return `<tr><td>${stIcon(c.status)} ${c.status}</td><td><b>${esc(c.type)}</b></td>`
+          + `<td class="muted">${esc(JSON.stringify(c.params))}</td>`
+          + `<td class="muted">${esc(c.issued_by)}</td>`
+          + `<td class="muted">${esc(c.issued_at)}</td>`
+          + `<td class="muted">${esc(res)}</td></tr>`;
       }).join("");
   } catch (e) {}
 }
@@ -212,7 +393,8 @@ const mLabel = (ts) => new Date(ts * 1000).toLocaleString("es", {day:"2-digit",m
 function mkMetricChart(canvasId, type) {
   return new Chart($(canvasId), {
     type, data: {labels: [], datasets: []},
-    options: {responsive: true, plugins: {legend: {labels: {boxWidth: 12}}}, scales: {y: {beginAtZero: true}}},
+    options: {responsive: true, maintainAspectRatio: false,
+      plugins: {legend: {labels: {boxWidth: 12}}}, scales: {y: {beginAtZero: true}}},
   });
 }
 
@@ -257,10 +439,10 @@ async function loadMetrics() {
   const models = metrics.llm_by_model || [], agents = metrics.llm_by_agent || [];
   $("m-tables").style.display = (models.length || agents.length) ? "" : "none";
   $("m-models").querySelector("tbody").innerHTML = models.map(m =>
-    `<tr><td>${m.model || "—"}</td><td>${mFmt(m.calls)}</td><td>${mFmt(m.avg_latency_ms)}</td>` +
+    `<tr><td>${esc(m.model) || "—"}</td><td>${mFmt(m.calls)}</td><td>${mFmt(m.avg_latency_ms)}</td>` +
     `<td class="muted">${mFmt(m.prompt_tokens)}/${mFmt(m.completion_tokens)}</td></tr>`).join("");
   $("m-agents").querySelector("tbody").innerHTML = agents.map(a =>
-    `<tr><td>${a.agent_id || "—"}</td><td>${mFmt(a.steps)}</td><td>${mPct(a.success_rate)}</td>` +
+    `<tr><td>${esc(a.agent_id) || "—"}</td><td>${mFmt(a.steps)}</td><td>${mPct(a.success_rate)}</td>` +
     `<td>${mFmt(a.avg_latency_ms)}</td></tr>`).join("");
 }
 
@@ -316,26 +498,23 @@ let timer = null;
 auth.onAuthStateChanged(async (user) => {
   if (!user) {
     idToken = null; clearInterval(timer);
-    hide("app"); hide("userbox"); show("login");
+    hide("app"); show("login");
     return;
   }
   idToken = await user.getIdToken();
-  $("useremail").textContent = user.email;
   // Autorización + capacidades RBAC (rol resuelto contra el roster del Brain).
   let me;
   try { me = await api("/api/me"); }
   catch (e) {
     $("login-error").textContent = e.message + " — tu cuenta no tiene acceso";
-    show("login"); hide("app"); hide("userbox"); auth.signOut(); return;
+    show("login"); hide("app"); auth.signOut(); return;
   }
   CAPS = me.caps || {};
   $("useremail").textContent = user.email + " · " + me.role;
-  hide("login"); show("app"); show("userbox");
-  if (CAPS.view_full) show("audit-card"); else hide("audit-card");
-  if (CAPS.emit) {
-    show("actions-card");
-    try { await loadCatalog(); } catch (e) { hide("actions-card"); }
-  } else { hide("actions-card"); }
+  hide("login"); show("app");
+  renderNav();
+  route();           // respeta el hash actual si la cap lo permite, si no cae al primero
+  if (CAPS.emit) { try { await loadCatalog(); } catch (e) {} }
   refresh();
   timer = setInterval(async () => { idToken = await user.getIdToken(); refresh(); }, 10000);
 });
