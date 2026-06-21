@@ -113,6 +113,19 @@ archivos `.json` más abajo describen el **modelo lógico**; físicamente son fi
 la DB. Quedan como archivos por diseño: embeddings `.npy`, traces JSONL, sesión de WhatsApp,
 samples de audio, y `panels.yaml` (config del repo leída por backoffice/scripts).
 
+#### Watchdog de HAOS y alertas (FASE 8.28)
+
+La **detección y recuperación** de HAOS caído las hace un watchdog **externo** en el SER9
+(`ha-watchdog.timer`, cada 60s): chequea `:8123`, y ante fallos sostenidos escala
+`ha core restart` (3 fallos) → `qm reset 100` (6 fallos). Cubre el caso "core colgado pero
+vivo" que el supervisor de HAOS no agarra. El core sólo aporta el **canal de notificación**:
+el hook del watchdog (`ha-watchdog-notify`) hace `POST /alerts/haos` con el evento
+(`down|restarted|reset|recovered`) y el core avisa a los **admins por WhatsApp** (usuarios
+`role=admin` con `wa_phone`, + `HAOS_ALERT_PHONE` override; token opcional `X-Alert-Token`),
+persistiendo el evento en `metrics_store.haos_health_events`. Health-check propio:
+`ha_client.ping()` y `GET /health/haos` (`{up}`). No hay loop de ping dentro del core: la
+detección vive en el watchdog para no duplicarla.
+
 ### cloud (backoffice en la nube) — FASE 33
 
 Backoffice accesible desde internet **sin exponer el Brain ni HAOS**, con principio
