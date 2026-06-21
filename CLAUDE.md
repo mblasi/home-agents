@@ -388,10 +388,37 @@ satélite por panel — con la versión que corre, la última disponible, link a
 y (en el cloud, rol admin) un botón "Actualizar" que elige el comando solo. `wa`/`bridge` en
 "avanzado". El cloud-bo opera el deploy; el backoffice local es read-only (egress-only).
 
-Comandos: `deploy.release {services?, *_ref?}` (services del Brain), `deploy.cloud` (cloud-bo
-en GCP, build `gcloud run deploy --source` desde el Brain), `deploy.satellites {node_id?}`
-(fuerza el pull de un panel o todos vía la respuesta del heartbeat). Detalle en
-`cloud/bridge/README.md`. Tag semver por repo gateado por `DEPLOY_TAG_RELEASES`.
+### Desplegar desde Claude (mismo camino que el cloud-bo)
+
+`scripts/deploy.sh <target>` es el invocador LOCAL. Resuelve el target al MISMO comando tipado
+que emite el cloud-bo y lo corre con `validate_command` + `executor.execute` en el Brain — el
+mismo funnel que el bridge usa al desencolar un comando de la nube. **Desplegar desde Claude es
+idéntico a hacerlo desde el cloud-bo**; sólo cambia el disparador (LAN/SSH vs cola en Firestore).
+No usar `gcloud`, `git pull` ni `systemctl` sueltos para desplegar: siempre por este camino, así
+hay health-gate, rollback y registro de versión.
+
+Un target por componente de la matriz (health-gate + rollback automático en todos):
+
+```zsh
+bash scripts/deploy.sh                 # services default: core + ear(audio_server) + backoffice
+bash scripts/deploy.sh core            # un service del Brain (deploy.release)
+bash scripts/deploy.sh audio_server    # repo ear → capitan-audio-server
+bash scripts/deploy.sh backoffice
+bash scripts/deploy.sh cloud-bo        # Cloud Run (activa la SA de deploy) → deploy.cloud
+bash scripts/deploy.sh panels          # fuerza el pull de TODOS los paneles → deploy.satellites
+bash scripts/deploy.sh nspanel-comedor # fuerza el pull de un panel
+bash scripts/deploy.sh core --ref core=v0.1.0   # pin a un tag/sha (rollback o release fijo)
+bash scripts/deploy.sh wa              # (avanzado) reinicia WhatsApp; bridge requiere restart desacoplado
+```
+
+Mapeo target → comando (registro `TARGETS` en `deploy_engine.py`, compartido con el cloud-bo y
+el snapshot): `core/audio_server/backoffice/wa/bridge` → `deploy.release`; `cloud-bo` →
+`deploy.cloud`; `panels`/`<node_id>` → `deploy.satellites`. Detalle del motor y los comandos en
+`cloud/bridge/README.md`. Tag semver por repo gateado por `DEPLOY_TAG_RELEASES` (default on).
+
+**Flujo correcto al desplegar un cambio**: mergear el PR a main (branch→PR→merge) → `bash
+scripts/deploy.sh <target>`. El motor hace el pin a HEAD de main, restart, health-gate y, si
+falla, rollback. NO hace falta entrar al Brain a mano.
 
 > El Brain es el rol del servidor central (LXC capitan-lxc). "SER9" es sólo el modelo de
 > hardware actual (Beelink SER9 Pro) — no usarlo como nombre del rol.

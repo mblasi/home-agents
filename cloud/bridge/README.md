@@ -11,12 +11,17 @@ salientes** hacia el servicio Cloud Run (`cloud/`):
   (subprocess con lista de args, sin shell). El catálogo es el mismo de la nube
   (`cloud/app/commands.py`), re-validado en el bridge.
 - `deploy_engine.py` — el **motor de deploy** (FASE 34): único backend para todo deploy.
+- `deploy_cli.py` — invocador LOCAL por target: resuelve `<target>` al mismo comando tipado que
+  el cloud-bo y lo corre con `validate_command` + `executor.execute` (lo llama `scripts/deploy.sh`).
 
 ## Motor de deploy (FASE 34)
 
 `deploy_engine.py` es el ÚNICO lugar con lógica de deploy (snapshot → pin de ref → install →
-restart → health-gate → rollback → registro de versión). Lo invocan dos frontends sin
-reimplementar nada: el `executor` (remoto, comando del cloud-bo) y `scripts/deploy.sh` (local).
+restart → health-gate → rollback → registro de versión). Lo invocan dos disparadores que
+convergen en el MISMO funnel `validate_command` + `executor.execute`:
+- **remoto** — el cloud-bo encola un comando → el bridge lo polea → `executor.execute`.
+- **local** — `scripts/deploy.sh <target>` → `deploy_cli.py` resuelve el target al mismo comando
+  → `executor.execute`. Desplegar desde la LAN (Claude) es idéntico a hacerlo desde el cloud-bo.
 
 Modelo en tres capas:
 - **Repo** (unidad de versión): `core`, `ear`, `umbrella`. Pin independiente por repo con
