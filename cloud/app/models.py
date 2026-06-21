@@ -52,7 +52,20 @@ class WakewordNode(BaseModel):
 class Wakeword(BaseModel):
     last_score: float | None = None
     false_positives_24h: int | None = None
+    status: str = "idle"   # estado del último retrain (idle/running/done/error), FASE 37.1
     nodes: list[WakewordNode] = Field(default_factory=list)
+
+
+class Counts(BaseModel):
+    """Conteos agregados (sin contenido PII en claro). FASE 37.1.
+
+    El detalle (contenido de intents/goals/rutinas/conversaciones) NO sale de la LAN:
+    sólo viaja el conteo, gated por `access`. El contenido queda detrás de `view_pii`
+    (capacidad admin-only, 37.2) que no expone este snapshot."""
+    intents: int = 0
+    goals: int = 0
+    routines: int = 0
+    conversations: int = 0
 
 
 class UserSummary(BaseModel):
@@ -74,6 +87,10 @@ class StateSnapshot(BaseModel):
     recent_commands: list[RecentCommand] = Field(default_factory=list)
     wakeword: Wakeword = Field(default_factory=Wakeword)
     users_summary: list[UserSummary] = Field(default_factory=list)
+    # FASE 37.1: alertas proactivas (texto listo para TTS; gated por `access`, no PII secreta)
+    # y conteos agregados de intents/goals/rutinas/conversaciones (sin contenido en claro).
+    alerts: list[str] = Field(default_factory=list)
+    counts: Counts = Field(default_factory=Counts)
     # Matriz unificada de targets (34.15): {targets: [{id,label,where,kind,version,url,latest,
     # latest_url,behind,command,params,advanced}], satellite_expected}. Opcional (retrocompat).
     versions: dict[str, Any] = Field(default_factory=dict)

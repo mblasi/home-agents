@@ -3437,7 +3437,7 @@ Objetivo: Llevar el backoffice cloud (FASE 33) de una única página SPA con tar
           el backoffice cloud debe ser mobile-friendly (responsive, mobile-first), ya que
           el acceso remoto egress-only es típicamente desde el celular — toda sección,
           sidebar y formulario de comandos debe funcionar y ser usable en pantalla chica.
-Estado:   Pendiente.
+Estado:   EN CURSO (1/13 — hecho 37.1; pendientes 37.2-37.12).
 Deps:     FASE 33 (backoffice cloud + bridge egress-only + RBAC — COMPLETA, base a extender),
           FASE 35 (dashboards de métricas — COMPLETA, ya viven en el cloud),
           FASE 34 (deploy remoto — la sección Deploy del sidebar consume su versión reportada).
@@ -3488,8 +3488,15 @@ Mapa de paridad local→cloud (qué se incluye y bajo qué gate):
           - FUERA del cloud: Shared State, Ambientes (rooms), Integraciones (OAuth/tokens).
 ```
 
+PREMISA TRANSVERSAL DE UX (comandos): TODO lo relativo a comandos invocables —
+          catálogo, observabilidad del estado (pending→running→done/error), y la UX de
+          definición de parámetros— debe construirse con calidad de producto final-user,
+          aunque el ítem no lo detalle explícitamente. Nada de inputs JSON crudos ni jerga
+          interna: widgets tipados, labels claros, validación inline, feedback legible.
+          Aplica especialmente a 37.5/37.6 pero gobierna toda superficie de comandos.
+
 #### Etapa A - Contrato y RBAC
-- [ ] 37.1  Contrato del snapshot ampliado: campos `alerts`, `wakeword.status`, conteos de
+- [x] 37.1  Contrato del snapshot ampliado: campos `alerts`, `wakeword.status`, conteos de
             intents/goals/routines/conversaciones y versión desplegada (cruza FASE 34).
             Documentar qué sale y qué NO (sin contenido PII en claro). Tests de contrato del
             snapshot (`cloud/tests`).
