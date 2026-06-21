@@ -128,3 +128,39 @@ def test_deploy_satellites_node_id():
 def test_deploy_satellites_param_desconocido():
     with pytest.raises(CommandError):
         validate_command("deploy.satellites", {"nodo": "comedor"})
+
+
+# ── FASE 37.2: comandos de operación acotados ─────────────────────────────────
+
+def test_agent_toggle_ok():
+    assert validate_command("agent.toggle", {"agent_id": "haos", "status": "planned"}) == {
+        "agent_id": "haos", "status": "planned"}
+
+
+def test_agent_toggle_status_invalido():
+    with pytest.raises(CommandError):
+        validate_command("agent.toggle", {"agent_id": "haos", "status": "on"})
+
+
+def test_agent_toggle_requiere_agent_y_status():
+    with pytest.raises(CommandError):
+        validate_command("agent.toggle", {"agent_id": "haos"})
+    with pytest.raises(CommandError):
+        validate_command("agent.toggle", {"status": "active"})
+
+
+def test_panel_reboot_ok():
+    assert validate_command("panel.reboot", {"node_id": "comedor"}) == {"node_id": "comedor"}
+    with pytest.raises(CommandError):
+        validate_command("panel.reboot", {})
+
+
+def test_proactive_run_ok():
+    assert validate_command("proactive.run", {"agent_id": "clima"}) == {"agent_id": "clima"}
+    with pytest.raises(CommandError):
+        validate_command("proactive.run", {})
+
+
+def test_new_commands_in_catalog_summary():
+    types = {c["type"] for c in catalog_summary()}
+    assert {"agent.toggle", "panel.reboot", "proactive.run"} <= types

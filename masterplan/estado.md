@@ -3437,7 +3437,7 @@ Objetivo: Llevar el backoffice cloud (FASE 33) de una única página SPA con tar
           el backoffice cloud debe ser mobile-friendly (responsive, mobile-first), ya que
           el acceso remoto egress-only es típicamente desde el celular — toda sección,
           sidebar y formulario de comandos debe funcionar y ser usable en pantalla chica.
-Estado:   EN CURSO (1/13 — hecho 37.1; pendientes 37.2-37.12).
+Estado:   EN CURSO (2/13 — hecho 37.1, 37.2; pendientes 37.3-37.12).
 Deps:     FASE 33 (backoffice cloud + bridge egress-only + RBAC — COMPLETA, base a extender),
           FASE 35 (dashboards de métricas — COMPLETA, ya viven en el cloud),
           FASE 34 (deploy remoto — la sección Deploy del sidebar consume su versión reportada).
@@ -3500,7 +3500,7 @@ PREMISA TRANSVERSAL DE UX (comandos): TODO lo relativo a comandos invocables —
             intents/goals/routines/conversaciones y versión desplegada (cruza FASE 34).
             Documentar qué sale y qué NO (sin contenido PII en claro). Tests de contrato del
             snapshot (`cloud/tests`).
-- [ ] 37.2  Capacidad `view_pii` (admin-only) en `cloud/app/rbac.py`, distinta de `view_full`;
+- [x] 37.2  Capacidad `view_pii` (admin-only) en `cloud/app/rbac.py`, distinta de `view_full`;
             `filter_state` redacta el detalle PII según ella (deja conteos). Catálogo de comandos
             extendido en `cloud/app/commands.py` (`agent.toggle`, `panel.reboot`, `proactive.run`)
             con validadores existentes. Tests de RBAC y de catálogo.
