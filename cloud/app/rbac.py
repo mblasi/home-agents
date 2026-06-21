@@ -8,14 +8,19 @@ Capacidades por rol (consistente con los roles de la gestión de usuarios del co
 """
 from __future__ import annotations
 
-# access: puede entrar al dashboard | view_full: ve users/auditoría | emit: emite comandos
+# Capacidades:
+#   access    → puede entrar al dashboard
+#   view_full → ve roster de usuarios, auditoría y detalle operativo de métricas
+#   view_pii  → ve CONTENIDO sensible (texto de comandos/conversaciones); admin-only (FASE 37.2),
+#               estrictamente más restrictiva que view_full. Sin ella se ven sólo conteos.
+#   emit      → emite comandos admin
 ROLE_CAPS: dict[str, dict[str, bool]] = {
-    "admin":       {"access": True,  "view_full": True,  "emit": True},
-    "familiar":    {"access": True,  "view_full": True,  "emit": False},
-    "adolescente": {"access": True,  "view_full": False, "emit": False},
+    "admin":       {"access": True,  "view_full": True,  "view_pii": True,  "emit": True},
+    "familiar":    {"access": True,  "view_full": True,  "view_pii": False, "emit": False},
+    "adolescente": {"access": True,  "view_full": False, "view_pii": False, "emit": False},
 }
 
-_NO_ACCESS = {"access": False, "view_full": False, "emit": False}
+_NO_ACCESS = {"access": False, "view_full": False, "view_pii": False, "emit": False}
 
 
 def caps_for(role: str | None) -> dict[str, bool]:
@@ -23,12 +28,21 @@ def caps_for(role: str | None) -> dict[str, bool]:
 
 
 def filter_state(state: dict, caps: dict[str, bool]) -> dict:
-    """Aplica RBAC al snapshot que ve el dashboard: oculta PII de usuarios a quien
-    no tiene view_full."""
-    if caps.get("view_full"):
-        return state
+    """Aplica RBAC al snapshot que ve el dashboard.
+
+    Dos niveles de redacción (FASE 37.2):
+      - sin `view_full`: oculta el roster de usuarios (PII de identidad).
+      - sin `view_pii`: oculta el CONTENIDO de la actividad (el texto de cada comando en
+        `recent_commands`) dejando la metadata (ts/agente/ok/latencia). Los `counts` —que son
+        sólo enteros— se conservan siempre: el detalle queda detrás de view_pii, los conteos no.
+    """
     redacted = dict(state)
-    redacted["users_summary"] = []  # adolescente no ve la lista de usuarios
+    if not caps.get("view_full"):
+        redacted["users_summary"] = []  # adolescente no ve la lista de usuarios
+    if not caps.get("view_pii"):
+        redacted["recent_commands"] = [
+            {**c, "text": ""} for c in redacted.get("recent_commands", [])
+        ]
     return redacted
 
 

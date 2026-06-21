@@ -13,6 +13,8 @@ from typing import Any, Callable
 
 SERVICES = ("capitan-core", "capitan-backoffice", "capitan-wa", "capitan-ear")
 CONFIG_TARGETS = ("core", "backoffice")
+# Estados de agente que admite el core (PATCH /agents/{id}/status). FASE 37.2.
+AGENT_STATUSES = ("active", "planned", "unavailable")
 # Componentes del motor de deploy (FASE 34). Nombres lógicos del motor (deploy_engine.SERVICES),
 # distintos de las units de SERVICES de arriba.
 DEPLOY_SERVICES = ("core", "ear", "backoffice", "wa", "bridge")
@@ -99,6 +101,12 @@ CATALOG: dict[str, dict[str, tuple[Callable[[Any], Any], bool]]] = {
     "wakeword.retrain": {},
     "voice.reenroll":  {"node_id": (_str("node_id"), True),
                         "user_id": (_str("user_id"), True)},
+    # FASE 37.2: comandos de operación acotados (sólo admin). El bridge los ejecuta contra
+    # APIs/scripts existentes del Brain (37.8). Sin shell arbitrario.
+    "agent.toggle":    {"agent_id": (_str("agent_id"), True),
+                        "status": (_enum("status", AGENT_STATUSES), True)},
+    "panel.reboot":    {"node_id": (_str("node_id"), True)},
+    "proactive.run":   {"agent_id": (_str("agent_id"), True)},
 }
 
 
