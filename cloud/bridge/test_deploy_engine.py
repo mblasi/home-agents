@@ -274,7 +274,7 @@ def test_release_registra_tag_en_estado(state_tmp, monkeypatch):
     assert "v1.0.1" in st["repos"]["core"]["url"]
 
 
-# ── Driver cloudrun (T4): deploy GCP desde el SER9 ────────────────────────────
+# ── Driver cloudrun (T4): deploy GCP desde el Brain ────────────────────────────
 
 class _FakeGcloud:
     """Mock de _run para gcloud: describe→revisión, deploy/update-traffic ok salvo `fail`."""

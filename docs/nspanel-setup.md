@@ -20,7 +20,7 @@ Replica exactamente el panel del comedor (192.168.68.113) que quedó funcionando
 ## Resumen de arquitectura
 
 ```
-NSPanel Pro (Android 8.1, Termux)            SER9 LXC (capitan-lxc)
+NSPanel Pro (Android 8.1, Termux)            Brain LXC (capitan-lxc)
   satellite.py                                 audio_server.py (:8766)
   - openWakeWord (capitan.onnx)                - faster-whisper STT
   - graba 5s post-wake-word                    - strip wake word prefix
@@ -36,7 +36,7 @@ Latencia end-to-end: ~5s warm.
 ## Prerequisitos
 
 - NSPanel Pro con firmware eWeLink, en la LAN, IP conocida
-- `audio_server` corriendo en el SER9 (`systemctl --user status capitan-audio-server`)
+- `audio_server` corriendo en el Brain (`systemctl --user status capitan-audio-server`)
 - El modelo `capitan.onnx` + `melspectrogram.onnx` + `embedding_model.onnx` en la laptop
   (en `~/.local/share/wakeword/` y el venv de openwakeword)
 
@@ -210,7 +210,7 @@ este panel:
 El usuario habla ~4s tras cada beep (5 frases). El audio_server computa el embedding y lo
 guarda en `embeddings/<uid>.npy`.
 
-Activar el gate (rechaza voces no enroladas = TV/charla ajena) en `ear/.env` del SER9:
+Activar el gate (rechaza voces no enroladas = TV/charla ajena) en `ear/.env` del Brain:
 ```
 SPEAKER_THRESHOLD=0.6
 REQUIRE_KNOWN_SPEAKER=true

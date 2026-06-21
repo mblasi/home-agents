@@ -120,12 +120,12 @@ async function api(path, opts = {}) {
 
 function dot(ok) { return ok ? "🟢" : "🔴"; }
 
-// Matriz de versiones (FASE 34 T5): repos del SER9 con link al release de GitHub + paneles
-// con su versión y si están al día respecto del código que sirve el SER9.
+// Matriz de versiones (FASE 34 T5): repos del Brain con link al release de GitHub + paneles
+// con su versión y si están al día respecto del código que sirve el Brain.
 // Matriz unificada de TARGETS (34.15): una fila por cosa que corre, un botón que elige el
 // comando solo. El snapshot ya trae version/latest/behind + command+params por target.
 let TARGETS_BY_ID = {};
-const WHERE_ICON = { SER9: "🖥️", GCP: "☁️", NSPanel: "📟" };
+const WHERE_ICON = { Brain: "🖥️", GCP: "☁️", NSPanel: "📟" };
 function renderVersions(v) {
   const esc = (s) => String(s == null ? "" : s).replace(/[<>&]/g, c => ({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]));
   const link = (text, url) => url ? `<a href="${esc(url)}" target="_blank">${esc(text)}</a>` : esc(text);
@@ -173,7 +173,7 @@ let CAPS = {};
 async function refresh() {
   try {
     const { state } = await api("/api/state");
-    if (!state) { $("updated").textContent = "sin datos del SER9 todavía"; return; }
+    if (!state) { $("updated").textContent = "sin datos del Brain todavía"; return; }
     $("updated").textContent = "snapshot: " + (state.ts || "?");
     $("services").innerHTML = Object.entries(state.services || {})
       .map(([k, v]) => `<div>${dot(v.up)} <b>${k}</b> <span class="muted">${v.detail || ""}</span></div>`).join("");
@@ -321,7 +321,7 @@ auth.onAuthStateChanged(async (user) => {
   }
   idToken = await user.getIdToken();
   $("useremail").textContent = user.email;
-  // Autorización + capacidades RBAC (rol resuelto contra el roster del SER9).
+  // Autorización + capacidades RBAC (rol resuelto contra el roster del Brain).
   let me;
   try { me = await api("/api/me"); }
   catch (e) {

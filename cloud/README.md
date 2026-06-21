@@ -1,7 +1,7 @@
 # cloud/ — Backoffice en la nube (FASE 33)
 
-Backoffice accesible desde internet **sin exponer el SER9 ni HAOS**. La nube nunca
-inicia conexiones hacia la casa: el SER9 empuja estado y polea una cola de comandos
+Backoffice accesible desde internet **sin exponer el Brain ni HAOS**. La nube nunca
+inicia conexiones hacia la casa: el Brain empuja estado y polea una cola de comandos
 (patrón command/executor, control por inversión). Toda conexión es SALIENTE desde la
 LAN. Diseño/contrato: `../masterplan/fase33_cloud_backoffice.md`.
 
@@ -34,7 +34,7 @@ cloud/
 
 ## Endpoints
 
-Bridge (SER9 → nube, auth OIDC de la SA del bridge):
+Bridge (Brain → nube, auth OIDC de la SA del bridge):
 - `POST /ingest/state` — recibe el snapshot.
 - `GET  /commands/pending` — devuelve pending y los pasa a running (claim atómico).
 - `POST /commands/{id}/result` — resultado de ejecución.

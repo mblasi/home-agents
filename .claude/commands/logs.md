@@ -1,4 +1,4 @@
-Mostrá logs de los servicios de home-agents corriendo en el SER9 (capitan-lxc).
+Mostrá logs de los servicios de home-agents corriendo en el Brain (capitan-lxc).
 
 Servicios disponibles: `core`, `backoffice`, `wa` (o `all` para todos).
 Opciones: `--follow` para seguir en tiempo real, `--lines N` para N líneas (default 50).

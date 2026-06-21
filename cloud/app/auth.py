@@ -1,7 +1,7 @@
 """Autenticación bidireccional. Ver fase33_cloud_backoffice.md (33.4).
 
 - Dashboard (navegador): Firebase ID token, restringido por allow-list de email.
-- Bridge (SER9): Google OIDC ID token de la Service Account del bridge, con
+- Bridge (Brain): Google OIDC ID token de la Service Account del bridge, con
   audience = URL del servicio. Sin API keys embebidas.
 """
 from __future__ import annotations
@@ -43,7 +43,7 @@ class Principal:
 
 def require_dashboard_user(authorization: str | None = Header(default=None)) -> Principal:
     """Valida el Firebase ID token y autoriza contra el roster de usuarios (email→rol)
-    pusheado por el SER9. `ALLOWED_EMAILS` queda sólo como bootstrap de emergencia
+    pusheado por el Brain. `ALLOWED_EMAILS` queda sólo como bootstrap de emergencia
     (→ admin) para no quedar bloqueado si el roster está vacío. Devuelve el Principal
     con rol y capacidades RBAC (33.20/33.21)."""
     token = _bearer(authorization)

@@ -1,8 +1,8 @@
 """Backoffice en la nube — Cloud Run + Firestore. FASE 33 Etapa B.
 
-Patrón command/executor con control por inversión: el SER9 empuja estado (ingest)
+Patrón command/executor con control por inversión: el Brain empuja estado (ingest)
 y polea comandos (pending) — todas conexiones SALIENTES desde la casa. La nube
-nunca inicia conexiones hacia el SER9.
+nunca inicia conexiones hacia el Brain.
 """
 from __future__ import annotations
 
@@ -63,7 +63,7 @@ def health():
     return {"ok": True}
 
 
-# ── Bridge (SER9 → nube): conexiones salientes, auth OIDC de la SA ──────────────
+# ── Bridge (Brain → nube): conexiones salientes, auth OIDC de la SA ──────────────
 
 @app.post("/ingest/state")
 def ingest_state(snapshot: StateSnapshot, sa: str = Depends(require_bridge)):
@@ -79,7 +79,7 @@ def ingest_state(snapshot: StateSnapshot, sa: str = Depends(require_bridge)):
 
 @app.post("/ingest/metrics")
 def ingest_metrics(snapshot: MetricsSnapshot, sa: str = Depends(require_bridge)):
-    """Recibe agregados de métricas del bridge (FASE 35.5). Egress-only: el SER9
+    """Recibe agregados de métricas del bridge (FASE 35.5). Egress-only: el Brain
     empuja, la nube almacena."""
     ratelimit.limit_ingest(sa)
     if snapshot.schema_version != METRICS_SCHEMA_VERSION:

@@ -1,5 +1,5 @@
 """
-core del MOTOR DE DEPLOY (FASE 34) — corre en el SER9, es el ÚNICO backend de deploy.
+core del MOTOR DE DEPLOY (FASE 34) — corre en el Brain, es el ÚNICO backend de deploy.
 
 Principio (FASE 34): existe UN solo motor con la lógica de deploy (snapshot → pin de ref →
 install → restart → health-gate → rollback → registro de versión). Lo invocan dos frontends
@@ -39,7 +39,7 @@ STATE_PATH = os.environ.get(
 HEALTH_RETRIES = int(os.environ.get("DEPLOY_HEALTH_RETRIES", "15"))
 HEALTH_BACKOFF = float(os.environ.get("DEPLOY_HEALTH_BACKOFF", "2.0"))
 # Versionado formal (FASE 34, D8/34.12): tras un deploy exitoso, crear un tag semver por repo
-# y pushearlo (SSH; el SER9 ya pushea por SSH). GATE de seguridad: off por defecto para no crear
+# y pushearlo (SSH; el Brain ya pushea por SSH). GATE de seguridad: off por defecto para no crear
 # tags reales hasta validarlo. El "Release" formal de GitHub (notas) requiere token y se agrega
 # aparte; el tag pusheado ya es un ref inmutable y trazable, y GitHub lo muestra.
 TAG_RELEASES = os.environ.get("DEPLOY_TAG_RELEASES", "false").lower() in ("1", "true", "yes")
@@ -397,11 +397,11 @@ def run_release(services: Optional[list[str]] = None,
 
 
 # ── Driver cloudrun (GCP, FASE 34 T4 / D2) ────────────────────────────────────
-# El SER9 despliega Cloud Run con `gcloud run deploy --source` (egress a Google, saliente),
-# usando la SA de deploy (D9: GOOGLE_APPLICATION_CREDENTIALS apunta a la key en el SER9).
+# El Brain despliega Cloud Run con `gcloud run deploy --source` (egress a Google, saliente),
+# usando la SA de deploy (D9: GOOGLE_APPLICATION_CREDENTIALS apunta a la key en el Brain).
 # Health-gate = curl a la URL pública. Rollback = update-traffic a la revisión previa (Cloud Run
 # conserva revisiones). NO pasa por el bridge para sí mismo (circularidad, D4): el deploy del
-# cloud-bo lo dispara igual el SER9, y si rompe, el rollback a la revisión previa lo hace el SER9.
+# cloud-bo lo dispara igual el Brain, y si rompe, el rollback a la revisión previa lo hace el Brain.
 
 GCLOUD = os.environ.get("GCLOUD_BIN", "gcloud")
 GCP_PROJECT = os.environ.get("GCP_PROJECT", "capitan-495518")
@@ -409,7 +409,7 @@ GCP_PROJECT = os.environ.get("GCP_PROJECT", "capitan-495518")
 
 @dataclass
 class CloudRunTarget:
-    """Servicio de Cloud Run desplegable desde el SER9. `source` es el dir (relativo a REPO_DIR)
+    """Servicio de Cloud Run desplegable desde el Brain. `source` es el dir (relativo a REPO_DIR)
     que contiene el Dockerfile; `health_url` es la URL pública para el health-gate."""
     name: str
     service: str
@@ -467,7 +467,7 @@ CLOUDRUN_TARGETS: dict[str, CloudRunTarget] = {
 
 
 # ── Targets desplegables (vista de operación unificada, 34.15) ─────────────────
-# Un TARGET es "algo que corre en algún lado y tiene una versión". Unifica services del SER9,
+# Un TARGET es "algo que corre en algún lado y tiene una versión". Unifica services del Brain,
 # Cloud Run y satélites bajo una sola operatoria: la matriz muestra una fila por target y un
 # botón que elige el comando solo. El snapshot y los dos frontends consumen esta lista; los
 # satélites NO están acá (son dinámicos: uno por panel, los agrega el snapshot desde /nodes).
@@ -475,7 +475,7 @@ CLOUDRUN_TARGETS: dict[str, CloudRunTarget] = {
 class Target:
     id: str
     label: str
-    where: str          # "SER9" | "GCP"
+    where: str          # "Brain" | "GCP"
     repo: str           # repo fuente (para la última versión disponible + link)
     kind: str           # "service" | "cloudrun"
     command: str        # tipo de comando que lo despliega
@@ -483,12 +483,12 @@ class Target:
     advanced: bool = False   # wa/bridge: ocultos en la vista normal
 
 TARGETS: list[Target] = [
-    Target("core",         "core",         "SER9", "core",     "service",  "deploy.release", {"services": ["core"]}),
-    Target("audio_server", "audio_server", "SER9", "ear",      "service",  "deploy.release", {"services": ["ear"]}),
-    Target("backoffice",   "backoffice",   "SER9", "umbrella", "service",  "deploy.release", {"services": ["backoffice"]}),
+    Target("core",         "core",         "Brain", "core",     "service",  "deploy.release", {"services": ["core"]}),
+    Target("audio_server", "audio_server", "Brain", "ear",      "service",  "deploy.release", {"services": ["ear"]}),
+    Target("backoffice",   "backoffice",   "Brain", "umbrella", "service",  "deploy.release", {"services": ["backoffice"]}),
     Target("cloud-bo",     "cloud-bo",     "GCP",  "umbrella", "cloudrun", "deploy.cloud",   {"services": ["cloud-bo"]}),
-    Target("wa",           "wa",           "SER9", "umbrella", "service",  "deploy.release", {"services": ["wa"]},     advanced=True),
-    Target("bridge",       "bridge",       "SER9", "umbrella", "service",  "deploy.release", {"services": ["bridge"]}, advanced=True),
+    Target("wa",           "wa",           "Brain", "umbrella", "service",  "deploy.release", {"services": ["wa"]},     advanced=True),
+    Target("bridge",       "bridge",       "Brain", "umbrella", "service",  "deploy.release", {"services": ["bridge"]}, advanced=True),
 ]
 
 
@@ -549,7 +549,7 @@ def _parse_refs(items: list[str]) -> dict[str, Optional[str]]:
 
 def main(argv: Optional[list[str]] = None) -> int:
     import argparse
-    ap = argparse.ArgumentParser(description="Motor de deploy del SER9 (FASE 34)")
+    ap = argparse.ArgumentParser(description="Motor de deploy del Brain (FASE 34)")
     ap.add_argument("--service", action="append", default=[], metavar="name",
                     help=f"servicio a desplegar {sorted(SERVICES)}; default {DEFAULT_SERVICES}")
     ap.add_argument("--ref", action="append", default=[], metavar="repo=ref",

@@ -1,4 +1,4 @@
-"""Construcción del snapshot de estado (SER9 → nube). FASE 33 (33.10).
+"""Construcción del snapshot de estado (Brain → nube). FASE 33 (33.10).
 
 Reusa datos que ya producen core (:8765) y audio_server (:8766) + /tmp/capitan.
 Best-effort y resiliente: cada fuente está envuelta en try/except y nunca propaga
@@ -164,7 +164,7 @@ _last_fetch = 0.0
 
 def _maybe_fetch(repos, de) -> None:
     """git fetch de los repos para conocer la ÚLTIMA versión disponible (origin/main + tags), con
-    throttle (no en cada snapshot). Egress-only: el SER9 sólo hace una conexión saliente a GitHub."""
+    throttle (no en cada snapshot). Egress-only: el Brain sólo hace una conexión saliente a GitHub."""
     global _last_fetch
     import time
     if time.time() - _last_fetch < _FETCH_INTERVAL:
@@ -199,7 +199,7 @@ def _repo_git_info(de, repo) -> dict:
 
 def _versions(nodes: list[dict]) -> dict:
     """Matriz de TARGETS desplegables (34.15): UNA lista plana de cosas que corren — services del
-    SER9 (core/audio_server/backoffice), Cloud Run (cloud-bo) y un satélite por panel. Cada target
+    Brain (core/audio_server/backoffice), Cloud Run (cloud-bo) y un satélite por panel. Cada target
     lleva la versión que corre, la última disponible (origin/main + tag) con flag `behind`, links a
     GitHub, y el comando+params que lo despliega (el frontend sólo emite). Best-effort; nunca lanza."""
     out: dict = {"targets": [], "satellite_expected": None}

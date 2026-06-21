@@ -1,7 +1,7 @@
 # FASE 33 — Backoffice en la nube: diseño y contrato (Etapa A)
 
 Documento de diseño de los ítems 33.1–33.4. Fuente de verdad del contrato entre el
-SER9 y la nube. Cualquier cambio de payload, comando o autenticación se refleja acá
+Brain y la nube. Cualquier cambio de payload, comando o autenticación se refleja acá
 **antes** de tocar código.
 
 Plataforma: Google Cloud (Cloud Run + Firestore + Identity Platform + Secret Manager).
@@ -12,21 +12,21 @@ Plataforma: Google Cloud (Cloud Run + Firestore + Identity Platform + Secret Man
 
 ### Principio rector
 
-El SER9 **sólo** abre conexiones salientes HTTPS hacia la nube. La nube nunca inicia
+El Brain **sólo** abre conexiones salientes HTTPS hacia la nube. La nube nunca inicia
 una conexión hacia la casa. No hay port-forwarding, no hay inbound, no hay túnel
 persistente reverso administrado por terceros. Si la nube desaparece, la casa sigue
 operando y el backoffice local (FASE 12, LAN) sigue disponible.
 
 ```
                  (1) push estado  ─────────────►
-   [SER9 LXC] ── (2) poll comandos ────────────►  [Cloud Run + Firestore] ◄── HTTPS ── [navegador]
+   [Brain LXC] ── (2) poll comandos ────────────►  [Cloud Run + Firestore] ◄── HTTPS ── [navegador]
                  (3) post resultado ───────────►
                           ▲
-                  todas SALIENTES desde el SER9
+                  todas SALIENTES desde el Brain
 ```
 
 Las tres interacciones del bridge (push estado, poll comandos, post resultado) son
-requests HTTPS salientes iniciadas por el SER9. La nube responde dentro de esa misma
+requests HTTPS salientes iniciadas por el Brain. La nube responde dentro de esa misma
 conexión; nunca abre una nueva hacia la LAN.
 
 ### Qué sale de la red local (dato que cruza a la nube)
@@ -58,12 +58,12 @@ campo no está en el contrato de 33.2, no se envía.
 
 ### Por qué la nube no puede iniciar conexiones hacia la casa
 
-- No existe ningún endpoint inbound en el SER9 expuesto a internet. El LXC no tiene
+- No existe ningún endpoint inbound en el Brain expuesto a internet. El LXC no tiene
   puerto publicado ni regla de NAT/port-forward en el router.
 - La nube no conoce ninguna IP pública enrutable hacia la casa (IP dinámica + sin
-  DNS dinámico apuntando al SER9).
-- El control fluye por inversión: la nube **encola** comandos en Firestore; el SER9
-  los **busca** (pull) en su próximo ciclo de polling. La nube nunca "empuja" al SER9.
+  DNS dinámico apuntando al Brain).
+- El control fluye por inversión: la nube **encola** comandos en Firestore; el Brain
+  los **busca** (pull) en su próximo ciclo de polling. La nube nunca "empuja" al Brain.
 - Aunque la cuenta de nube se comprometa, el atacante sólo puede encolar comandos del
   catálogo tipado (33.3), que se ejecutan con permiso mínimo y quedan auditados. No
   obtiene shell, ni los secretos, ni acceso a HAOS.
@@ -82,7 +82,7 @@ campo no está en el contrato de 33.2, no se envía.
 
 ---
 
-## 33.2 — Contrato del snapshot de estado (SER9 → nube)
+## 33.2 — Contrato del snapshot de estado (Brain → nube)
 
 Endpoint destino: `POST /ingest/state`. El bridge envía el snapshot completo en cada
 ciclo (idempotente: la nube reemplaza el snapshot actual y conserva histórico corto).
@@ -175,7 +175,7 @@ a una función concreta; un `type` desconocido se rechaza sin ejecutar.
 
 ### Catálogo (v1)
 
-| `type` | Parámetros | Validación | Acción en el SER9 |
+| `type` | Parámetros | Validación | Acción en el Brain |
 |---|---|---|---|
 | `service.restart` | `service` ∈ {`capitan-core`, `capitan-backoffice`, `capitan-wa`, `capitan-ear`} | enum cerrado | `systemctl --user restart <service>` |
 | `service.status` | `service` (mismo enum) o vacío = todos | enum/opcional | `systemctl --user status` parseado |
@@ -209,7 +209,7 @@ Notas:
 - Reglas de seguridad de Firestore por colección (33.6) refuerzan el acceso del lado
   de datos: lectura del dashboard sólo para emails autorizados.
 
-### Bridge (SER9 → nube)
+### Bridge (Brain → nube)
 
 - El bridge se autentica con un **token OIDC de Service Account** (sin API key
   embebida en el repo). La SA tiene permiso mínimo: invocar el servicio Cloud Run de
@@ -241,7 +241,7 @@ Notas:
 
 ## Decisiones de Etapa A (no reabrir sin justificación)
 
-- Control por **inversión / pull**: la nube encola, el SER9 polea. Cero inbound.
+- Control por **inversión / pull**: la nube encola, el Brain polea. Cero inbound.
 - Firestore unifica **estado + cola de comandos** (vs Pub/Sub) para tener histórico
   y auditoría con TTL en un solo lugar.
 - Comandos **tipados y cerrados**, nunca shell. Catálogo versionado junto al executor.

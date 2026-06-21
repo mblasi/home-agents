@@ -183,7 +183,7 @@ OS:   Gentoo Linux — GCC 15.2.1 znver3 — kernel x86_64
 
 La laptop NO corre servicios en producción. Solo git, editor, deploy vía SSH.
 
-### Servidor central — SER9 (Beelink SER9 Pro)
+### Servidor central — Brain (Beelink SER9 Pro)
 ```
 CPU:  AMD Ryzen AI 7 HX 255, 32GB DDR5
 GPU:  Radeon 780M (RDNA 3 / gfx1103) — ROCm con HSA_OVERRIDE_GFX_VERSION=11.0.0
@@ -342,22 +342,22 @@ CORE_TIMEOUT=30
 # Activar entorno (laptop)
 source ~/home-agents-env/bin/activate
 
-# Deploy al SER9 (desde laptop, tras mergear PR a main)
+# Deploy al Brain (desde laptop, tras mergear PR a main)
 bash scripts/deploy.sh           # actualiza core + backoffice
 bash scripts/deploy.sh --restart-wa  # incluye WA
 
-# Logs en SER9
+# Logs en Brain
 ssh capitan-lxc "journalctl --user -u capitan-core -f"
 ssh capitan-lxc "journalctl --user -u capitan-backoffice -f"
 ssh capitan-lxc "journalctl --user -u capitan-wa -f"
 
-# Test del core en SER9
+# Test del core en Brain
 curl http://192.168.68.132:8765/health
 curl -X POST http://192.168.68.132:8765/process \
   -H 'Content-Type: application/json' \
   -d '{"text":"prende la luz"}'
 
-# Servicios en SER9
+# Servicios en Brain
 ssh capitan-lxc "systemctl --user status capitan-core capitan-backoffice capitan-wa"
 ssh capitan-lxc "systemctl --user restart capitan-core"
 
@@ -378,12 +378,12 @@ git submodule update --remote
 ```
 [NSPanel Pro — mic]
     ↓ wake word detectado (Python/Termux)
-    ↓ WebSocket/HTTP → SER9 LXC ear (servidor de audio)
+    ↓ WebSocket/HTTP → Brain LXC ear (servidor de audio)
         ↓ faster-whisper small int8 + ROCm       ~4.6s STT
         ↓ HTTP POST :8765/process
-        [core/server.py — SER9 LXC]
+        [core/server.py — Brain LXC]
             ↓ qwen2.5:7b Ollama + ROCm            ~13.3s warm
-        [ACTION → HAOS REST API :8123 → VM HAOS SER9]
+        [ACTION → HAOS REST API :8123 → VM HAOS Brain]
         ↓ Piper TTS → WAV
     ↓ WAV de respuesta → NSPanel Pro speaker
 
@@ -398,7 +398,7 @@ Pipeline anterior (hasta FASE 21): laptop con mic/speaker local. Ya reemplazado.
 - STT: faster-whisper sobre openai-whisper
 - Wake word: training propio con openWakeWord (Porcupine descartado)
 - Reproducción: ffplay (aplay descartado)
-- Arquitectura: SER9 es el servidor central, laptop es desarrollo puro
+- Arquitectura: Brain es el servidor central, laptop es desarrollo puro
 - Resampling: scipy.signal.resample_poly (no librosa, más rápido)
 - Voz TTS: es_AR-daniela-high (claude y davefx descartadas)
 - Comunicación ear↔core: HTTP REST en localhost:8765 (no IPC — permite múltiples ears)
@@ -410,7 +410,7 @@ Pipeline anterior (hasta FASE 21): laptop con mic/speaker local. Ya reemplazado.
   Sin esa var, Ollama 0.30+ descarta GPUs integradas silenciosamente → fallback a CPU.
   Config en `/etc/systemd/system/ollama.service.d/keepalive.conf`.
   Latencia warm con GPU: ~3-5s | sin GPU: ~74s.
-- Wake word retrain en SER9 (`/wakeword/train`): el venv necesita `torch` (CPU),
+- Wake word retrain en Brain (`/wakeword/train`): el venv necesita `torch` (CPU),
   `torchaudio` (variante +cpu, matchear versión de torch), training deps de openWakeWord
   (audiomentations, speechbrain, librosa, acoustics, pronouncing...) y `onnxscript` para el
   export ONNX. Parches del venv: openwakeword `__init__.py` (scipy import opcional) y

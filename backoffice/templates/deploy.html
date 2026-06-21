@@ -16,7 +16,7 @@
   {%- if url %}<a href="{{ url }}" target="_blank" class="text-sky-400 hover:underline">{{ text }}</a>{% else %}{{ text }}{% endif -%}
 {%- endmacro %}
 
-{% set where_icon = {"SER9": "🖥️", "GCP": "☁️", "NSPanel": "📟"} %}
+{% set where_icon = {"Brain": "🖥️", "GCP": "☁️", "NSPanel": "📟"} %}
 {% set targets = versions.targets or [] %}
 
 <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden mb-4">

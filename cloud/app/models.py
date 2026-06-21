@@ -1,4 +1,4 @@
-"""Modelos Pydantic del contrato nube↔SER9. Ver fase33_cloud_backoffice.md (33.2)."""
+"""Modelos Pydantic del contrato nube↔Brain. Ver fase33_cloud_backoffice.md (33.2)."""
 from __future__ import annotations
 
 from typing import Any
@@ -82,7 +82,7 @@ class StateSnapshot(BaseModel):
 class MetricsSnapshot(BaseModel):
     """Agregados de métricas que el bridge envía a POST /ingest/metrics (FASE 35.5).
 
-    Los agregados se calculan en el SER9 (core, FASE 35.2/35.3); la nube sólo almacena
+    Los agregados se calculan en el Brain (core, FASE 35.2/35.3); la nube sólo almacena
     y muestra. Campos flexibles (dict/list) con el shape que devuelve la API del core."""
     schema_version: int = METRICS_SCHEMA_VERSION
     ts: str

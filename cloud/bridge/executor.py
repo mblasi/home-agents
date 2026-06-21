@@ -57,7 +57,7 @@ def _logs_tail(p: dict) -> ExecResult:
 
 def _run_engine(services, repo_refs, emit=None) -> ExecResult:
     """Invoca el MOTOR único de deploy (FASE 34). El executor NO reimplementa lógica de deploy:
-    sólo traduce comando→args, corre el motor in-process (el bridge corre EN el SER9) y reporta
+    sólo traduce comando→args, corre el motor in-process (el bridge corre EN el Brain) y reporta
     el log incremental + el ok/rollback. `emit` (D5): callback de progreso en vivo — cada línea
     del motor se reenvía al cloud mientras el deploy corre. Ver deploy_engine.run_release / D1."""
     import deploy_engine
@@ -90,7 +90,7 @@ def _deploy_release(p: dict, emit=None) -> ExecResult:
 
 
 def _deploy_cloud(p: dict, emit=None) -> ExecResult:
-    """FASE 34 T4: deploy de Cloud Run (cloud-bo) desde el SER9 vía el motor (driver cloudrun)."""
+    """FASE 34 T4: deploy de Cloud Run (cloud-bo) desde el Brain vía el motor (driver cloudrun)."""
     import deploy_engine
     targets = p.get("services") or list(deploy_engine.CLOUDRUN_TARGETS)
     lines: list[str] = []
@@ -108,7 +108,7 @@ def _deploy_cloud(p: dict, emit=None) -> ExecResult:
 def _deploy_satellites(p: dict) -> ExecResult:
     """34.16: fuerza el pull de código de uno o todos los paneles. Marca el nodo en el audio_server
     (POST /nodes/{id}/update); el satélite corre _check_code_update() en su próximo heartbeat. El
-    pull en sí es egress-only (el panel baja del SER9). node_id ausente/'*' → todos los paneles."""
+    pull en sí es egress-only (el panel baja del Brain). node_id ausente/'*' → todos los paneles."""
     node_id = p.get("node_id") or "*"
     try:
         r = requests.post(f"{AUDIO_URL}/nodes/{node_id}/update", timeout=10)

@@ -286,5 +286,5 @@ def test_snapshot_versions_panels_y_ser9():
     assert byid["panel:comedor"]["behind"] is False     # version == expected[:12]
     assert byid["panel:pieza"]["behind"] is True        # rezagado
     assert byid["panel:comedor"]["command"] == "deploy.satellites"
-    # los services del SER9 también son targets (al menos core/backoffice)
+    # los services del Brain también son targets (al menos core/backoffice)
     assert any(t["id"] == "core" and t["kind"] == "service" for t in v["targets"])

@@ -45,7 +45,7 @@ gcloud iam service-accounts describe "$RUNTIME_SA_EMAIL" >/dev/null 2>&1 || \
     --display-name="Capitán Cloud Run runtime"
 gcloud iam service-accounts describe "$BRIDGE_SA_EMAIL" >/dev/null 2>&1 || \
   gcloud iam service-accounts create "$BRIDGE_SA" \
-    --display-name="Capitán bridge (SER9) — sin roles, sólo identidad OIDC"
+    --display-name="Capitán bridge (Brain) — sin roles, sólo identidad OIDC"
 
 echo "== IAM: runtime SA puede leer/escribir Firestore (permiso mínimo) =="
 gcloud projects add-iam-policy-binding "$PROJECT" \
