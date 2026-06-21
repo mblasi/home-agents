@@ -174,6 +174,33 @@ def test_deploy_release_failure_reports_not_ok(monkeypatch):
     assert r.ok is False and "rollback" in r.error
 
 
+def test_deploy_satellites_marca_nodo(monkeypatch):
+    captured = {}
+
+    def fake_post(url, timeout=10):
+        captured["url"] = url
+        return type("R", (), {"raise_for_status": lambda self: None,
+                              "json": lambda self: {"ok": True, "flagged": ["comedor"]}})()
+
+    monkeypatch.setattr(executor.requests, "post", fake_post)
+    r = executor.execute("deploy.satellites", {"node_id": "comedor"})
+    assert r.ok is True and "comedor" in r.output
+    assert captured["url"].endswith("/nodes/comedor/update")
+
+
+def test_deploy_satellites_todos_por_default(monkeypatch):
+    captured = {}
+
+    def fake_post(url, timeout=10):
+        captured["url"] = url
+        return type("R", (), {"raise_for_status": lambda self: None,
+                              "json": lambda self: {"ok": True, "flagged": ["comedor", "pieza"]}})()
+
+    monkeypatch.setattr(executor.requests, "post", fake_post)
+    executor.execute("deploy.satellites", {})
+    assert captured["url"].endswith("/nodes/*/update")   # sin node_id → todos
+
+
 # ── Logs en vivo (D5): emit del executor + batching del bridge ─────────────────
 
 def test_execute_passes_emit_to_deploy(monkeypatch):
@@ -251,8 +278,13 @@ def test_snapshot_versions_panels_y_ser9():
          patch.object(snapshot, "_maybe_fetch", lambda *a, **k: None):  # sin git fetch real
         snap = snapshot.build_snapshot()
     v = snap["versions"]
-    assert isinstance(v["ser9"], dict)                  # repos del SER9 (best-effort)
+    assert isinstance(v["targets"], list)               # matriz unificada de targets (34.15)
     assert v["satellite_expected"] == "abc123def456"    # [:12]
-    byid = {p["node_id"]: p for p in v["panels"]}
-    assert byid["comedor"]["up_to_date"] is True        # version == expected[:12]
-    assert byid["pieza"]["up_to_date"] is False         # rezagado
+    byid = {t["id"]: t for t in v["targets"]}
+    # los paneles son targets dinámicos (id "panel:<node_id>"), kind satellite
+    assert byid["panel:comedor"]["kind"] == "satellite"
+    assert byid["panel:comedor"]["behind"] is False     # version == expected[:12]
+    assert byid["panel:pieza"]["behind"] is True        # rezagado
+    assert byid["panel:comedor"]["command"] == "deploy.satellites"
+    # los services del SER9 también son targets (al menos core/backoffice)
+    assert any(t["id"] == "core" and t["kind"] == "service" for t in v["targets"])

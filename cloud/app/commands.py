@@ -91,6 +91,8 @@ CATALOG: dict[str, dict[str, tuple[Callable[[Any], Any], bool]]] = {
                         "umbrella_ref": (_git_ref("umbrella_ref"), False)},
     # T4: deploy de Cloud Run (cloud-bo) desde el SER9. Sin params = todos los cloudrun targets.
     "deploy.cloud":    {"services": (_str_list("services", CLOUDRUN_SERVICES), False)},
+    # 34.16: fuerza el pull de código de un panel (o todos si node_id ausente/'*').
+    "deploy.satellites": {"node_id": (_str("node_id"), False)},
     "logs.tail":       {"service": (_enum("service", SERVICES), True),
                         "lines": (_int_range("lines", 1, 500), False)},
     "config.reload":   {"target": (_enum("target", CONFIG_TARGETS), True)},

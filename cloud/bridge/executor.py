@@ -105,6 +105,23 @@ def _deploy_cloud(p: dict, emit=None) -> ExecResult:
                       "" if res.ok else "deploy cloud con fallos (ver rollback en el log)")
 
 
+def _deploy_satellites(p: dict) -> ExecResult:
+    """34.16: fuerza el pull de código de uno o todos los paneles. Marca el nodo en el audio_server
+    (POST /nodes/{id}/update); el satélite corre _check_code_update() en su próximo heartbeat. El
+    pull en sí es egress-only (el panel baja del SER9). node_id ausente/'*' → todos los paneles."""
+    node_id = p.get("node_id") or "*"
+    try:
+        r = requests.post(f"{AUDIO_URL}/nodes/{node_id}/update", timeout=10)
+        r.raise_for_status()
+        flagged = r.json().get("flagged", [])
+        if not flagged:
+            return ExecResult(True, "sin paneles para marcar (¿ninguno online?)")
+        return ExecResult(True, f"marcados para actualizar: {', '.join(flagged)} "
+                                f"(aplican en su próximo heartbeat, ~30s)")
+    except Exception as exc:  # noqa: BLE001
+        return ExecResult(False, "", f"no se pudo marcar el panel: {exc}")
+
+
 def _config_reload(p: dict) -> ExecResult:
     if p["target"] == "core":
         try:
@@ -143,6 +160,7 @@ HANDLERS = {
     "deploy.run": _deploy_run,
     "deploy.release": _deploy_release,
     "deploy.cloud": _deploy_cloud,
+    "deploy.satellites": _deploy_satellites,
     "config.reload": _config_reload,
     "wakeword.retrain": _wakeword_retrain,
     "voice.reenroll": _voice_reenroll,

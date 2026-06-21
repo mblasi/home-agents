@@ -3170,7 +3170,7 @@ DECISIONES CONSOLIDADAS (2026-06-20, al tomar la fase — amplían el alcance de
             el motor en el SER9 (egress-only; el SER9 ya hace sólo conexiones salientes).
 
 #### Etapa C - Visibilidad y operación
-- [ ] 34.7  Registrar la versión desplegada por componente (core/ear/umbrella → release de
+- [x] 34.7  Registrar la versión desplegada por componente (core/ear/umbrella → release de
             GitHub + estado del release) y exponerla en LOS DOS frontends: (a) dashboard cloud
             egress-only vía snapshot, y (b) backoffice interno (LAN, FASE 12) leyendo el estado
             local del SER9. Mostrar versión actual corriendo, último deploy, resultado y si
@@ -3181,14 +3181,16 @@ DECISIONES CONSOLIDADAS (2026-06-20, al tomar la fase — amplían el alcance de
             su transporte; registra la versión desplegada por panel. El satélite AUTO-REPORTA su
             versión (ref/tag corriendo) al registrarse en `audio_server`. Tests con scp/ssh
             mockeados. (Hereda el modelo egress-only y los footguns de pkill/supervisor del panel.)
-- [ ] 34.14 Matriz `dispositivo × componente → versión` en LOS DOS frontends: en vez de "versión
+- [x] 34.14 Matriz `dispositivo × componente → versión` en LOS DOS frontends: en vez de "versión
             de core", una tabla por dispositivo (SER9: core/backoffice/wa/audio_server; cada
             NSPanel: satellite) con la versión corriendo, si está rezagada vs. el release vigente,
             y último deploy/rollback por dispositivo. La versión por panel llega vía snapshot
             (audio_server → bridge). Reusa el panel de versiones de 34.7.
-- [ ] 34.8  Panel de deploy en el dashboard cloud (RBAC: sólo admin emite): elegir ref/tag,
-            disparar el release, ver progreso/resultado/rollback. Reusa el panel de acciones
-            y el gate de capacidades de FASE 33; el frontend oculta la acción a no-admin.
+- [x] 34.8  Panel de deploy en el dashboard cloud (RBAC: sólo admin emite): botón de deploy
+            contextual por componente en la matriz de versiones (repo SER9 → deploy.release;
+            cloud-bo → deploy.cloud; '⬆ actualizar' cuando behind). Reusa el gate CAPS.emit y
+            el streaming de logs (streamCommand) de FASE 33; el frontend oculta la acción a
+            no-admin. El form admin genérico (select+JSON) se conserva para pin de refs y wa/bridge.
 - [x] 34.9  Invocadores sobre el motor único (cierra el principio de unificación). Las dos
             rutas invocan el MISMO motor (34.3-34.6); ninguna reimplementa nada:
             (a) REMOTO — el `executor` del bridge (`cloud/bridge/executor.py`) deja de hacer
@@ -3240,6 +3242,24 @@ Etapa E (T4b) — HECHO 2026-06-21 (escritura verificada + convergencia + #602 r
   NOTA: el TERMUX_USER difiere por panel (comedor u0_a113, pieza u0_a53, según apps previas en
        cada Android); se pasa por env TERMUX_USER. A futuro: detectarlo automáticamente.
 ```
+
+#### Etapa F - Matriz de targets unificada + compartimentación física
+- [ ] 34.15 Matriz de TARGETS unificada (operatoria): en vez de mostrar repos/services/cloudrun/
+            paneles como abstracciones separadas, una sola lista de "targets desplegables" (core,
+            audio_server, backoffice, cloud-bo, un panel por NSPanel), cada uno con versión que
+            corre + última disponible + un botón "Actualizar" que elige el comando solo
+            (deploy.release / deploy.cloud / deploy.satellites). Registro único `TARGETS` en el
+            motor, consumido por el snapshot y los dos frontends. wa/bridge quedan en "avanzado".
+- [ ] 34.16 `deploy.satellites` (force pull de paneles): el panel ya auto-actualiza cada
+            MODEL_SYNC_SECS; el comando marca el nodo (`POST /nodes/{id}/update` en audio_server)
+            y el próximo heartbeat le devuelve `update:true` → corre `_check_code_update()` fuera
+            de ciclo. node_id '*'/'all' → todos. Cierra el botón de deploy por panel en la matriz.
+- [ ] 34.17 (FUTURO) Compartimentación física por unidad deployable: extraer `backoffice/`,
+            `cloud/` (bo+bridge, acoplados por el contrato `app.commands`) y `wa/` del umbrella a
+            submodules propios, cada uno con su línea de versión. NO 1:1 estricto por target:
+            cloud-bo+bridge y audio_server+satélite están acoplados por código y van juntos.
+            umbrella queda con scripts/masterplan/docs/infra (orquestación, no runtime). Trabajo
+            grande y casi irreversible (repos GH nuevos, CI, paths de deploy) → tanda aparte.
 
 #### Etapa D - Tests y documentación
 - [ ] 34.10 Tests: validación del comando con refs (`cloud/tests`); executor con snapshot /
