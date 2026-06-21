@@ -114,11 +114,9 @@
         </div>
       </section>
 
-      <!-- ── Paneles (37.4) ──────────────────────────────────── -->
+      <!-- ── Paneles ─────────────────────────────────────────── -->
       <section class="view" data-view="paneles">
-        <div class="card placeholder"><h2>Paneles</h2>
-          <p class="muted">Sección en preparación (37.4): estado y reboot por panel.</p>
-        </div>
+        <div class="card"><h2>Paneles (NSPanel)</h2><div id="panels"></div></div>
       </section>
 
       <!-- ── Deploy ──────────────────────────────────────────── -->
@@ -341,6 +339,23 @@ function renderWakeword(ww) {
     + (nodes || `<div class="muted">sin nodos</div>`);
 }
 
+function renderPanels(state) {
+  const nodes = (state.wakeword || {}).nodes || [];
+  // versión/al-día por panel desde la matriz de targets (kind satellite)
+  const tgt = {};
+  ((state.versions || {}).targets || []).filter(t => t.kind === "satellite")
+    .forEach(t => { tgt[t.label] = t; });
+  $("panels").innerHTML = nodes.length ? `<div class="grid">` + nodes.map(n => {
+    const t = tgt[n.id] || {};
+    const ver = t.version ? `<span class="muted">${esc(t.version)}</span>` : "";
+    const upd = t.behind ? ` <span class="warn">⬆ desactualizado</span>` : "";
+    const rms = n.rms != null ? ` · rms ${n.rms}` : "";
+    return `<div class="tile"><b>${dot(n.online)} ${esc(n.id)}</b>`
+      + `<span>${esc(n.ip || "sin ip")}${rms}</span>`
+      + `<span>${ver}${upd}</span></div>`;
+  }).join("") + `</div>` : `<span class="muted">sin paneles registrados</span>`;
+}
+
 function renderUsers(users) {
   $("users").querySelector("tbody").innerHTML = (users || []).map(u =>
     `<tr><td><b>${esc(u.name)}</b></td><td>${esc(u.role)}</td>`
@@ -362,6 +377,7 @@ async function refresh() {
     $("agents").innerHTML = (state.agents || [])
       .map(a => `<div>${dot(a.active)} <b>${esc(a.id)}</b>${a.proactive ? " ⚡" : ""}</div>`).join("");
     renderWakeword(state.wakeword || {});
+    renderPanels(state);
     renderVersions(state.versions || {});
     renderUsers(state.users_summary);
     $("recent").querySelector("tbody").innerHTML = (state.recent_commands || [])
