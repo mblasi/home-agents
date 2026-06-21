@@ -44,6 +44,20 @@ Dashboard (navegador → nube, auth Firebase + allow-list email):
 - `POST /api/commands` — emite un comando validado contra el catálogo.
 - `GET  /` — dashboard.
 
+## Deploy de servicios (FASE 34)
+
+El dashboard incluye una **matriz de targets**: una fila por componente que corre (core,
+audio_server, backoffice, cloud-bo, un satélite por panel) con la versión que corre, la última
+disponible y un botón "Actualizar" (rol admin). El botón emite el comando que el bridge del
+Brain polea y ejecuta con el motor único (`cloud/bridge/deploy_engine.py`): `deploy.release`
+(services del Brain), `deploy.cloud` (cloud-bo en GCP), `deploy.satellites` (force pull de un
+panel). Health-gate + rollback automático; logs en vivo en el dashboard. Detalle del motor en
+`cloud/bridge/README.md`.
+
+El **deploy del propio cloud-bo** lo dispara el Brain (`gcloud run deploy --source` desde el
+LXC, egress a Google) — NO pasa por el bridge (evita la circularidad de reiniciarse a sí mismo,
+D4); si rompe, el rollback a la revisión previa lo hace el Brain.
+
 ## Provisión / deploy
 
 ```bash

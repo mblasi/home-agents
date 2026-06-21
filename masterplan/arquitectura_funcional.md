@@ -726,6 +726,41 @@ y rate limiting que el resto del bridge. La nube los guarda en Firestore (`metri
 
 ---
 
+## Deploy y versionado (FASE 34)
+
+Un **motor único** (`cloud/bridge/deploy_engine.py`) corre en el Brain y concentra TODA la
+lógica de deploy. Dos frontends lo invocan sin reimplementar nada: el **executor** del bridge
+(remoto, comando emitido desde el cloud-bo y poleado por el Brain — egress-only, opera desde
+fuera de la LAN) y `scripts/deploy.sh` (local, en la LAN).
+
+**Modelo en tres capas.** *Repo* = unidad de versión (core, ear, umbrella; pin independiente
+con `git checkout`, sin `git submodule update`). *Service* = unidad de restart/health
+(core, audio_server, backoffice, wa, bridge). *Target* = unidad de operación que ve el usuario:
+una lista plana (core, audio_server, backoffice, cloud-bo, un satélite por panel) en la matriz
+de versiones de ambos backoffices, cada uno con la versión que corre, la última disponible
+(origin/main + tag), flag `behind`, link al release de GitHub, y el comando que lo despliega.
+
+**Flujo de release** (por repo, atómico — D7): snapshot de la versión actual → pin del ref
+pedido (default origin/main) → `pip install` si cambió requirements → restart del service →
+**health-gate** (`/health` con reintentos). Si el health falla, **rollback** automático: re-pin
+al snapshot previo + restart; los repos sanos quedan desplegados. Tras un release sano se crea
+un **tag semver** por repo (gate `DEPLOY_TAG_RELEASES`). El estado (versión por repo/service,
+último release, rollback) se persiste en `~/.local/share/capitan/deploy_state.json` y un
+subconjunto viaja en el snapshot a la nube.
+
+**Targets especiales.** *cloud-bo* (Cloud Run): `gcloud run deploy --source` desde el Brain
+(egress a Google) + `--to-latest`; health por curl a la URL pública; rollback a la revisión
+previa (`update-traffic --to-revisions`); registra el sha de umbrella que corre en GCP.
+*Satélites* (NSPanel): auto-pull cada `MODEL_SYNC_SECS` (md5 de `satellite.py`/`satellite_ui.py`
+que sirve el audio_server desde su checkout de `ear`); `deploy.satellites` fuerza el pull ya,
+marcando el nodo → su próximo heartbeat devuelve `update:true` → `_check_code_update()`.
+
+Comandos tipados (validados en nube y bridge): `deploy.release`, `deploy.cloud`,
+`deploy.satellites`. RBAC: sólo rol admin emite; el cloud-bo oculta la acción al resto y el
+backoffice local es read-only (el deploy se opera desde la nube por el modelo egress-only).
+
+---
+
 ## Persistencia en disco
 
 Todos los datos del usuario se almacenan en `~/.local/share/capitan/`:

@@ -297,9 +297,7 @@ class _FakeGcloud:
         return any(all(s in " ".join(c) for s in subs) for c in self.calls)
 
 
-def test_cloud_release_ok(monkeypatch):
-    monkeypatch.setattr(de, "HEALTH_RETRIES", 2)
-    monkeypatch.setattr(de, "HEALTH_BACKOFF", 0.0)
+def test_cloud_release_ok(state_tmp, monkeypatch):
     fake = _FakeGcloud(revision="capitan-cloud-00010")
     monkeypatch.setattr(de, "_run", fake)
     monkeypatch.setattr(de, "_http_ok", lambda *a, **k: True)
@@ -308,9 +306,21 @@ def test_cloud_release_ok(monkeypatch):
     assert fake.did("run", "deploy", "capitan-cloud", "--source")
 
 
-def test_cloud_release_health_fail_rollback(monkeypatch):
-    monkeypatch.setattr(de, "HEALTH_RETRIES", 2)
-    monkeypatch.setattr(de, "HEALTH_BACKOFF", 0.0)
+def test_cloud_release_registra_version_en_estado(state_tmp, monkeypatch):
+    # 34.15/34.2: tras un deploy ok, el state guarda la versión (sha de umbrella) que corre en
+    # el target cloudrun → la matriz puede mostrar qué versión sirve cloud-bo en GCP.
+    fake = _FakeGcloud(revision="capitan-cloud-00010")
+    monkeypatch.setattr(de, "_run", fake)
+    monkeypatch.setattr(de, "_http_ok", lambda *a, **k: True)
+    de.run_cloud_release(["cloud-bo"])
+    ci = de.load_state().get("cloud", {}).get("cloud-bo", {})
+    assert ci.get("ok") is True
+    assert ci.get("version")                 # sha del repo fuente (umbrella)
+    assert ci.get("revision") == "capitan-cloud-00010"
+    assert ci.get("repo") == "umbrella"
+
+
+def test_cloud_release_health_fail_rollback(state_tmp, monkeypatch):
     fake = _FakeGcloud(revision="capitan-cloud-prev")
     monkeypatch.setattr(de, "_run", fake)
     monkeypatch.setattr(de, "_http_ok", lambda *a, **k: False)   # health falla siempre
@@ -319,21 +329,39 @@ def test_cloud_release_health_fail_rollback(monkeypatch):
     assert res.services["cloud-bo"]["rolled_back"] is True
     # rollback a la revisión previa
     assert fake.did("update-traffic", "capitan-cloud-prev=100")
+    # el state marca el target como no-ok (no pisa la versión sana con una rota)
+    assert de.load_state().get("cloud", {}).get("cloud-bo", {}).get("ok") is False
 
 
-def test_cloud_release_unknown_target():
+def test_cloud_release_unknown_target(state_tmp):
     import pytest
     with pytest.raises(ValueError):
         de.run_cloud_release(["nope"])
 
 
-def test_cloud_deploy_forces_to_latest(monkeypatch):
+def test_cloud_deploy_forces_to_latest(state_tmp, monkeypatch):
     # tras el deploy, despinea el tráfico → --to-latest (si no, un rollback previo deja la
     # revisión nueva sin tráfico). Regresión del bug T5.
-    monkeypatch.setattr(de, "HEALTH_RETRIES", 2)
-    monkeypatch.setattr(de, "HEALTH_BACKOFF", 0.0)
     fake = _FakeGcloud()
     monkeypatch.setattr(de, "_run", fake)
     monkeypatch.setattr(de, "_http_ok", lambda *a, **k: True)
     de.run_cloud_release(["cloud-bo"])
     assert fake.did("update-traffic", "--to-latest")
+
+
+# ── Registro TARGETS (34.15): consistencia con el motor ───────────────────────
+
+def test_targets_consistentes_con_el_motor():
+    """Cada target declara un comando y params válidos contra los registros del motor."""
+    for t in de.TARGETS:
+        assert t.repo in de.REPOS, f"{t.id}: repo {t.repo!r} desconocido"
+        if t.kind == "service":
+            assert t.command == "deploy.release"
+            for s in t.params["services"]:
+                assert s in de.SERVICES, f"{t.id}: service {s!r} no está en SERVICES"
+        elif t.kind == "cloudrun":
+            assert t.command == "deploy.cloud"
+            for s in t.params["services"]:
+                assert s in de.CLOUDRUN_TARGETS, f"{t.id}: {s!r} no es target cloudrun"
+        else:
+            raise AssertionError(f"{t.id}: kind inesperado {t.kind!r}")
