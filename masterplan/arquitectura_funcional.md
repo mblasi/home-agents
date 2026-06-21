@@ -29,7 +29,7 @@ El nodo es agnóstico al usuario: solo graba y manda audio crudo.
 | Archivo | Función |
 |---------|---------|
 | `satellite.py` | Nodo NSPanel: wake word (openWakeWord) → graba comando → POST /process-audio → reproduce respuesta. Duck de volumen (18.2), pull del modelo (16.17), enrollment inline (16.21). |
-| `satellite_ui.py` | Indicador visual overlay (Termux:GUI): barra de estado del pipeline (18.3). |
+| `satellite_ui.py` | Indicador visual overlay (Termux:GUI): barra de estado del pipeline (18.3) + VU-meter de wake word de N leds discretos (un overlay por led, tono fijo rojo→verde, encendido bottom-up por score). |
 | `audio_server.py` | FastAPI `:8766` en el Brain: STT (faster-whisper) + TTS (Piper) + voice-id (speaker_id) + canal de enrollment + registry de nodos. |
 | `speaker_id.py` | Voice-ID por embeddings (resemblyzer/GE2E). Perfiles en `embeddings/<uid>.npy`. |
 | `tts.py` | Piper TTS (voz `es_AR-daniela-high`). |
