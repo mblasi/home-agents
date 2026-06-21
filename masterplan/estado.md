@@ -3244,13 +3244,13 @@ Etapa E (T4b) — HECHO 2026-06-21 (escritura verificada + convergencia + #602 r
 ```
 
 #### Etapa F - Matriz de targets unificada + compartimentación física
-- [ ] 34.15 Matriz de TARGETS unificada (operatoria): en vez de mostrar repos/services/cloudrun/
+- [x] 34.15 Matriz de TARGETS unificada (operatoria): en vez de mostrar repos/services/cloudrun/
             paneles como abstracciones separadas, una sola lista de "targets desplegables" (core,
             audio_server, backoffice, cloud-bo, un panel por NSPanel), cada uno con versión que
             corre + última disponible + un botón "Actualizar" que elige el comando solo
             (deploy.release / deploy.cloud / deploy.satellites). Registro único `TARGETS` en el
             motor, consumido por el snapshot y los dos frontends. wa/bridge quedan en "avanzado".
-- [ ] 34.16 `deploy.satellites` (force pull de paneles): el panel ya auto-actualiza cada
+- [x] 34.16 `deploy.satellites` (force pull de paneles): el panel ya auto-actualiza cada
             MODEL_SYNC_SECS; el comando marca el nodo (`POST /nodes/{id}/update` en audio_server)
             y el próximo heartbeat le devuelve `update:true` → corre `_check_code_update()` fuera
             de ciclo. node_id '*'/'all' → todos. Cierra el botón de deploy por panel en la matriz.
