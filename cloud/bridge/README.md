@@ -10,6 +10,38 @@ salientes** hacia el servicio Cloud Run (`cloud/`):
 - `executor.py` — ejecuta cada comando del catálogo TIPADO con una función concreta
   (subprocess con lista de args, sin shell). El catálogo es el mismo de la nube
   (`cloud/app/commands.py`), re-validado en el bridge.
+- `deploy_engine.py` — el **motor de deploy** (FASE 34): único backend para todo deploy.
+
+## Motor de deploy (FASE 34)
+
+`deploy_engine.py` es el ÚNICO lugar con lógica de deploy (snapshot → pin de ref → install →
+restart → health-gate → rollback → registro de versión). Lo invocan dos frontends sin
+reimplementar nada: el `executor` (remoto, comando del cloud-bo) y `scripts/deploy.sh` (local).
+
+Modelo en tres capas:
+- **Repo** (unidad de versión): `core`, `ear`, `umbrella`. Pin independiente por repo con
+  `git checkout` (NO `git submodule update`): pinar el umbrella no pisa core/ear.
+- **Service** (unidad de restart/health): `core`, `ear`(audio_server), `backoffice`, `wa`,
+  `bridge`. Atomicidad POR-REPO (D7): si un service falla su health, se revierte SU repo.
+- **Target** (unidad de operación, 34.15): lo que se ve y se opera en la matriz. Registro
+  `TARGETS` (core, audio_server, backoffice, cloud-bo, + un satélite por panel). Cada target
+  mapea a un comando: services → `deploy.release`, cloud-bo → `deploy.cloud`, paneles →
+  `deploy.satellites`. El snapshot (`snapshot._versions`) produce `versions.targets` con la
+  versión que corre + la última disponible + `behind` + el comando que lo despliega; ambos
+  frontends sólo renderizan y emiten.
+
+Comandos de deploy (catálogo tipado, validados en nube y bridge):
+- `deploy.release {services?, core_ref?, ear_ref?, umbrella_ref?}` — services del Brain; sin
+  params = todo a HEAD de main; `*_ref` pinea cada repo a un tag/sha.
+- `deploy.cloud {services?}` — targets de Cloud Run (cloud-bo). Build `gcloud run deploy
+  --source` desde el Brain (egress a Google) + `--to-latest`; health-gate por curl; rollback
+  a la revisión previa (`update-traffic --to-revisions`). Registra el sha de umbrella que corre.
+- `deploy.satellites {node_id?}` — fuerza el pull de código de un panel (o todos con `*`/ausente):
+  marca el nodo en el audio_server (`POST /nodes/{id}/update`); su próximo heartbeat devuelve
+  `update:true` y el satélite corre `_check_code_update()` fuera del ciclo de 10 min.
+
+Versionado: tras un deploy sano, tag semver por repo (gate `DEPLOY_TAG_RELEASES`). Estado
+persistido en `~/.local/share/capitan/deploy_state.json` (matriz de versiones + último release).
 
 ## Credencial (33.13)
 

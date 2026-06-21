@@ -373,6 +373,29 @@ python scripts/sync_issues.py
 git submodule update --remote
 ```
 
+## Deploy (FASE 34 — motor único + matriz de targets)
+
+Existe UN motor de deploy (`cloud/bridge/deploy_engine.py`) que corre en el Brain y es el
+único backend: snapshot → pin de ref → install → restart → health-gate → rollback → tag.
+Lo invocan dos frontends sin reimplementar nada:
+- **Remoto** — el backoffice **cloud** emite un comando, el bridge del Brain lo polea y lo
+  ejecuta (egress-only; sirve desde fuera de la LAN). Es la vía principal.
+- **Local** — `scripts/deploy.sh` (mismo motor por SSH) cuando se opera desde la LAN.
+
+**Matriz de targets** (operatoria, 34.15): ambos backoffices (`/dashboard` cloud, `/deploy`
+local) muestran UNA fila por cosa que corre — core, audio_server, backoffice, cloud-bo, y un
+satélite por panel — con la versión que corre, la última disponible, link al release de GitHub
+y (en el cloud, rol admin) un botón "Actualizar" que elige el comando solo. `wa`/`bridge` en
+"avanzado". El cloud-bo opera el deploy; el backoffice local es read-only (egress-only).
+
+Comandos: `deploy.release {services?, *_ref?}` (services del Brain), `deploy.cloud` (cloud-bo
+en GCP, build `gcloud run deploy --source` desde el Brain), `deploy.satellites {node_id?}`
+(fuerza el pull de un panel o todos vía la respuesta del heartbeat). Detalle en
+`cloud/bridge/README.md`. Tag semver por repo gateado por `DEPLOY_TAG_RELEASES`.
+
+> El Brain es el rol del servidor central (LXC capitan-lxc). "SER9" es sólo el modelo de
+> hardware actual (Beelink SER9 Pro) — no usarlo como nombre del rol.
+
 ## Pipeline actual (objetivo FASE 16)
 
 ```
