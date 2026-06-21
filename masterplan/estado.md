@@ -693,7 +693,12 @@ Nota:     El Brain (Beelink, iGPU 780M/ROCm) alcanza para los servicios y el 7b,
 - [ ] 8.25 UPS para el servidor (evitar cortes abruptos con modelos en memoria)
 - [x] 8.26 Systemd units para auto-restart de todos los servicios
 - [ ] 8.27 Monitoreo de recursos: temperatura GPU/CPU, uso de VRAM, latencias por agente
-- [ ] 8.28 Alertas si un servicio cae (notificación por WhatsApp vía FASE 3.5)
+- [x] 8.28 Alertas si un servicio cae (notificación por WhatsApp vía FASE 3.5).
+           Implementado para HAOS: watchdog externo en el SER9 (`ha-watchdog.timer`, 60s)
+           detecta/recupera (3 fallos→`ha core restart`, 6→`qm reset 100`) y su hook postea
+           a `POST /alerts/haos` en core → notifica a los admins por WhatsApp (+`HAOS_ALERT_PHONE`)
+           y persiste el evento (`metrics_store.haos_health_events`). `ha_client.ping()` +
+           `GET /health/haos`. PR core #212.
 - [ ] 8.29 Backup automático de modelos fine-tuneados y configuraciones
 - [ ] 8.30 Wake-on-LAN desde laptop (servidor puede estar en suspend fuera de horario)
 - [ ] 8.31 Auto power-on del Brain tras corte de luz: setear en BIOS "Restore AC Power Loss"
