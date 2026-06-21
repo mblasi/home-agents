@@ -105,6 +105,23 @@ lo verifica, resuelve email→usuario→rol contra su DB y abre sesión con RBAC
 familiar/adolescente read-only). El `redirect_uri` se valida contra `LOCAL_SSO_ORIGINS`. El
 codec del token está espejado en `cloud/app/sso.py` y en el backoffice.
 
+## Contrato del snapshot — qué sale y qué NO (FASE 37.1)
+
+El `StateSnapshot` (`app/models.py`) es una **allow-list cerrada**: sólo viaja lo enumerado.
+Campos ampliados en FASE 37 y su gate RBAC:
+
+| Campo | Contenido | Gate | PII |
+|-------|-----------|------|-----|
+| `alerts` | textos de alertas proactivas (listas para TTS) | `access` | no secreta — son avisos del hogar, no contenido de conversaciones |
+| `wakeword.status` | estado del último retrain (idle/running/done/error) | `access` | no |
+| `counts.{intents,goals,routines,conversations}` | **sólo enteros** | `access` | no — el contenido nunca sale |
+| `versions` | matriz de targets desplegables (FASE 34) | `access`/`emit` | no |
+
+**Nunca sale de la LAN**: `.env`, tokens HAOS/OAuth, ni el **contenido** de intents, goals,
+rutinas o conversaciones (sólo su conteo). El detalle PII queda detrás de la capacidad
+`view_pii` (admin-only, 37.2), que **no** se sirve por este snapshot — se obtiene por
+comando-poll explícito. El tipo de `counts` son enteros: es imposible filtrar texto por ahí.
+
 ## Seguridad
 
 - Secretos y PII **nunca** cruzan a la nube (ver contrato 33.1/33.2).
