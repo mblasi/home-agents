@@ -51,6 +51,16 @@ final-user: acciones contextuales por entidad + formularios tipados desde `/api/
 crudo). `/api/catalog` enriquece cada parámetro con metadata de presentación
 (`kind`/`label`/`choices`/`min`/`max`/`default`) sin tocar `validate_command`.
 
+**Config por panel (FASE 38).** La sección Paneles incluye, por panel (rol `emit`), un botón
+"configurar" que abre un form tipado: tiempo de inactividad para apagar la pantalla
+(`screen_timeout_secs`, `0` = nunca) y dashboard por defecto (selector poblado desde
+`snapshot.dashboards`, kind de presentación `dashboard`). Emite el comando `panel.config`
+(allowlist), que el bridge ejecuta: upserta la config en core (fuente de verdad: tabla `panels`)
+y marca el nodo en `audio_server`; el satélite la reaplica en el próximo heartbeat (~30s) — apaga
+la pantalla con `screen_off_timeout` y abre el dashboard con `am start -d`. Egress-only: cero
+inbound; el panel hace el PULL. El snapshot lleva la config vigente de cada panel (no PII) para
+prellenar el form.
+
 ## Deploy de servicios (FASE 34)
 
 El dashboard incluye una **matriz de targets**: una fila por componente que corre (core,

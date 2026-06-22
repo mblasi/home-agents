@@ -63,6 +63,11 @@ main { max-width: 1000px; width: 100%; margin: 0 auto; padding: 20px; }
 .tile span { font-size: 12px; color: var(--muted); }
 .tile.ok b { color: #2ea043; }
 .tile.warn b { color: #f0a020; }
+/* FASE 38: form de config contextual por panel */
+.panel-cfg { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: 8px; }
+.panel-cfg .field { max-width: 100%; }
+.panel-cfg input, .panel-cfg select { font-size: 13px; }
 
 .alerts-list { margin: 0; padding-left: 18px; font-size: 14px; }
 .alerts-list li { margin: 4px 0; }

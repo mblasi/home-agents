@@ -223,6 +223,35 @@ def _panel_reboot(p: dict) -> ExecResult:
         return ExecResult(False, "", f"no se pudo reiniciar el panel: {exc}")
 
 
+def _panel_config(p: dict) -> ExecResult:
+    """FASE 38: configura un panel. Upserta la config en core (fuente de verdad: tabla panels) y
+    marca el nodo en audio_server para que el satélite la reaplique en el próximo heartbeat. No
+    toca el dispositivo directamente — el satélite hace el PULL (egress-only)."""
+    node_id = p["node_id"]
+    config: dict = {}
+    if "screen_timeout_secs" in p:
+        config["screen_timeout_secs"] = p["screen_timeout_secs"]
+    if "default_dashboard" in p:
+        config["default_dashboard"] = p["default_dashboard"]
+    if not config:
+        return ExecResult(False, "", "nada para configurar (sin parámetros)")
+    try:
+        # name del panel a partir del registro (config en core es por name); fallback al node_id.
+        r = requests.get(f"{CORE_URL}/panels", timeout=8)
+        r.raise_for_status()
+        name = next((pan["name"] for pan in r.json()
+                     if pan.get("node_id") == node_id), node_id.replace("nspanel-", "", 1))
+        ru = requests.post(f"{CORE_URL}/panels", json={"name": name, "config": config}, timeout=10)
+        ru.raise_for_status()
+    except Exception as exc:  # noqa: BLE001
+        return ExecResult(False, "", f"no se pudo guardar la config en core: {exc}")
+    try:
+        requests.post(f"{AUDIO_URL}/nodes/{node_id}/config-changed", timeout=8)
+    except Exception:  # noqa: BLE001
+        pass   # converge igual en el ciclo de sync del satélite; el flag es sólo inmediatez
+    return ExecResult(True, f"config de {node_id} guardada: {config} — se aplica en el panel en ~30s")
+
+
 HANDLERS = {
     "service.restart": _service_restart,
     "service.status": _service_status,
@@ -238,6 +267,7 @@ HANDLERS = {
     "agent.toggle": _agent_toggle,
     "panel.reboot": _panel_reboot,
     "proactive.run": _proactive_run,
+    "panel.config": _panel_config,
 }
 
 # Comandos largos que emiten progreso EN VIVO (D5): el handler acepta un callback `emit` y va

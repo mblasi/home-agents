@@ -110,6 +110,11 @@ CATALOG: dict[str, dict[str, tuple[Callable[[Any], Any], bool]]] = {
                         "status": (_enum("status", AGENT_STATUSES), True)},
     "panel.reboot":    {"node_id": (_str("node_id"), True)},
     "proactive.run":   {"agent_id": (_str("agent_id"), True)},
+    # FASE 38: config por panel (apagado de pantalla por inactividad + dashboard por defecto).
+    # El bridge upserta en core y marca el nodo en audio_server; el satélite la reaplica.
+    "panel.config":    {"node_id": (_str("node_id"), True),
+                        "screen_timeout_secs": (_int_range("screen_timeout_secs", 0, 86400), False),
+                        "default_dashboard": (_str("default_dashboard"), False)},
 }
 
 
@@ -149,6 +154,7 @@ def validate_command(cmd_type: str, params: dict[str, Any] | None) -> dict[str, 
 #         node   → selector de panel (poblado por el front desde el snapshot)
 #         user   → selector de usuario
 #         agent  → selector de agente
+#         dashboard → selector de dashboard de HA (poblado desde snapshot.dashboards, FASE 38)
 # Comandos con entidad-ancla (agent.toggle/panel.reboot/proactive.run/...) se invocan como
 # acciones contextuales en su sección; igual se exponen aquí para completitud.
 CMD_LABELS: dict[str, str] = {
@@ -166,6 +172,7 @@ CMD_LABELS: dict[str, str] = {
     "agent.toggle": "Cambiar estado de agente",
     "panel.reboot": "Reiniciar panel",
     "proactive.run": "Correr agente proactivo",
+    "panel.config": "Configurar panel",
 }
 
 PRESENTATION: dict[str, dict[str, dict[str, Any]]] = {
@@ -190,6 +197,10 @@ PRESENTATION: dict[str, dict[str, dict[str, Any]]] = {
                         "status": {"kind": "enum", "label": "Estado", "choices": AGENT_STATUSES}},
     "panel.reboot":    {"node_id": {"kind": "node", "label": "Panel"}},
     "proactive.run":   {"agent_id": {"kind": "agent", "label": "Agente"}},
+    "panel.config":    {"node_id": {"kind": "node", "label": "Panel"},
+                        "screen_timeout_secs": {"kind": "int", "label": "Apagar pantalla tras (seg, 0 = nunca)",
+                                                "min": 0, "max": 86400, "default": 120},
+                        "default_dashboard": {"kind": "dashboard", "label": "Dashboard por defecto"}},
 }
 
 

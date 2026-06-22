@@ -1878,7 +1878,9 @@ def panels_page(request: Request):
     panels = _panels()
     nodes = {n["node_id"]: n for n in (_audio("/nodes") or [])}
     areas = _core("/areas") or []   # áreas de HAOS para bindear el panel (16.7)
-    return _render(request, "panels.html", "panels", panels=panels, nodes=nodes, areas=areas)
+    dashboards = _core("/dashboards") or []   # FASE 38: selector de dashboard por defecto
+    return _render(request, "panels.html", "panels", panels=panels, nodes=nodes,
+                   areas=areas, dashboards=dashboards)
 
 
 @app.post("/panels/{name}/area", response_class=HTMLResponse)
@@ -1888,6 +1890,27 @@ async def panels_set_area(name: str, request: Request):
     area_id = str(form.get("area_id", "")).strip()
     _core("/panels", method="POST", json={"name": name, "area_id": area_id})
     return HTMLResponse('<span class="text-xs text-emerald-400">✓ guardado</span>')
+
+
+@app.post("/panels/{name}/config", response_class=HTMLResponse)
+async def panels_set_config(name: str, request: Request):
+    """Config del panel (FASE 38): tiempo de inactividad para apagar la pantalla + dashboard por
+    defecto. Persiste en core (verdad) y marca el nodo en audio_server para que reaplique ya."""
+    form = await request.form()
+    config: dict = {}
+    raw_timeout = str(form.get("screen_timeout_secs", "")).strip()
+    if raw_timeout:
+        try:
+            config["screen_timeout_secs"] = int(raw_timeout)
+        except ValueError:
+            return HTMLResponse('<span class="text-xs text-red-400">✗ tiempo inválido</span>')
+    config["default_dashboard"] = str(form.get("default_dashboard", "")).strip()
+    res = _core("/panels", method="POST", json={"name": name, "config": config})
+    if res is None:
+        return HTMLResponse('<span class="text-xs text-red-400">✗ error al guardar</span>')
+    node_id = str(form.get("node_id", "")).strip() or f"nspanel-{name}"
+    _audio(f"/nodes/{node_id}/config-changed", method="POST")   # inmediatez
+    return HTMLResponse('<span class="text-xs text-emerald-400">✓ guardado — se aplica en ~30s</span>')
 
 
 # ── Deploy / Versiones (FASE 34 T5 — 34.7/34.14) ──────────────────────────────

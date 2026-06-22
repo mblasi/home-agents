@@ -88,9 +88,28 @@ def _nodes() -> list[dict]:
     return data if isinstance(data, list) else []
 
 
+def _panel_configs() -> dict[str, dict]:
+    """Config por panel desde core (FASE 38), indexada por node_id. No PII: sólo
+    screen_timeout_secs + default_dashboard."""
+    data = _get(f"{CORE_URL}/panels")
+    out: dict[str, dict] = {}
+    for p in data if isinstance(data, list) else []:
+        nid = p.get("node_id")
+        if nid:
+            out[nid] = p.get("config") or {}
+    return out
+
+
+def _dashboards() -> list[dict]:
+    """Dashboards de HA para el selector de 'dashboard por defecto' (FASE 38)."""
+    data = _get(f"{CORE_URL}/dashboards")
+    return data if isinstance(data, list) else []
+
+
 def _wakeword(nodes: list[dict]) -> dict:
     fps = [n.get("fp", 0) for n in nodes]
     status = (_get(f"{CORE_URL}/wakeword/train/status") or {}).get("status", "idle")
+    configs = _panel_configs()
     return {
         "last_score": None,  # no expuesto por el audio_server actual
         "false_positives_24h": sum(fps) if fps else None,
@@ -101,6 +120,7 @@ def _wakeword(nodes: list[dict]) -> dict:
                 "ip": n.get("ip") or None,
                 "online": n.get("state") == "active",
                 "rms": None,
+                "config": configs.get(n.get("node_id"), {}),   # FASE 38
             }
             for n in nodes
         ],
@@ -285,4 +305,5 @@ def build_snapshot() -> dict:
         "versions": _versions(nodes),
         "alerts": _alerts(),
         "counts": _counts(),
+        "dashboards": _dashboards(),   # FASE 38: selector de dashboard del comando panel.config
     }

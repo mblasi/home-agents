@@ -227,3 +227,30 @@ def test_presentation_does_not_alter_validation():
     assert validate_command("agent.toggle", {"agent_id": "haos", "status": "active"})["status"] == "active"
     with pytest.raises(CommandError):
         validate_command("logs.tail", {"service": "capitan-core", "lines": 999})
+
+
+# ── FASE 38: panel.config ─────────────────────────────────────────────────────
+
+def test_panel_config_requires_node():
+    with pytest.raises(CommandError):
+        validate_command("panel.config", {"screen_timeout_secs": 60})  # falta node_id
+
+
+def test_panel_config_optional_params_and_range():
+    assert validate_command("panel.config", {"node_id": "nspanel-comedor"}) == {
+        "node_id": "nspanel-comedor"}
+    assert validate_command("panel.config", {
+        "node_id": "nspanel-comedor", "screen_timeout_secs": 120,
+        "default_dashboard": "http://h/lovelace-comedor/0"}) == {
+        "node_id": "nspanel-comedor", "screen_timeout_secs": 120,
+        "default_dashboard": "http://h/lovelace-comedor/0"}
+    with pytest.raises(CommandError):
+        validate_command("panel.config", {"node_id": "x", "screen_timeout_secs": -1})
+    with pytest.raises(CommandError):
+        validate_command("panel.config", {"node_id": "x", "screen_timeout_secs": 999999})
+
+
+def test_panel_config_presentation_kinds():
+    assert _param("panel.config", "node_id")["kind"] == "node"
+    assert _param("panel.config", "screen_timeout_secs")["kind"] == "int"
+    assert _param("panel.config", "default_dashboard")["kind"] == "dashboard"
