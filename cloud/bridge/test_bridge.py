@@ -234,6 +234,63 @@ def test_deploy_satellites_todos_por_default(monkeypatch):
     assert captured["url"].endswith("/nodes/*/update")   # sin node_id → todos
 
 
+# ── FASE 37.8: handlers de operación (agent.toggle / panel.reboot / proactive.run) ──
+
+def _resp(payload=None):
+    return type("R", (), {"raise_for_status": lambda self: None,
+                          "json": lambda self: payload or {}})()
+
+
+def test_agent_toggle_patches_core_status(monkeypatch):
+    captured = {}
+
+    def fake_patch(url, json=None, timeout=10):
+        captured.update(url=url, json=json)
+        return _resp()
+
+    monkeypatch.setattr(executor.requests, "patch", fake_patch)
+    r = executor.execute("agent.toggle", {"agent_id": "haos", "status": "planned"})
+    assert r.ok and captured["url"].endswith("/agents/haos/status")
+    assert captured["json"] == {"status": "planned"}
+
+
+def test_proactive_run_posts_core(monkeypatch):
+    captured = {}
+
+    def fake_post(url, timeout=60):
+        captured["url"] = url
+        return _resp({"ran": True})
+
+    monkeypatch.setattr(executor.requests, "post", fake_post)
+    r = executor.execute("proactive.run", {"agent_id": "clima"})
+    assert r.ok and captured["url"].endswith("/proactive/clima/run")
+
+
+def test_panel_reboot_resolves_ip_and_runs_script(monkeypatch):
+    captured = {}
+    monkeypatch.setattr(executor.requests, "get",
+        lambda url, timeout=8: _resp([{"node_id": "comedor", "ip": "192.168.68.113"}]))
+
+    class P:
+        returncode = 0; stdout = "Reiniciando"; stderr = ""
+
+    def fake_run(args, **kw):
+        captured.update(args=args, ip=kw.get("env", {}).get("NSPANEL_IP"))
+        return P()
+
+    monkeypatch.setattr(executor.subprocess, "run", fake_run)
+    r = executor.execute("panel.reboot", {"node_id": "comedor"})
+    assert r.ok
+    assert captured["args"][0] == "bash" and captured["args"][-1] == "reboot"
+    assert captured["ip"] == "192.168.68.113"   # IP resuelta del registro → env del script
+
+
+def test_panel_reboot_unknown_node(monkeypatch):
+    monkeypatch.setattr(executor.requests, "get", lambda url, timeout=8: _resp([]))
+    r = executor.execute("panel.reboot", {"node_id": "fantasma"})
+    assert not r.ok and "IP" in r.error
+
+
 # ── Logs en vivo (D5): emit del executor + batching del bridge ─────────────────
 
 def test_execute_passes_emit_to_deploy(monkeypatch):

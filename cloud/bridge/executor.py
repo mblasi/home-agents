@@ -153,6 +153,61 @@ def _voice_reenroll(p: dict) -> ExecResult:
         return ExecResult(False, "", f"endpoint de enroll no disponible: {exc}")
 
 
+def _agent_toggle(p: dict) -> ExecResult:
+    """FASE 37.8: cambia el status de un agente (PATCH /agents/{id}/status del core). El status
+    ya viene validado por el catálogo (active/planned/unavailable)."""
+    try:
+        r = requests.patch(f"{CORE_URL}/agents/{p['agent_id']}/status",
+                            json={"status": p["status"]}, timeout=10)
+        r.raise_for_status()
+        return ExecResult(True, f"{p['agent_id']} → {p['status']}")
+    except Exception as exc:  # noqa: BLE001
+        return ExecResult(False, "", f"no se pudo cambiar el agente: {exc}")
+
+
+def _proactive_run(p: dict) -> ExecResult:
+    """FASE 37.8: dispara el ciclo proactivo de un agente (POST /proactive/{id}/run del core)."""
+    try:
+        r = requests.post(f"{CORE_URL}/proactive/{p['agent_id']}/run", timeout=60)
+        r.raise_for_status()
+        return ExecResult(True, f"proactivo {p['agent_id']}: {str(r.json())[:300]}")
+    except Exception as exc:  # noqa: BLE001
+        return ExecResult(False, "", f"no se pudo correr el agente: {exc}")
+
+
+NSPANEL_SCRIPT = os.environ.get("NSPANEL_SCRIPT", os.path.join(REPO_DIR, "scripts", "nspanel.sh"))
+
+
+def _node_ip(node_id: str) -> str | None:
+    try:
+        nodes = requests.get(f"{AUDIO_URL}/nodes", timeout=8).json()
+        for n in nodes if isinstance(nodes, list) else []:
+            if n.get("node_id") == node_id:
+                return n.get("ip")
+    except Exception:  # noqa: BLE001
+        return None
+    return None
+
+
+def _panel_reboot(p: dict) -> ExecResult:
+    """FASE 37.8: reinicia un NSPanel reusando scripts/nspanel.sh (adb `su -c reboot`, el único
+    camino de reboot del firmware eWeLink). Resuelve la IP del nodo desde el registro del
+    audio_server y se la pasa al script por NSPANEL_IP. No reimplementa el reboot."""
+    node_id = p["node_id"]
+    ip = _node_ip(node_id)
+    if not ip:
+        return ExecResult(False, "", f"no encontré la IP del panel {node_id!r} (¿online?)")
+    env = {**os.environ, "NSPANEL_IP": ip}
+    try:
+        proc = subprocess.run(["bash", NSPANEL_SCRIPT, "reboot"],
+                              capture_output=True, text=True, timeout=30, env=env)
+        out = ((proc.stdout or "") + (proc.stderr or "")).strip()
+        ok = proc.returncode == 0
+        return ExecResult(ok, out, "" if ok else f"reboot falló (exit {proc.returncode})")
+    except Exception as exc:  # noqa: BLE001
+        return ExecResult(False, "", f"no se pudo reiniciar el panel: {exc}")
+
+
 HANDLERS = {
     "service.restart": _service_restart,
     "service.status": _service_status,
@@ -164,6 +219,9 @@ HANDLERS = {
     "config.reload": _config_reload,
     "wakeword.retrain": _wakeword_retrain,
     "voice.reenroll": _voice_reenroll,
+    "agent.toggle": _agent_toggle,
+    "panel.reboot": _panel_reboot,
+    "proactive.run": _proactive_run,
 }
 
 # Comandos largos que emiten progreso EN VIVO (D5): el handler acepta un callback `emit` y va
