@@ -122,6 +122,66 @@ POST /process {text, source, conversation_id?}
 6. Actualizar conversación y trazas
 ```
 
+#### Auditoría del flujo de ejecución — cortocircuitos y elección de agente (FASE 40.1)
+
+**Principio rector:** la elección de agente debe ser SIEMPRE producto de la planeación del LLM
+(coordinador) sobre `(prompt del usuario + AgentCards disponibles)`. El uso de un agente es
+*orgánico y eventual*, nunca prefijado. Está PROHIBIDO cualquier corte determinista pre-coordinador
+que **decida el agente** o sesgue el routing. Los únicos cortes admisibles antes del LLM son
+housekeeping de canal verdaderamente agnóstico (cierre/ack) que **no eligen agente**.
+
+Mapa real de puntos donde se elige o se puentea el agente, end-to-end. Cada punto marcado
+**[AGNÓSTICO]** (no decide agente / housekeeping puro) o **[NO-AGNÓSTICO]** (viola el principio).
+
+**Path voz/web — `server.py:process` (POST /process):**
+
+| # | Punto | file:line | Veredicto |
+|---|-------|-----------|-----------|
+| 3  | Frase de cierre → cierra conversación, responde "Hasta luego." | `server.py:599` (`is_close_phrase`, `conversations.py:48`) | **[AGNÓSTICO]** housekeeping de canal — no elige agente. Riesgo: falso positivo si una frase de comando contiene un substring de cierre (`_CLOSE_PHRASES` se matchea por `in`, no por igualdad). |
+| 3b | Ack/confirmación → ignora en silencio | `server.py:608` (`is_acknowledgment`, `conversations.py:53`) | **[AGNÓSTICO]** match por igualdad estricta contra `_ACK_WORDS`. No elige agente. Riesgo menor de falso positivo. |
+| 3c | **Captura de request intent** → el texto del usuario se trata como la respuesta a un request pendiente y se rutea al agente dueño (`handle_captured_reply`) | `server.py:615-632` | **[NO-AGNÓSTICO]** — **el bug central de la fase.** Decide el agente (el dueño del request) sin pasar por el coordinador, sólo porque existe un request pendiente. |
+| 4  | **fast_classifier** fast-path: clasificador entrenado elige agente sin LLM | `coordinator.py:206-223` | **[NO-AGNÓSTICO en intención, atenuado]** elige agente sin el planner, pero gateado por `not conv_context` + `conf >= CLASSIFIER_THRESHOLD` y entrenado de ejemplos del propio routing. Es una *aproximación barata del planner*, no un bias hacia un agente fijo. Falta guard de ambigüedad/umbral más explícito. |
+| 4b | fast_classifier fallback ante excepción del LLM | `coordinator.py:279-297` | **[AGNÓSTICO degradado]** sólo se usa cuando el planner falló; mejor que devolver `unknown`. |
+| 5  | Agregación multi-step | `_run_plan` (server.py) | **[AGNÓSTICO]** sintetiza resultados de agentes ya elegidos por el plan; no elige agente. |
+
+**Causa raíz del 3c (hijack cross-canal):** `get_pending_request` (`intent_state.py:224-235`)
+matchea CUALQUIER conversación cuando el intent no tiene `conversation_id`:
+
+```python
+# intent_state.py:231-234
+# Si tiene conversation_id, debe coincidir; si no tiene, aplica a cualquiera
+if e.get("conversation_id") and e["conversation_id"] != conversation_id:
+    continue
+return e
+```
+
+Los request proactivos de finanzas se crean SIN `conversation_id` (`finance_agent.py:485-498` →
+`proactive.py:_persist_proactive_item:711` → `intent_state.upsert(conversation_id=item.get("conversation_id"))`
+= `None`). Resultado: un request pendiente de finanzas captura el siguiente enunciado de
+cualquier canal/conversación —p.ej. "¿cómo está el clima?"— como su respuesta, lo pasa por
+`handle_captured_reply` con `_is_affirmative("¿cómo está el clima?") = False` y devuelve
+"Entendido, el plan 'X' queda sin cambios" (`finance_agent.py:521`). El clima nunca llega al
+planner.
+
+Además, el 3c **no verifica que la conversación esté esperando esa respuesta**: ignora el
+`ContinuationState` (FASE 36, `conversations.py:68`), que es el mecanismo correcto para saber si
+un exchange espera la próxima respuesta del usuario (`conv.is_waiting`, `kind=field|clarification|reply`).
+
+**Path WhatsApp — `server.py:wa_inbound` (POST /wa/inbound):**
+
+| # | Punto | file:line | Veredicto |
+|---|-------|-----------|-----------|
+| W1 | Intercept `CAPITAN_OAUTH:` | `server.py:920` | **[AGNÓSTICO]** mensaje de sistema, no comando. |
+| W2 | Ack con `intent_id` → cierra el intent | `server.py:925` | **[AGNÓSTICO]** housekeeping. |
+| W3 | Captura de request con `intent_id` (quoted-reply) | `server.py:937-938` (`get_request_by_id`) | **[NO-AGNÓSTICO acotado]** dirigido explícitamente por el usuario a ESE intent (reply citado) → match estricto por id, sin agarrar el primer pendiente. Aceptable: hay intención explícita del usuario. |
+| W4 | Captura de request sin `intent_id` (fallback por conversación) | `server.py:940` (`get_pending_request`) | **[NO-AGNÓSTICO]** mismo bug que 3c: cae al match laxo por conversación. |
+
+**Conclusión de la auditoría:** los cortes 3c (voz) y W4 (WhatsApp) violan el principio rector —
+deciden agente por precedencia dura sobre la existencia de un request pendiente, agravado por el
+match laxo de `get_pending_request`. El fast_classifier (4) es una aproximación del planner, no un
+bias, pero necesita guard de ambigüedad. Cierre (3) y ack (3b) son housekeeping pero deben acotarse
+para no dispararse sobre comandos reales. Las etapas B–E de FASE 40 corrigen en ese orden.
+
 #### Persistencia de datos (SQLite — FASE 32)
 
 Toda la data del sistema vive en **`~/.local/share/capitan/capitan.db`** (SQLite) vía
