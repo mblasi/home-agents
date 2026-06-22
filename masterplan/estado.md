@@ -3629,3 +3629,174 @@ Decisiones tomadas:
             (`dev_screen_timeout_secs`/`dev_dashboard`); `audio_server` la expone en `/nodes`
             (`device_config`) y la lleva el snapshot; ambos backoffices prellenan el form con el
             estado del dispositivo (fallback a la config guardada en core). Tests.
+
+### FASE 39 - Mensajería P2P entre usuarios mediada por agente (multi-canal, por turnos)
+
+```
+Objetivo: Permitir que dos usuarios CONOCIDos mantengan una conversación por TURNOS que
+          atraviese canales: de un panel a otro, de WhatsApp a un panel y de un panel a
+          WhatsApp. El intercambio lo media un agente nuevo que el orquestador rutea como a
+          cualquier otro dominio. Ejemplos: "decile a Lucía que ya salgo", "respondele a papá",
+          "mandale al panel de la cocina que baje a cenar", "avisale a mamá por WhatsApp".
+Estado:   Pendiente.
+Deps:     FASE 9  (coordinador LLM — routing agnóstico por catálogo de AgentCards),
+          FASE 22 (intents tipados — request/continuation reusados para turnos diferidos),
+          FASE 36 (continuidad conversacional unificada — ContinuationState, multiturno voz/WA),
+          FASE 3.5/19 (canal WhatsApp inbound `/wa/inbound` + push `wa_notifier.notify`),
+          FASE 2.5 (usuarios — identidades por canal: wa_phone, voice_id, panel_id),
+          FASE 32 (doc store SQLite — persistencia de la sesión P2P).
+PRINCIPIO RECTOR (no-bias, transversal): ningún caso de uso debe sesgar a un agente
+          particular. El relay P2P se modela como UN AGENTE MÁS (`messenger`) con su AgentCard
+          + ejemplos; el coordinador LLM decide rutear "decile a X…" / "respondele a Y…" por
+          planeación, igual que cualquier dominio. Queda PROHIBIDO agregar lógica de mensajería
+          al coordinador. El relay del turno de vuelta tampoco se hardcodea: la conversación del
+          receptor queda en `ContinuationState.waiting` (owner=messenger) y la continuación
+          GENÉRICA enruta la respuesta al agente dueño — el mismo mecanismo de clarification/field.
+Decisiones tomadas:
+          - Agente NUEVO `messenger` (no extender profile/user_mgmt): registrado en REGISTRY con
+            AgentCard + examples; el fast_classifier lo aprende de sus ejemplos. Cero hardcode en
+            coordinator.py.
+          - Entrega: STORE-AND-FORWARD async. El mensaje queda PENDIENTE hasta que el destinatario
+            sea alcanzable o interactúe; los turnos alternan en el tiempo (no requiere ambos
+            presentes). Reusa la máquina de intents/continuation, no un canal nuevo en vivo.
+          - Turnos ESTRICTOS: la sesión P2P lleva `turn_owner`; un mensaje fuera de turno se
+            encola/avisa, no pisa el turno del otro.
+          - Ruteo a destino: AUTO con fallback. El LLM extrae destinatario (+ hint opcional de
+            canal); el sistema resuelve panel asignado/último activo → fallback wa_phone; si no
+            hay canal alcanzable, avisa al emisor (no se pierde el mensaje, queda pendiente).
+          - Privacidad: HOGAR ABIERTO. Cualquier usuario conocido puede mensajear a otro; guest/
+            invitado NUNCA emite ni recibe. El destinatario puede mute/DND y bloquear emisores.
+          - Identidad: resolución nombre→user sobre el roster (alias/fuzzy); ambigüedad dispara
+            CLARIFICATION del coordinador ("¿a qué Lucía?"), reusando needs_clarification.
+          - GAP de infra que se construye: entrega DIRIGIDA a un panel concreto. Hoy los paneles
+            no tienen push proactivo dirigido (sólo respuesta síncrona, `alert_queue` GLOBAL y
+            flags en heartbeat). Se agrega un BUZÓN DE SALIDA POR-NODO que el satélite drena y
+            anuncia por TTS. WhatsApp reusa `wa_notifier.notify(phone, text)`.
+```
+
+PREMISA DE DASHBOARD (CLAUDE.md): la feature introduce datos nuevos (sesiones P2P, mensajes
+          relayados, latencia de entrega por canal). Reflejarlo en observabilidad persistida
+          (`metrics_store`) y en `/metrics` de ambos backoffices + panel zellij — se cubre en 39.8.
+          Egress-only: sólo conteos, sin contenido de mensajes en claro hacia la nube.
+
+#### Etapa A - Modelo de sesión + agente messenger
+- [ ] 39.1  Modelo de sesión P2P persistido (`core/p2p_session.py`, doc store SQLite FASE 32):
+            participantes (from_user/to_user), `turn_owner`, `status`
+            (open/awaiting_sender/awaiting_recipient/closed/declined), binding de canal por
+            participante, log de turnos (texto + canal + ts) y TTL. CRUD + tests del ciclo de
+            vida y de la alternancia estricta de turnos (mensaje fuera de turno se encola, no pisa).
+- [ ] 39.2  Agente `messenger` (`core/messenger_agent.py`) implementando `BaseAgent.process`:
+            extrae destinatario + cuerpo del query reformulado por el coordinador, resuelve el
+            user destino, crea/continúa la sesión P2P y encola la entrega. Registrado en REGISTRY
+            con AgentCard + examples ("decile a X que…", "respondele a Y", "avisale a mamá por
+            WhatsApp", "mandale al panel de la cocina…"). Retorna `intent_updates`/continuation
+            para esperar el turno. Tests del process mockeando entrega y resolución de usuario.
+- [ ] 39.3  Resolución destinatario nombre→user (alias/fuzzy sobre el roster), exclusión de
+            guest/invitado, y disparo de CLARIFICATION ante ambigüedad reusando el
+            `needs_clarification` del coordinador (sin lógica nueva en coordinator.py). Tests.
+
+#### Etapa B - Capa de entrega dirigida (multi-canal)
+- [ ] 39.4  Abstracción `deliver(user, text, session)` que elige canal por binding/presencia:
+            panel asignado (`panel_id`) / último panel activo → fallback `wa_phone`; si no hay
+            canal, marca no-entregable y avisa al emisor (queda pendiente). Selección y fallback
+            testeados.
+- [ ] 39.5  Buzón de salida POR-NODO para paneles (NUEVO; cubre el gap de push dirigido): cola
+            por `node_id` en core/audio_server; el satélite la drena (heartbeat node-scoped o
+            `GET /nodes/{id}/outbox`) y la anuncia por TTS con marca de quién envía. La entrega
+            WhatsApp reusa `wa_notifier.notify`. Tests de encolado/drenado con HTTP mockeado.
+- [ ] 39.6  Relay del turno de vuelta: cuando el receptor responde (voz panel o WA), su
+            `ContinuationState` (owner=messenger) enruta la respuesta al messenger vía la
+            continuación GENÉRICA; el messenger la entrega al otro participante y alterna el turno.
+            Resuelve el cross-user (la captura por intent es hoy por-usuario) dentro de la sesión
+            P2P. Tests del relay bidireccional y de la alternancia de turnos.
+
+#### Etapa C - Privacidad y control
+- [ ] 39.7  Mute/DND y bloqueo por usuario: preferencias en `User` (ventana DND, emisores
+            muted/blocked); `deliver()` respeta DND (encola hasta el fin de la ventana) y descarta
+            de emisores bloqueados avisando al emisor. Guest nunca emite ni recibe. Tests de
+            gating.
+
+#### Etapa D - Observabilidad y documentación
+- [ ] 39.8  Métricas: persistir en `metrics_store` los eventos de relay (enviados/entregados/
+            pendientes/fallidos por canal + latencia de entrega). Panel zellij (nuevo o extender
+            history/agents) + sección en `/metrics` de ambos backoffices (sólo conteos; egress-only
+            por el push de métricas existente, sin contenido en claro). Tests de ingesta/serie.
+- [ ] 39.9  Documentación: `README.md` (core + raíz) y `masterplan/arquitectura_funcional.md`
+            (agente `messenger`, sesión P2P, capa de entrega dirigida, buzón por-nodo). Conteo de
+            sesiones P2P en el Resumen del backoffice cloud (detalle de contenido sólo bajo
+            `view_pii`).
+
+### FASE 40 - Auditoría del flujo de ejecución + orquestación 100% agnóstica (sin bias de agente)
+
+```
+Objetivo: Garantizar que la elección de agente sea SIEMPRE producto de la planeación del LLM
+          sobre (prompt del usuario + AgentCards disponibles). Erradicar los cortocircuitos
+          deterministas pre-coordinador que condicionan o secuestran el routing. Corregir el bug
+          observado: un `request` intent pendiente (típicamente un proactivo de finanzas, creado
+          SIN `conversation_id`) captura cualquier enunciado siguiente como su respuesta y
+          devuelve "Entendido, el plan 'X' queda sin cambios" ante, p.ej., una consulta de clima.
+Estado:   Pendiente.
+Deps:     FASE 9  (coordinador LLM — el corazón agnóstico a preservar),
+          FASE 22 (intents tipados + captura 22.5 — el path a corregir),
+          FASE 36 (ContinuationState — el mecanismo CORRECTO de espera de respuesta),
+          FASE 24 (tracing — para evidenciar y medir los bypasses).
+PRINCIPIO RECTOR: el corazón es 100% agnóstico — el LLM arma el plan desde (prompt + AgentCards)
+          y de ahí surge, orgánico y eventual, el uso de un agente. PROHIBIDO bias hacia un agente
+          o lógica determinista que condicione qué agente atiende. Los únicos cortes admisibles
+          antes del LLM son housekeeping de canal verdaderamente agnóstico (cierre/ack) y NO deben
+          decidir agente. La pregunta "¿este enunciado es respuesta a algo pendiente o un comando
+          nuevo?" debe resolverse de forma agnóstica (idealmente por el propio planner), nunca por
+          precedencia dura.
+Hallazgos de la auditoría inicial (ya realizada — base de esta fase):
+          - 4 cortocircuitos antes del coordinador en `server.py:process`: (3) `is_close_phrase`,
+            (3b) `is_acknowledgment`, (3c) `get_pending_request`→`handle_captured_reply`
+            (server.py:615-632), (4) `fast_classifier` dentro de `coordinate()`. El 3c rompe el
+            principio.
+          - Causa raíz: `get_pending_request` (intent_state.py:231-233) matchea CUALQUIER
+            conversación cuando el intent no tiene `conversation_id`; los proactivos de finanzas
+            (finance_agent.py:485-498) se crean SIN `conversation_id` → hijack cross-canal. En
+            server.py:617 se captura el texto como respuesta sin verificar si realmente es una
+            respuesta ni si la conversación está esperando. `_is_affirmative` False → finance_agent.py:521.
+          - El path WhatsApp (server.py:933-946) prefiere `intent_id` explícito (quoted-reply) pero
+            cae al mismo `get_pending_request` como fallback.
+```
+
+#### Etapa A - Auditoría documentada
+- [ ] 40.1  Documentar en `arquitectura_funcional.md` el flujo real de ejecución de un comando
+            (voz y WhatsApp) end-to-end, enumerando TODOS los puntos donde se elige o se puentea el
+            agente (los 4 cortocircuitos + fast_classifier + aggregation) con file:line, y marcando
+            cada uno como agnóstico / no-agnóstico contra el principio rector.
+
+#### Etapa B - Fix del secuestro de captura
+- [ ] 40.2  Corregir el hijack: la captura de un request pendiente (server.py 3c) sólo procede
+            cuando la conversación está EFECTIVAMENTE esperando esa respuesta — acoplar a
+            `ContinuationState.waiting` (FASE 36) con match estricto de `conversation_id`; nunca
+            capturar contra un intent sin `conversation_id` en otra conversación. Test de regresión:
+            con un request proactivo pendiente, "¿cómo está el clima?" debe ir al planner y rutear
+            a weather, NO a finance.
+- [ ] 40.3  Los `request` intents proactivos deben sellar el `conversation_id` del canal/turno
+            donde se ENTREGAN (no nacer sin él): al entregarse por WhatsApp (`wa_notifier`) o al
+            inyectarse en un turno de voz, fijar el `conversation_id` en ese momento.
+            `get_pending_request` deja de matchear "cualquier conversación" salvo intención
+            explícita. Tests.
+
+#### Etapa C - Decisión agnóstica respuesta-vs-comando
+- [ ] 40.4  Hacer agnóstica la decisión "¿respuesta a lo pendiente o comando nuevo?": pasar la
+            pregunta pendiente como CONTEXTO al coordinador y dejar que el plan resuelva el destino
+            (incluida la opción "es la respuesta al intent X" como un resultado más del planner),
+            en vez de precedencia dura pre-LLM. Conservar a lo sumo un fast-path barato para
+            respuestas inequívocas (sí/no a una pregunta yes/no) sin sesgar el resto. Tests de
+            ambos caminos.
+
+#### Etapa D - Auditar los demás cortocircuitos
+- [ ] 40.5  Revisar 3 (close), 3b (ack) y 4 (fast_classifier) contra el principio: que ninguno
+            DECIDA agente de forma sesgada. Acotar `is_close_phrase`/`is_acknowledgment` a
+            housekeeping puro (no dispararse sobre comandos reales — falsos positivos).
+            fast_classifier: confirmar que su bypass es agnóstico (entrenado de ejemplos, gateado
+            por ausencia de contexto) y agregar guard de umbral/ambigüedad. Tests de falsos positivos.
+
+#### Etapa E - Observabilidad de bypass
+- [ ] 40.6  Instrumentar cada bypass: registrar en el trace (FASE 24) cuándo una request NO pasó
+            por el planner y por qué cortocircuito (close/ack/capture/fast_classifier). Métrica de
+            tasa de bypass por tipo en `/metrics` (ambos backoffices) + panel zellij, para detectar
+            regresiones de bias. Tests de ingesta.
