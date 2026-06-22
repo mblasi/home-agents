@@ -164,3 +164,57 @@ def test_proactive_run_ok():
 def test_new_commands_in_catalog_summary():
     types = {c["type"] for c in catalog_summary()}
     assert {"agent.toggle", "panel.reboot", "proactive.run"} <= types
+
+
+# ── FASE 37.6: metadata de presentación en el catálogo ────────────────────────
+
+def _cmd(t):
+    return next(c for c in catalog_summary() if c["type"] == t)
+
+
+def _param(t, name):
+    return next(p for p in _cmd(t)["params"] if p["name"] == name)
+
+
+def test_catalog_has_command_label():
+    assert _cmd("service.restart")["label"] == "Reiniciar servicio"
+    # comando sin label declarado cae al type
+    assert all("label" in c for c in catalog_summary())
+
+
+def test_enum_param_exposes_choices():
+    p = _param("service.restart", "service")
+    assert p["kind"] == "enum"
+    assert "capitan-core" in p["choices"] and isinstance(p["choices"], list)
+
+
+def test_int_param_exposes_min_max_default():
+    p = _param("logs.tail", "lines")
+    assert p["kind"] == "int" and p["min"] == 1 and p["max"] == 500 and p["default"] == 100
+
+
+def test_bool_param_kind():
+    assert _param("deploy.run", "restart_wa")["kind"] == "bool"
+
+
+def test_multi_param_kind():
+    p = _param("deploy.release", "services")
+    assert p["kind"] == "multi" and "core" in p["choices"]
+
+
+def test_entity_param_kinds():
+    assert _param("agent.toggle", "agent_id")["kind"] == "agent"
+    assert _param("panel.reboot", "node_id")["kind"] == "node"
+    assert _param("voice.reenroll", "user_id")["kind"] == "user"
+
+
+def test_param_without_presentation_defaults_to_str():
+    p = _param("deploy.release", "core_ref")
+    assert p["kind"] == "str" and "label" in p
+
+
+def test_presentation_does_not_alter_validation():
+    # el catálogo enriquecido no cambia validate_command: choices presentacionales == enum real
+    assert validate_command("agent.toggle", {"agent_id": "haos", "status": "active"})["status"] == "active"
+    with pytest.raises(CommandError):
+        validate_command("logs.tail", {"service": "capitan-core", "lines": 999})

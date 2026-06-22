@@ -134,12 +134,76 @@ def validate_command(cmd_type: str, params: dict[str, Any] | None) -> dict[str, 
     return out
 
 
+# ── Metadata de PRESENTACIÓN (FASE 37.6) ──────────────────────────────────────
+# Describe cómo renderizar cada comando/parámetro en una UI final-user (sin JSON crudo):
+# label legible, `kind` de widget y restricciones. NO participa de la validación
+# (validate_command sigue siendo la única autoridad); es sólo presentación.
+#   kind: enum   → dropdown (choices)
+#         multi  → checkboxes (choices, lista)
+#         bool   → toggle
+#         int    → número (min/max)
+#         str    → texto libre
+#         node   → selector de panel (poblado por el front desde el snapshot)
+#         user   → selector de usuario
+#         agent  → selector de agente
+# Comandos con entidad-ancla (agent.toggle/panel.reboot/proactive.run/...) se invocan como
+# acciones contextuales en su sección; igual se exponen aquí para completitud.
+CMD_LABELS: dict[str, str] = {
+    "service.restart": "Reiniciar servicio",
+    "service.status": "Estado de servicio",
+    "deploy.run": "Deploy (legacy)",
+    "deploy.release": "Release de servicios",
+    "deploy.cloud": "Deploy Cloud Run",
+    "deploy.satellites": "Actualizar paneles",
+    "logs.tail": "Ver logs de servicio",
+    "config.reload": "Recargar configuración",
+    "wakeword.retrain": "Reentrenar wake word",
+    "voice.reenroll": "Re-enrolar voz",
+    "agent.toggle": "Cambiar estado de agente",
+    "panel.reboot": "Reiniciar panel",
+    "proactive.run": "Correr agente proactivo",
+}
+
+PRESENTATION: dict[str, dict[str, dict[str, Any]]] = {
+    "service.restart": {"service": {"kind": "enum", "label": "Servicio", "choices": SERVICES}},
+    "service.status":  {"service": {"kind": "enum", "label": "Servicio", "choices": SERVICES}},
+    "deploy.run":      {"restart_wa": {"kind": "bool", "label": "Reiniciar WhatsApp", "default": False}},
+    "deploy.release":  {"services": {"kind": "multi", "label": "Servicios", "choices": DEPLOY_SERVICES},
+                        "core_ref": {"kind": "str", "label": "Ref core (sha/tag/branch)"},
+                        "ear_ref": {"kind": "str", "label": "Ref ear"},
+                        "umbrella_ref": {"kind": "str", "label": "Ref umbrella"}},
+    "deploy.cloud":    {"services": {"kind": "multi", "label": "Targets Cloud Run", "choices": CLOUDRUN_SERVICES}},
+    "deploy.satellites": {"node_id": {"kind": "node", "label": "Panel (vacío = todos)"}},
+    "logs.tail":       {"service": {"kind": "enum", "label": "Servicio", "choices": SERVICES},
+                        "lines": {"kind": "int", "label": "Líneas", "min": 1, "max": 500, "default": 100}},
+    "config.reload":   {"target": {"kind": "enum", "label": "Target", "choices": CONFIG_TARGETS}},
+    "wakeword.retrain": {},
+    "voice.reenroll":  {"node_id": {"kind": "node", "label": "Panel"},
+                        "user_id": {"kind": "user", "label": "Usuario"}},
+    "agent.toggle":    {"agent_id": {"kind": "agent", "label": "Agente"},
+                        "status": {"kind": "enum", "label": "Estado", "choices": AGENT_STATUSES}},
+    "panel.reboot":    {"node_id": {"kind": "node", "label": "Panel"}},
+    "proactive.run":   {"agent_id": {"kind": "agent", "label": "Agente"}},
+}
+
+
 def catalog_summary() -> list[dict[str, Any]]:
-    """Resumen del catálogo para el frontend (qué comandos se pueden emitir)."""
+    """Resumen del catálogo para el frontend, enriquecido con metadata de presentación (37.6).
+
+    Cada comando lleva un `label` legible y cada parámetro un `kind` de widget + restricciones
+    (`choices`/`min`/`max`/`default`). Si un parámetro no tiene presentación declarada, cae a
+    `kind=str`. No altera la validación: es sólo para renderizar la UI."""
     out = []
     for t, spec in CATALOG.items():
-        out.append({
-            "type": t,
-            "params": [{"name": n, "required": req} for n, (_, req) in spec.items()],
-        })
+        pres = PRESENTATION.get(t, {})
+        params = []
+        for n, (_, req) in spec.items():
+            meta = dict(pres.get(n) or {})
+            meta.setdefault("kind", "str")
+            meta.setdefault("label", n)
+            # choices como lista (las constantes son tuplas) para serializar a JSON
+            if "choices" in meta:
+                meta["choices"] = list(meta["choices"])
+            params.append({"name": n, "required": req, **meta})
+        out.append({"type": t, "label": CMD_LABELS.get(t, t), "params": params})
     return out
