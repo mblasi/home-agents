@@ -3735,7 +3735,7 @@ Objetivo: Garantizar que la elección de agente sea SIEMPRE producto de la plane
           observado: un `request` intent pendiente (típicamente un proactivo de finanzas, creado
           SIN `conversation_id`) captura cualquier enunciado siguiente como su respuesta y
           devuelve "Entendido, el plan 'X' queda sin cambios" ante, p.ej., una consulta de clima.
-Estado:   EN CURSO (4/6 — Etapas A, B y C completas; quedan 40.5 y 40.6).
+Estado:   EN CURSO (5/6 — Etapas A-D completas; queda 40.6 observabilidad).
 Deps:     FASE 9  (coordinador LLM — el corazón agnóstico a preservar),
           FASE 22 (intents tipados + captura 22.5 — el path a corregir),
           FASE 36 (ContinuationState — el mecanismo CORRECTO de espera de respuesta),
@@ -3789,7 +3789,7 @@ Hallazgos de la auditoría inicial (ya realizada — base de esta fase):
             ambos caminos.
 
 #### Etapa D - Auditar los demás cortocircuitos
-- [ ] 40.5  Revisar 3 (close), 3b (ack) y 4 (fast_classifier) contra el principio: que ninguno
+- [x] 40.5  Revisar 3 (close), 3b (ack) y 4 (fast_classifier) contra el principio: que ninguno
             DECIDA agente de forma sesgada. Acotar `is_close_phrase`/`is_acknowledgment` a
             housekeeping puro (no dispararse sobre comandos reales — falsos positivos).
             fast_classifier: confirmar que su bypass es agnóstico (entrenado de ejemplos, gateado

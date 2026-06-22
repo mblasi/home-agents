@@ -202,6 +202,15 @@ si es la respuesta, o un plan normal si es un comando nuevo (el `fast_classifier
 hay pregunta pendiente). En WhatsApp, `wa_inbound` sólo captura el quoted-reply **dirigido**
 (intent_id explícito); sin intent_id la decisión la toma `process()` por el mismo camino agnóstico.
 
+**Etapa D — auditar los demás cortocircuitos (40.5, resuelto).** `is_close_phrase` deja de
+matchear por **substring** (un comando que contenía "eso es todo"/"nada más" disparaba un cierre):
+ahora la frase de cierre debe ser **todo** el enunciado salvo relleno de cortesía/temporal
+(gracias, bueno, por hoy…) quitado de ambos extremos. `is_acknowledgment` ya era match estricto
+(no dispara sobre comandos). El `fast_classifier` suma, además del umbral de confianza, un **guard
+de margen** top1-top2 (`CLASSIFIER_MARGIN`): si dos agentes empatan, la elección es ambigua y se
+difiere al planner LLM en vez de que el clasificador decida con poca evidencia (margen en
+`CoordinatorTrace.fast_margin`). Ninguno de los tres decide agente de forma sesgada.
+
 #### Persistencia de datos (SQLite — FASE 32)
 
 Toda la data del sistema vive en **`~/.local/share/capitan/capitan.db`** (SQLite) vía
