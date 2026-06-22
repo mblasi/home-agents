@@ -3437,7 +3437,7 @@ Objetivo: Llevar el backoffice cloud (FASE 33) de una única página SPA con tar
           el backoffice cloud debe ser mobile-friendly (responsive, mobile-first), ya que
           el acceso remoto egress-only es típicamente desde el celular — toda sección,
           sidebar y formulario de comandos debe funcionar y ser usable en pantalla chica.
-Estado:   EN CURSO (11/13 — hecho 37.1-37.8, 37.10, 37.12-mobile, 37.12-voiceid; pendientes 37.9, 37.11).
+Estado:   EN CURSO (12/13 — hecho 37.1-37.8, 37.10, 37.11, 37.12-mobile, 37.12-voiceid; queda 37.9).
 Deps:     FASE 33 (backoffice cloud + bridge egress-only + RBAC — COMPLETA, base a extender),
           FASE 35 (dashboards de métricas — COMPLETA, ya viven en el cloud),
           FASE 34 (deploy remoto — la sección Deploy del sidebar consume su versión reportada).
@@ -3555,7 +3555,7 @@ PREMISA TRANSVERSAL DE UX (comandos): TODO lo relativo a comandos invocables —
             lint de estado + sync de issues.
 
 #### Etapa G - Observabilidad de detección: score WW + voice-id en el tiempo (ambos backoffices)
-- [ ] 37.11 Visualizar el comportamiento del SCORE de wake word vs el threshold a lo largo del
+- [x] 37.11 Visualizar el comportamiento del SCORE de wake word vs el threshold a lo largo del
             tiempo, en la sección Métricas de AMBOS backoffices (local LAN + cloud egress-only).
             El score hoy sólo vive en stdout del satélite (`ear/satellite.py:_score_chunk`,
             logea >= `SCORE_LOG_MIN`, dispara >= `WAKEWORD_THRESH`) — NO se persiste. Pipeline

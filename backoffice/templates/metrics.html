@@ -45,6 +45,11 @@
   </div>
 
   <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 mb-6">
+    <div class="text-xs text-gray-400 uppercase tracking-wider mb-3">Wake word — score (pico/promedio) vs threshold</div>
+    <canvas id="ww-chart" height="90"></canvas>
+  </div>
+
+  <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 mb-6">
     <div class="text-xs text-gray-400 uppercase tracking-wider mb-3">
       Voice-ID — confianza known vs guest vs threshold <span id="conf-thr" class="text-gray-500"></span>
     </div>
@@ -153,6 +158,7 @@ function mkChart(canvasId, type) {
   });
 }
 const vozChart = mkChart("voz-chart", "bar");
+const wwChart = mkChart("ww-chart", "line");
 const confChart = mkChart("conf-chart", "line");
 const llmChart = mkChart("llm-chart", "line");
 
@@ -171,10 +177,11 @@ function applySeries(chart, payload, colorOffset) {
 // ── Voz ───────────────────────────────────────────────────────────────────────
 async function loadVoz() {
   const extra = {node_id: $("f-node").value};
-  const [sum, series, conf, retr] = await Promise.all([
+  const [sum, series, conf, ww, retr] = await Promise.all([
     getJSON("/api/metrics/voice/summary?" + qs(extra)),
     getJSON("/api/metrics/voice/series?" + qs({...extra, bucket: bucketFor()})),
     getJSON("/api/metrics/voice/conf-series?" + qs({...extra, bucket: bucketFor()})),
+    getJSON("/api/metrics/wakeword/series?" + qs({...extra, bucket: bucketFor()})),
     getJSON("/api/metrics/voice/retrains?limit=10"),
   ]);
   $("voz-cards").innerHTML =
@@ -188,6 +195,11 @@ async function loadVoz() {
   // sólo tp/fp en el gráfico (total/fp_rate fuera para no saturar)
   applySeries(vozChart, {labels: series.labels,
                          series: (series.series || []).filter(s => ["tp", "fp"].includes(s.name))});
+  // Wake word: pico/promedio del score vs threshold (FASE 37.11)
+  const WW_NAMES = {max_score: "pico", avg_score: "promedio", threshold: "threshold"};
+  applySeries(wwChart, {labels: ww.labels,
+                        series: (ww.series || []).filter(s => s.name !== "fired")
+                                .map(s => ({...s, name: WW_NAMES[s.name] || s.name}))}, 1);
   // Voice-ID: confianza known/guest vs threshold (FASE 37.12)
   const CONF_NAMES = {known_conf: "known", guest_conf: "guest", threshold: "threshold"};
   applySeries(confChart, {labels: conf.labels,

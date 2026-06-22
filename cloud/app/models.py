@@ -107,6 +107,7 @@ class MetricsSnapshot(BaseModel):
     voice_summary: dict[str, Any] = Field(default_factory=dict)
     voice_series: dict[str, Any] = Field(default_factory=dict)
     voice_conf_series: dict[str, Any] = Field(default_factory=dict)   # FASE 37.12 (voice-id vs threshold)
+    ww_score_series: dict[str, Any] = Field(default_factory=dict)     # FASE 37.11 (score WW vs threshold)
     retrains: list[dict[str, Any]] = Field(default_factory=list)
     llm_summary: dict[str, Any] = Field(default_factory=dict)
     llm_by_model: list[dict[str, Any]] = Field(default_factory=list)

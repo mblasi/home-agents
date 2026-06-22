@@ -18,6 +18,7 @@ def test_minimal_metrics_snapshot_validates():
     assert d["window_hours"] == 24
     assert d["voice_summary"] == {} and d["llm_by_model"] == []
     assert d["voice_conf_series"] == {}   # FASE 37.12
+    assert d["ww_score_series"] == {}     # FASE 37.11
 
 
 def test_metrics_snapshot_carries_voice_conf_series():
