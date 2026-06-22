@@ -3588,7 +3588,7 @@ Objetivo: Dar a cada panel NSPanel una sección de CONFIGURACIÓN administrable 
           lugar para más:
             1. Tiempo de inactividad para apagar la pantalla (screen_timeout_secs, 0 = nunca).
             2. Dashboard por defecto del panel (default_dashboard, deeplink de HA Companion).
-Estado:   COMPLETA (6/6). Pendiente sólo el deploy + verificación e2e en hardware (satélite/su/am).
+Estado:   COMPLETA (7/7). Pendiente sólo la verificación e2e en hardware (satélite/su/am).
 Deps:     FASE 16 (paneles + audio_server + heartbeat/auto-update), FASE 33/37 (cloud + comandos
           tipados + snapshot egress-only), FASE 32 (tabla panels en SQLite).
 Decisiones tomadas:
@@ -3624,3 +3624,8 @@ Decisiones tomadas:
             (`test_commands`, `test_bridge`).
 - [x] 38.6  Docs: `arquitectura_funcional.md` (config de paneles + flujo pull), READMEs (raíz,
             core, ear, cloud); lint de estado + sync de issues.
+- [x] 38.7  Prefill con la config REAL del dispositivo: el satélite lee el `screen_off_timeout`
+            vigente (`settings get`) y reporta su config aplicada en el heartbeat
+            (`dev_screen_timeout_secs`/`dev_dashboard`); `audio_server` la expone en `/nodes`
+            (`device_config`) y la lleva el snapshot; ambos backoffices prellenan el form con el
+            estado del dispositivo (fallback a la config guardada en core). Tests.
