@@ -3735,7 +3735,7 @@ Objetivo: Garantizar que la elección de agente sea SIEMPRE producto de la plane
           observado: un `request` intent pendiente (típicamente un proactivo de finanzas, creado
           SIN `conversation_id`) captura cualquier enunciado siguiente como su respuesta y
           devuelve "Entendido, el plan 'X' queda sin cambios" ante, p.ej., una consulta de clima.
-Estado:   EN CURSO (5/6 — Etapas A-D completas; queda 40.6 observabilidad).
+Estado:   COMPLETA (panel zellij de 40.6 N/A — los paneles ear ya no existen, FASE 21).
 Deps:     FASE 9  (coordinador LLM — el corazón agnóstico a preservar),
           FASE 22 (intents tipados + captura 22.5 — el path a corregir),
           FASE 36 (ContinuationState — el mecanismo CORRECTO de espera de respuesta),
@@ -3796,7 +3796,9 @@ Hallazgos de la auditoría inicial (ya realizada — base de esta fase):
             por ausencia de contexto) y agregar guard de umbral/ambigüedad. Tests de falsos positivos.
 
 #### Etapa E - Observabilidad de bypass
-- [ ] 40.6  Instrumentar cada bypass: registrar en el trace (FASE 24) cuándo una request NO pasó
+- [x] 40.6  Instrumentar cada bypass: registrar en el trace (FASE 24) cuándo una request NO pasó
             por el planner y por qué cortocircuito (close/ack/capture/fast_classifier). Métrica de
             tasa de bypass por tipo en `/metrics` (ambos backoffices) + panel zellij, para detectar
             regresiones de bias. Tests de ingesta.
+            (panel zellij N/A: `ear/dashboard.kdl` y `panel_*.py` ya no existen — pipeline laptop
+            reemplazado en FASE 21; la observabilidad persistida vive en los `/metrics` web.)
