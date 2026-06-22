@@ -87,10 +87,17 @@
         <div class="card"><h2>Alertas</h2><ul id="alerts-list" class="alerts-list"></ul></div>
       </section>
 
-      <!-- ── Logs (37.6) ─────────────────────────────────────── -->
+      <!-- ── Logs ────────────────────────────────────────────── -->
       <section class="view" data-view="logs">
-        <div class="card placeholder"><h2>Logs</h2>
-          <p class="muted">Sección en preparación (37.6): traer N líneas de un servicio o satélite por comando tipado.</p>
+        <div class="card">
+          <h2>Logs</h2>
+          <div class="form-row">
+            <label>Servicio <select id="logs-service"></select></label>
+            <label>Líneas <input id="logs-lines" type="number" min="1" max="500" value="100"></label>
+            <button id="logs-fetch">Traer logs</button>
+            <span id="logs-status" class="muted"></span>
+          </div>
+          <pre id="logs-output" class="cmd-log hidden"></pre>
         </div>
       </section>
 
@@ -132,16 +139,22 @@
         </div>
       </section>
 
-      <!-- ── Acciones (UI de comandos: overhaul en 37.5) ─────── -->
+      <!-- ── Acciones (formulario tipado, widgets desde /api/catalog) ─── -->
       <section class="view" data-view="acciones">
-        <div class="card" id="actions-card">
+        <div class="card">
           <h2>Acciones admin</h2>
-          <form id="emit">
-            <select id="cmd-type"></select>
-            <input id="cmd-params" placeholder='params JSON, ej {"service":"capitan-core"}'>
-            <button type="submit">Emitir</button>
-          </form>
-          <p id="emit-msg" class="muted"></p>
+          <p class="muted">Las acciones más comunes están junto a su entidad (Agentes, Paneles,
+            Servicios, Wake word). Acá podés emitir cualquier comando del catálogo con un
+            formulario tipado.</p>
+          <div class="form-row">
+            <label>Comando <select id="cmd-type"></select></label>
+          </div>
+          <p class="muted" id="cmd-desc"></p>
+          <div id="cmd-fields" class="cmd-fields"></div>
+          <div class="form-row">
+            <button id="cmd-emit">Emitir</button>
+            <span id="emit-msg" class="muted"></span>
+          </div>
           <pre id="cmd-log" class="hidden cmd-log"></pre>
         </div>
       </section>
@@ -207,6 +220,7 @@ const allowedSection = (id) => {
 };
 
 let CAPS = {};
+let LAST_STATE = {};   // último snapshot, para poblar selectores de entidad (node/user/agent)
 
 function renderNav() {
   $("nav").innerHTML = SECTIONS.map(g => {
@@ -231,6 +245,9 @@ function route() {
   document.querySelectorAll("#nav a").forEach(a =>
     a.classList.toggle("current", a.dataset.link === id));
   $("section-title").textContent = SECTION_BY_ID[id].label;
+  // Re-render del form tipado al entrar a Acciones: los selectores de entidad se pueblan del
+  // último snapshot, ya disponible cuando el usuario navega.
+  if (id === "acciones" && Object.keys(CATALOG_BY_TYPE).length) renderFields();
   closeDrawer();
 }
 window.addEventListener("hashchange", route);
@@ -287,22 +304,73 @@ function renderVersions(v) {
              + `<div class="grid">${adv}</div></details>` : "");
 }
 
-async function emitDeploy(type, params, label) {
-  if (!confirm(`¿Desplegar ${label}? Reinicia / actualiza el target en producción.`)) return;
+// Comandos que reinician/alteran producción → piden confirmación.
+const DESTRUCTIVE = new Set(["service.restart", "panel.reboot", "wakeword.retrain",
+  "deploy.run", "deploy.release", "deploy.cloud", "deploy.satellites", "config.reload"]);
+
+// Emisor unificado de comandos (37.5): confirmación en destructivos + feedback inline del
+// estado (encolado → progreso → done/error) reusando el streaming/auditoría. `opts.status`
+// es un elemento donde mostrar el estado; `opts.confirm` overridea el texto de confirmación.
+async function runCommand(type, params, opts = {}) {
+  const label = opts.label || type;
+  if (DESTRUCTIVE.has(type)) {
+    if (!confirm(opts.confirm || `¿${label}? Afecta producción.`)) return;
+  }
+  const setStatus = (t, cls) => { if (opts.status) { opts.status.textContent = t; opts.status.className = cls || "muted"; } };
+  setStatus("encolando…");
   try {
     const { command } = await api("/api/commands", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ type, params }),
     });
-    if (command && command.id && CAPS.view_full) streamCommand(command.id);
+    setStatus("⏳ encolado", "muted");
+    if (command && command.id) {
+      if (opts.log && CAPS.view_full) streamCommand(command.id, opts.log);
+      if (CAPS.view_full) trackStatus(command.id, setStatus);
+    }
     refresh();
-  } catch (e) { alert("error: " + e.message); }
+    return command;
+  } catch (e) { setStatus("✗ " + e.message, "error"); if (!opts.status) alert("error: " + e.message); }
+}
+
+// Polea sólo el estado de un comando para el feedback inline (sin volcar el log entero).
+async function trackStatus(id, setStatus) {
+  for (let i = 0; i < 400; i++) {
+    let cmd;
+    try { ({ command: cmd } = await api("/api/commands/" + id)); } catch { return; }
+    if (cmd) {
+      if (cmd.status === "running") setStatus("🟡 ejecutando…", "muted");
+      else if (cmd.status === "done") {
+        const r = cmd.result || {};
+        return setStatus(r.ok ? "🟢 ok" : "🔴 con fallos", r.ok ? "muted" : "error");
+      } else if (cmd.status === "error") return setStatus("🔴 error: " + ((cmd.result || {}).error || ""), "error");
+    }
+    await new Promise(r => setTimeout(r, 1500));
+  }
+}
+
+function emitDeploy(type, params, label) {
+  runCommand(type, params, { label: "Desplegar " + label,
+    confirm: `¿Desplegar ${label}? Reinicia / actualiza el target en producción.`,
+    log: true });
 }
 function deployTarget(id) {
   const t = TARGETS_BY_ID[id];
-  if (!t) return;
-  emitDeploy(t.command, t.params, t.label);
+  if (t) emitDeploy(t.command, t.params, t.label);
 }
+
+// ── Acciones contextuales por entidad (37.5) ──────────────────────────────────
+const actToggle = (id, status) =>
+  runCommand("agent.toggle", { agent_id: id, status },
+    { label: `Poner ${id} en ${status}`, status: $("act-" + id) });
+const actProactive = (id) =>
+  runCommand("proactive.run", { agent_id: id }, { label: `Correr ${id}`, status: $("act-" + id) });
+const actReboot = (id) =>
+  runCommand("panel.reboot", { node_id: id }, { label: `Reiniciar panel ${id}`, status: $("pan-" + id) });
+const actRetrain = () =>
+  runCommand("wakeword.retrain", {}, { label: "Reentrenar wake word", status: $("ww-status"), log: true });
+const actRestart = (svc) =>
+  runCommand("service.restart", { service: svc }, { label: `Reiniciar ${svc}`, status: $("svc-" + svc) });
 
 function renderSummary(state) {
   const svc = Object.values(state.services || {});
@@ -333,10 +401,13 @@ function renderWakeword(ww) {
   const stIcon = { running: "🟡", done: "🟢", error: "🔴" }[st] || "⚪";
   const nodes = (ww.nodes || []).map(n =>
     `<div>${dot(n.online)} <b>${esc(n.id)}</b> <span class="muted">${esc(n.ip || "")}</span></div>`).join("");
+  const retrain = CAPS.emit
+    ? `<div><button class="mini" onclick="actRetrain()">reentrenar</button> <span id="ww-status" class="muted"></span></div>` : "";
   $("wakeword-body").innerHTML =
     `<div>${stIcon} entrenamiento <b>${esc(st)}</b></div>`
     + `<div><b>${ww.false_positives_24h ?? "—"}</b> falsos pos. 24h</div>`
-    + (nodes || `<div class="muted">sin nodos</div>`);
+    + (nodes || `<div class="muted">sin nodos</div>`)
+    + retrain;
 }
 
 function renderPanels(state) {
@@ -350,9 +421,12 @@ function renderPanels(state) {
     const ver = t.version ? `<span class="muted">${esc(t.version)}</span>` : "";
     const upd = t.behind ? ` <span class="warn">⬆ desactualizado</span>` : "";
     const rms = n.rms != null ? ` · rms ${n.rms}` : "";
-    return `<div class="tile"><b>${dot(n.online)} ${esc(n.id)}</b>`
+    const id = esc(n.id);
+    const act = CAPS.emit
+      ? `<span><button class="mini" onclick="actReboot('${id}')">reiniciar</button> <span id="pan-${id}" class="muted"></span></span>` : "";
+    return `<div class="tile"><b>${dot(n.online)} ${id}</b>`
       + `<span>${esc(n.ip || "sin ip")}${rms}</span>`
-      + `<span>${ver}${upd}</span></div>`;
+      + `<span>${ver}${upd}</span>${act}</div>`;
   }).join("") + `</div>` : `<span class="muted">sin paneles registrados</span>`;
 }
 
@@ -367,15 +441,34 @@ async function refresh() {
   try {
     const { state } = await api("/api/state");
     if (!state) { $("updated").textContent = "sin datos del Brain todavía"; return; }
+    LAST_STATE = state;
     $("updated").textContent = "snapshot: " + (state.ts || "?");
     renderSummary(state);
+    const SVC_UNIT = { core: "capitan-core", backoffice: "capitan-backoffice", wa: "capitan-wa", ear: "capitan-ear" };
     $("services").innerHTML = Object.entries(state.services || {})
-      .map(([k, v]) => `<div>${dot(v.up)} <b>${k}</b> <span class="muted">${esc(v.detail || "")}</span></div>`).join("");
+      .map(([k, v]) => {
+        const unit = SVC_UNIT[k];
+        const act = (CAPS.emit && unit)
+          ? ` <button class="mini" onclick="actRestart('${unit}')">reiniciar</button>`
+            + ` <span id="svc-${unit}" class="muted"></span>` : "";
+        return `<div>${dot(v.up)} <b>${k}</b> <span class="muted">${esc(v.detail || "")}</span>${act}</div>`;
+      }).join("");
     const L = state.latency || {};
     $("latency").innerHTML = ["stt_ms", "llm_ms", "haos_ms"]
       .map(k => `<div><b>${k.replace("_ms","").toUpperCase()}</b> ${L[k] ?? "—"}</div>`).join("");
     $("agents").innerHTML = (state.agents || [])
-      .map(a => `<div>${dot(a.active)} <b>${esc(a.id)}</b>${a.proactive ? " ⚡" : ""}</div>`).join("");
+      .map(a => {
+        const id = esc(a.id);
+        let act = "";
+        if (CAPS.emit) {
+          const toggle = a.active
+            ? `<button class="mini" onclick="actToggle('${id}','planned')">desactivar</button>`
+            : `<button class="mini" onclick="actToggle('${id}','active')">activar</button>`;
+          const proa = a.proactive ? ` <button class="mini" onclick="actProactive('${id}')">correr</button>` : "";
+          act = ` ${toggle}${proa} <span id="act-${id}" class="muted"></span>`;
+        }
+        return `<div>${dot(a.active)} <b>${id}</b>${a.proactive ? " ⚡" : ""}${act}</div>`;
+      }).join("");
     renderWakeword(state.wakeword || {});
     renderPanels(state);
     renderVersions(state.versions || {});
@@ -462,34 +555,119 @@ async function loadMetrics() {
     `<td>${mFmt(a.avg_latency_ms)}</td></tr>`).join("");
 }
 
-async function loadCatalog() {
-  const { catalog } = await api("/api/catalog");
-  $("cmd-type").innerHTML = catalog.map(c => `<option value="${c.type}">${c.type}</option>`).join("");
+// ── Formulario tipado de comandos (37.5) ──────────────────────────────────────
+// Renderiza widgets desde la metadata de presentación de /api/catalog (kind/label/choices/
+// min/max/default). Reemplaza el viejo <select> + textarea JSON.
+let CATALOG_BY_TYPE = {};
+
+// Pobla un selector de entidad (node/user/agent) desde el último snapshot.
+function entityChoices(kind) {
+  const s = LAST_STATE || {};
+  if (kind === "node")  return ((s.wakeword || {}).nodes || []).map(n => n.id);
+  if (kind === "user")  return (s.users_summary || []).map(u => u.id);
+  if (kind === "agent") return (s.agents || []).map(a => a.id);
+  return [];
 }
 
-$("emit").onsubmit = async (e) => {
-  e.preventDefault();
-  let params = {};
-  try { params = $("cmd-params").value ? JSON.parse($("cmd-params").value) : {}; }
-  catch { $("emit-msg").textContent = "params JSON inválido"; return; }
-  try {
-    const { command } = await api("/api/commands", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: $("cmd-type").value, params }),
-    });
-    $("emit-msg").textContent = "comando encolado";
-    $("cmd-params").value = "";
-    if (command && command.id && CAPS.view_full) streamCommand(command.id);
-    refresh();
-  } catch (e) { $("emit-msg").textContent = "error: " + e.message; }
+function fieldWidget(p) {
+  const id = "f-" + p.name;
+  const opt = (vals, withEmpty) =>
+    (withEmpty && !p.required ? `<option value="">— sin especificar —</option>` : "")
+    + vals.map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join("");
+  let w;
+  switch (p.kind) {
+    case "enum":
+      w = `<select id="${id}">${opt(p.choices || [], true)}</select>`; break;
+    case "node": case "user": case "agent":
+      w = `<select id="${id}">${opt(entityChoices(p.kind), true)}</select>`; break;
+    case "multi":
+      w = `<div id="${id}" class="checks">` + (p.choices || []).map(v =>
+        `<label class="chk"><input type="checkbox" value="${esc(v)}"> ${esc(v)}</label>`).join("") + `</div>`; break;
+    case "bool":
+      w = `<label class="chk"><input type="checkbox" id="${id}" ${p.default ? "checked" : ""}> sí</label>`; break;
+    case "int":
+      w = `<input id="${id}" type="number"${p.min != null ? ` min="${p.min}"` : ""}`
+        + `${p.max != null ? ` max="${p.max}"` : ""}${p.default != null ? ` value="${p.default}"` : ""}>`; break;
+    default:
+      w = `<input id="${id}" type="text" placeholder="${esc(p.label)}">`;
+  }
+  const req = p.required ? ` <span class="req">*</span>` : "";
+  return `<div class="field"><label>${esc(p.label)}${req}</label>${w}</div>`;
+}
+
+function renderFields() {
+  const cmd = CATALOG_BY_TYPE[$("cmd-type").value];
+  $("cmd-desc").textContent = cmd ? `Emite ${cmd.type}` + (DESTRUCTIVE.has(cmd.type) ? " · pide confirmación" : "") : "";
+  $("cmd-fields").innerHTML = (cmd && cmd.params || []).map(fieldWidget).join("")
+    || `<p class="muted">Sin parámetros.</p>`;
+}
+
+function collectParams() {
+  const cmd = CATALOG_BY_TYPE[$("cmd-type").value];
+  const params = {};
+  for (const p of (cmd.params || [])) {
+    const el = $("f-" + p.name);
+    if (p.kind === "multi") {
+      const vals = [...el.querySelectorAll("input:checked")].map(c => c.value);
+      if (vals.length) params[p.name] = vals;
+    } else if (p.kind === "bool") {
+      if (el.checked || p.required) params[p.name] = el.checked;
+    } else if (p.kind === "int") {
+      if (el.value !== "") params[p.name] = parseInt(el.value, 10);
+    } else {
+      if (el.value !== "") params[p.name] = el.value;
+    }
+  }
+  return params;
+}
+
+async function loadCatalog() {
+  const { catalog } = await api("/api/catalog");
+  CATALOG_BY_TYPE = {};
+  catalog.forEach(c => { CATALOG_BY_TYPE[c.type] = c; });
+  $("cmd-type").innerHTML = catalog.map(c => `<option value="${esc(c.type)}">${esc(c.label)}</option>`).join("");
+  renderFields();
+}
+
+$("cmd-type").onchange = renderFields;
+$("cmd-emit").onclick = () => {
+  const type = $("cmd-type").value;
+  runCommand(type, collectParams(),
+    { label: (CATALOG_BY_TYPE[type] || {}).label || type, status: $("emit-msg"), log: true });
 };
+
+// ── Logs: emite logs.tail y polea el resultado ya ejecutado por el bridge ──────
+$("logs-fetch").onclick = async () => {
+  const service = $("logs-service").value;
+  const lines = parseInt($("logs-lines").value, 10) || 100;
+  $("logs-status").textContent = "solicitando…";
+  await runCommand("logs.tail", { service, lines }, { label: "Traer logs", status: $("logs-status") });
+  // Poll del resultado por /api/logs (el último logs.tail ejecutado).
+  for (let i = 0; i < 40; i++) {
+    await new Promise(r => setTimeout(r, 1500));
+    let log;
+    try { ({ log } = await api("/api/logs")); } catch { break; }
+    if (log && (log.status === "done" || log.status === "error")) {
+      const r = log.result || {};
+      $("logs-output").textContent = r.ok ? (r.output || "(vacío)") : ("error: " + (r.error || ""));
+      $("logs-output").classList.remove("hidden");
+      $("logs-status").textContent = "";
+      return;
+    }
+  }
+};
+
+function fillLogsServices() {
+  const svc = (CATALOG_BY_TYPE["logs.tail"] || {}).params || [];
+  const p = svc.find(x => x.name === "service");
+  if (p) $("logs-service").innerHTML = (p.choices || []).map(s => `<option>${esc(s)}</option>`).join("");
+}
 
 // D5: polea el progreso del comando (logs en vivo del deploy) y lo muestra en streaming hasta
 // que termina (done/error). Reusa /api/commands/{id} (gated por view_full, igual que la auditoría).
-async function streamCommand(id) {
-  const log = $("cmd-log");
-  log.textContent = ""; show("cmd-log");
+async function streamCommand(id, logEl) {
+  const log = logEl || $("cmd-log");
+  log.textContent = ""; log.classList.remove("hidden");
   for (let i = 0; i < 600; i++) {   // ~10 min de techo
     let cmd;
     try { ({ command: cmd } = await api("/api/commands/" + id)); }
@@ -530,7 +708,7 @@ auth.onAuthStateChanged(async (user) => {
   hide("login"); show("app");
   renderNav();
   route();           // respeta el hash actual si la cap lo permite, si no cae al primero
-  if (CAPS.emit) { try { await loadCatalog(); } catch (e) {} }
+  if (CAPS.emit) { try { await loadCatalog(); fillLogsServices(); } catch (e) {} }
   refresh();
   timer = setInterval(async () => { idToken = await user.getIdToken(); refresh(); }, 10000);
 });
