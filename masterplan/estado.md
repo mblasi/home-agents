@@ -3437,7 +3437,7 @@ Objetivo: Llevar el backoffice cloud (FASE 33) de una única página SPA con tar
           el backoffice cloud debe ser mobile-friendly (responsive, mobile-first), ya que
           el acceso remoto egress-only es típicamente desde el celular — toda sección,
           sidebar y formulario de comandos debe funcionar y ser usable en pantalla chica.
-Estado:   EN CURSO (8/13 — hecho 37.1-37.8; pendientes 37.9-37.12).
+Estado:   EN CURSO (9/13 — hecho 37.1-37.8 + 37.12-mobile; pendientes 37.9-37.11, 37.12-voiceid).
 Deps:     FASE 33 (backoffice cloud + bridge egress-only + RBAC — COMPLETA, base a extender),
           FASE 35 (dashboards de métricas — COMPLETA, ya viven en el cloud),
           FASE 34 (deploy remoto — la sección Deploy del sidebar consume su versión reportada).
@@ -3517,11 +3517,13 @@ PREMISA TRANSVERSAL DE UX (comandos): TODO lo relativo a comandos invocables —
             confirmación en destructivas y feedback inline del estado; formularios tipados para
             comandos sin entidad-ancla (ej. logs.tail), renderizados desde la metadata de
             presentación de `/api/catalog`. Elimina `#cmd-params` JSON.
-- [ ] 37.12 Mobile-friendly: el SPA (sidebar, secciones y formularios de comandos) debe ser
+- [x] 37.12 Mobile-friendly: el SPA (sidebar, secciones y formularios de comandos) debe ser
             responsive/mobile-first. Sidebar colapsable a drawer en viewport chico, tablas y
             charts (Chart.js) que se reflowan sin scroll horizontal, targets táctiles
             adecuados, sin layout roto en portrait. Verificar las vistas clave en ancho de
             celular. Premisa transversal de la fase, no una sección aparte.
+            (Drawer+scrim y reflow ya en 37.3; acá: tablas anchas scrollean dentro de su card,
+            targets táctiles más grandes. Verificación visual en navegador queda al desplegar.)
 
 #### Etapa C - Backend cloud
 - [x] 37.6  Endpoints `/api/alerts` y `/api/logs` (poll del resultado de `logs.tail`); ampliar
