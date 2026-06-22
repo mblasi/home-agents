@@ -40,9 +40,16 @@ Bridge (Brain → nube, auth OIDC de la SA del bridge):
 - `POST /commands/{id}/result` — resultado de ejecución.
 
 Dashboard (navegador → nube, auth Firebase + allow-list email):
-- `GET  /api/state` · `GET /api/commands` · `GET /api/catalog`
+- `GET  /api/state` · `GET /api/commands` · `GET /api/catalog` · `GET /api/me`
+- `GET  /api/alerts` (access) · `GET /api/logs` (emit, poll del último logs.tail/satellite)
 - `POST /api/commands` — emite un comando validado contra el catálogo.
-- `GET  /` — dashboard.
+- `GET  /` — dashboard SPA (sidebar + secciones, mobile-first; FASE 37).
+
+El frontend es un **SPA con sidebar** (Monitoreo / Sistema / Administración), router por hash y
+secciones gated por capacidad (`access`/`view_full`/`view_pii`/`emit`). La UI de comandos es
+final-user: acciones contextuales por entidad + formularios tipados desde `/api/catalog` (sin JSON
+crudo). `/api/catalog` enriquece cada parámetro con metadata de presentación
+(`kind`/`label`/`choices`/`min`/`max`/`default`) sin tocar `validate_command`.
 
 ## Deploy de servicios (FASE 34)
 
