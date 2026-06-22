@@ -84,6 +84,39 @@ def test_snapshot_maps_agents_and_nodes():
     assert snap["users_summary"][0]["intents_pending"] == 1
 
 
+# ── FASE 37.7: campos nuevos del snapshot (alerts, counts, wakeword.status) ──────
+
+def test_snapshot_emits_new_fields_and_validates():
+    from app.models import StateSnapshot
+
+    def fake_get(url, timeout=4):
+        if url.endswith("/alerts/recent"):       return ["doc vence", "lluvia fuerte"]
+        if url.endswith("/wakeword/train/status"): return {"status": "running"}
+        if url.endswith("/intents"):              return [{"user_id": "m"}, {"user_id": "j"}]
+        if url.endswith("/goals"):                return [{"id": "g1"}]
+        if url.endswith("/routines"):             return [{"id": "r1"}, {"id": "r2"}, {"id": "r3"}]
+        if url.endswith("/conversations"):        return [{"id": "c1"}]
+        return None
+
+    with patch.object(snapshot, "_get", fake_get), \
+         patch.object(snapshot, "_systemctl_active", lambda u: False):
+        snap = snapshot.build_snapshot()
+    assert snap["alerts"] == ["doc vence", "lluvia fuerte"]
+    assert snap["wakeword"]["status"] == "running"
+    assert snap["counts"] == {"intents": 2, "goals": 1, "routines": 3, "conversations": 1}
+    # No usa el endpoint destructivo /alerts (drain): sólo /alerts/recent (peek).
+    StateSnapshot(**snap)   # el shape del bridge valida contra el contrato de la nube
+
+
+def test_snapshot_new_fields_default_when_down():
+    with patch.object(snapshot, "_get", lambda *a, **k: None), \
+         patch.object(snapshot, "_systemctl_active", lambda u: False):
+        snap = snapshot.build_snapshot()
+    assert snap["alerts"] == []
+    assert snap["counts"] == {"intents": 0, "goals": 0, "routines": 0, "conversations": 0}
+    assert snap["wakeword"]["status"] == "idle"
+
+
 # ── metrics_snapshot (FASE 35.5) ────────────────────────────────────────────────
 
 import metrics_snapshot  # noqa: E402

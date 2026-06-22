@@ -90,9 +90,11 @@ def _nodes() -> list[dict]:
 
 def _wakeword(nodes: list[dict]) -> dict:
     fps = [n.get("fp", 0) for n in nodes]
+    status = (_get(f"{CORE_URL}/wakeword/train/status") or {}).get("status", "idle")
     return {
         "last_score": None,  # no expuesto por el audio_server actual
         "false_positives_24h": sum(fps) if fps else None,
+        "status": status,    # estado del último retrain (FASE 37.1/37.7)
         "nodes": [
             {
                 "id": n.get("node_id", n.get("room", "?")),
@@ -246,6 +248,27 @@ def _versions(nodes: list[dict]) -> dict:
     return out
 
 
+def _alerts() -> list[str]:
+    """Alertas recientes SIN consumir la cola (FASE 37.7): usa /alerts/recent (peek), no
+    /alerts (drain) — drenar le robaría alertas al satélite que las lee por TTS."""
+    data = _get(f"{CORE_URL}/alerts/recent")
+    return [str(a) for a in data][:RECENT_LIMIT] if isinstance(data, list) else []
+
+
+def _counts() -> dict:
+    """Conteos agregados (sin contenido PII en claro, FASE 37.1): sólo el largo de cada lista
+    admin que el core ya expone. Nunca sale texto de intents/goals/rutinas/conversaciones."""
+    def _len(path: str) -> int:
+        d = _get(f"{CORE_URL}{path}")
+        return len(d) if isinstance(d, list) else 0
+    return {
+        "intents":       _len("/intents"),
+        "goals":         _len("/goals"),
+        "routines":      _len("/routines"),
+        "conversations": _len("/conversations"),
+    }
+
+
 def build_snapshot() -> dict:
     """Arma el snapshot completo. Nunca lanza: campos faltantes quedan vacíos."""
     nodes = _nodes()
@@ -260,4 +283,6 @@ def build_snapshot() -> dict:
         "wakeword": _wakeword(nodes),
         "users_summary": _users(),
         "versions": _versions(nodes),
+        "alerts": _alerts(),
+        "counts": _counts(),
     }
