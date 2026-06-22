@@ -17,6 +17,14 @@ def test_minimal_metrics_snapshot_validates():
     assert d["schema_version"] == METRICS_SCHEMA_VERSION
     assert d["window_hours"] == 24
     assert d["voice_summary"] == {} and d["llm_by_model"] == []
+    assert d["voice_conf_series"] == {}   # FASE 37.12
+
+
+def test_metrics_snapshot_carries_voice_conf_series():
+    snap = MetricsSnapshot(ts="2026-06-21T00:00:00Z", voice_conf_series={
+        "labels": [1, 2], "series": [{"name": "known_conf", "data": [0.8, 0.85]},
+                                      {"name": "threshold", "data": [0.6, 0.6]}]})
+    assert snap.voice_conf_series["series"][0]["name"] == "known_conf"
 
 
 def test_ts_required():

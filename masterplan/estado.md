@@ -3437,7 +3437,7 @@ Objetivo: Llevar el backoffice cloud (FASE 33) de una única página SPA con tar
           el backoffice cloud debe ser mobile-friendly (responsive, mobile-first), ya que
           el acceso remoto egress-only es típicamente desde el celular — toda sección,
           sidebar y formulario de comandos debe funcionar y ser usable en pantalla chica.
-Estado:   EN CURSO (9/13 — hecho 37.1-37.8 + 37.12-mobile; pendientes 37.9-37.11, 37.12-voiceid).
+Estado:   EN CURSO (10/13 — hecho 37.1-37.8 + 37.12-mobile + 37.12-voiceid; pendientes 37.9-37.11).
 Deps:     FASE 33 (backoffice cloud + bridge egress-only + RBAC — COMPLETA, base a extender),
           FASE 35 (dashboards de métricas — COMPLETA, ya viven en el cloud),
           FASE 34 (deploy remoto — la sección Deploy del sidebar consume su versión reportada).
@@ -3570,7 +3570,7 @@ PREMISA TRANSVERSAL DE UX (comandos): TODO lo relativo a comandos invocables —
             Egress-only: viaja por el push de métricas existente (`cloud/bridge/metrics_snapshot.py`
             → `POST /ingest/metrics`), sin inbound. Tests de ingesta/serie/prune y del relay con
             HTTP mockeado.
-- [ ] 37.12 Visualizar el comportamiento del VOICE-ID (`speaker_conf`) vs `SPEAKER_THRESHOLD` a lo
+- [x] 37.12 Visualizar el comportamiento del VOICE-ID (`speaker_conf`) vs `SPEAKER_THRESHOLD` a lo
             largo del tiempo, en Métricas de ambos backoffices. El dato YA se persiste por evento
             en `voice_metrics.speaker_conf` (lo empuja `audio_server` en cada tp/fp); falta (a)
             exponer el `SPEAKER_THRESHOLD` vigente (no se guarda con el evento — sumarlo al evento
