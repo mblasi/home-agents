@@ -182,6 +182,16 @@ match laxo de `get_pending_request`. El fast_classifier (4) es una aproximación
 bias, pero necesita guard de ambigüedad. Cierre (3) y ack (3b) son housekeeping pero deben acotarse
 para no dispararse sobre comandos reales. Las etapas B–E de FASE 40 corrigen en ese orden.
 
+**Etapa B — fix del secuestro de captura (40.2/40.3, resuelto).** `get_pending_request`
+(`intent_state.py`) pasa a **match estricto** por `conversation_id`: un request sin
+`conversation_id` (o de otra conversación) ya no matchea — muere el hijack cross-canal. Las
+capturas 3c (`server.py`) y W4 (`wa_inbound`) sólo proceden si la conversación está **esperando un
+reply** (`ContinuationState.kind == "reply"`, FASE 36) y limpian la continuación al capturar. Los
+request proactivos **sellan su `conversation_id` al entregarse** (`proactive._seal_request_to_wa_conversation`
+fija el id de la conversación canónica de WhatsApp y la marca a la espera del reply); los reactivos
+lo sellan al `conversation_id` del turno (`apply_agent_updates`). La pregunta "¿esto es la respuesta
+o un comando nuevo dentro de la MISMA conversación?" queda para la Etapa C (40.4).
+
 #### Persistencia de datos (SQLite — FASE 32)
 
 Toda la data del sistema vive en **`~/.local/share/capitan/capitan.db`** (SQLite) vía
