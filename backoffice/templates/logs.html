@@ -16,9 +16,25 @@
   </div>
 </div>
 
-<div class="bg-gray-950 border border-gray-800 rounded-xl p-4 h-[calc(100vh-220px)] overflow-y-auto font-mono text-xs"
+<div class="bg-gray-950 border border-gray-800 rounded-xl p-4 h-[calc(100vh-340px)] overflow-y-auto font-mono text-xs mb-4"
      id="log-container">
   <div class="text-gray-600">Conectando…</div>
+</div>
+
+<!-- Log del satélite por panel (FASE 37.10) -->
+<div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+  <div class="flex items-center gap-2 mb-3 text-sm flex-wrap">
+    <span class="text-gray-400 font-semibold">Log de satélite</span>
+    <select id="sat-node" class="bg-gray-800 border border-gray-700 rounded px-2 py-1">
+      {% for n in nodes %}<option value="{{ n }}">{{ n }}</option>{% endfor %}
+      {% if not nodes %}<option value="">(sin paneles)</option>{% endif %}
+    </select>
+    <label class="text-gray-500">líneas <input id="sat-lines" type="number" min="1" max="500" value="100"
+           class="bg-gray-800 border border-gray-700 rounded px-2 py-1 w-20"></label>
+    <button onclick="fetchSatLog()" class="text-xs px-3 py-1.5 rounded-lg border border-gray-700 text-gray-300 hover:text-white">Traer log</button>
+    <span id="sat-status" class="text-gray-500 text-xs"></span>
+  </div>
+  <pre id="sat-log" class="bg-gray-950 border border-gray-800 rounded p-3 overflow-auto font-mono text-xs max-h-80 hidden"></pre>
 </div>
 
 <script>
@@ -57,6 +73,23 @@ function startStream(filter) {
     div.textContent = '— stream desconectado —';
     container.appendChild(div);
   };
+}
+
+// Log del satélite por panel (37.10): fetch one-shot al proxy del backoffice.
+async function fetchSatLog() {
+  const node = document.getElementById('sat-node').value;
+  const lines = parseInt(document.getElementById('sat-lines').value, 10) || 100;
+  const status = document.getElementById('sat-status');
+  const pre = document.getElementById('sat-log');
+  if (!node) { status.textContent = 'no hay paneles'; return; }
+  status.textContent = 'trayendo…';
+  try {
+    const r = await fetch(`/logs/satellite/${encodeURIComponent(node)}?lines=${lines}`);
+    const data = await r.json();
+    pre.textContent = r.ok ? (data.log || '(vacío)') : ('error: ' + (data.detail || r.status));
+  } catch (e) { pre.textContent = 'error: ' + e.message; }
+  pre.classList.remove('hidden');
+  status.textContent = '';
 }
 
 // Iniciar con "all" activo

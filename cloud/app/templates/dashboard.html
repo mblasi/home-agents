@@ -92,15 +92,24 @@
       <!-- ── Logs ────────────────────────────────────────────── -->
       <section class="view" data-view="logs">
         <div class="card">
-          <h2>Logs</h2>
+          <h2>Logs de servicio</h2>
           <div class="form-row">
             <label>Servicio <select id="logs-service"></select></label>
             <label>Líneas <input id="logs-lines" type="number" min="1" max="500" value="100"></label>
             <button id="logs-fetch">Traer logs</button>
             <span id="logs-status" class="muted"></span>
           </div>
-          <pre id="logs-output" class="cmd-log hidden"></pre>
         </div>
+        <div class="card">
+          <h2>Log de satélite (panel)</h2>
+          <div class="form-row">
+            <label>Panel <select id="logs-node"></select></label>
+            <label>Líneas <input id="logs-node-lines" type="number" min="1" max="500" value="100"></label>
+            <button id="logs-node-fetch">Traer log</button>
+            <span id="logs-node-status" class="muted"></span>
+          </div>
+        </div>
+        <pre id="logs-output" class="cmd-log hidden"></pre>
       </section>
 
       <!-- ── Actividad ───────────────────────────────────────── -->
@@ -250,6 +259,7 @@ function route() {
   // Re-render del form tipado al entrar a Acciones: los selectores de entidad se pueblan del
   // último snapshot, ya disponible cuando el usuario navega.
   if (id === "acciones" && Object.keys(CATALOG_BY_TYPE).length) renderFields();
+  if (id === "logs" && CAPS.emit) fillLogsNodes();   // paneles del último snapshot
   closeDrawer();
 }
 window.addEventListener("hashchange", route);
@@ -650,13 +660,11 @@ $("cmd-emit").onclick = () => {
     { label: (CATALOG_BY_TYPE[type] || {}).label || type, status: $("emit-msg"), log: true });
 };
 
-// ── Logs: emite logs.tail y polea el resultado ya ejecutado por el bridge ──────
-$("logs-fetch").onclick = async () => {
-  const service = $("logs-service").value;
-  const lines = parseInt($("logs-lines").value, 10) || 100;
-  $("logs-status").textContent = "solicitando…";
-  await runCommand("logs.tail", { service, lines }, { label: "Traer logs", status: $("logs-status") });
-  // Poll del resultado por /api/logs (el último logs.tail ejecutado).
+// ── Logs: emite el comando y polea el resultado ya ejecutado por el bridge ─────
+async function fetchLogs(type, params, statusEl) {
+  statusEl.textContent = "solicitando…";
+  await runCommand(type, params, { label: "Traer logs", status: statusEl });
+  // Poll del resultado por /api/logs (el último logs.tail/logs.satellite ejecutado).
   for (let i = 0; i < 40; i++) {
     await new Promise(r => setTimeout(r, 1500));
     let log;
@@ -665,16 +673,35 @@ $("logs-fetch").onclick = async () => {
       const r = log.result || {};
       $("logs-output").textContent = r.ok ? (r.output || "(vacío)") : ("error: " + (r.error || ""));
       $("logs-output").classList.remove("hidden");
-      $("logs-status").textContent = "";
+      statusEl.textContent = "";
       return;
     }
   }
+}
+
+$("logs-fetch").onclick = () => fetchLogs("logs.tail",
+  { service: $("logs-service").value, lines: parseInt($("logs-lines").value, 10) || 100 },
+  $("logs-status"));
+
+$("logs-node-fetch").onclick = () => {
+  const node_id = $("logs-node").value;
+  if (!node_id) { $("logs-node-status").textContent = "no hay paneles"; return; }
+  fetchLogs("logs.satellite",
+    { node_id, lines: parseInt($("logs-node-lines").value, 10) || 100 }, $("logs-node-status"));
 };
 
 function fillLogsServices() {
   const svc = (CATALOG_BY_TYPE["logs.tail"] || {}).params || [];
   const p = svc.find(x => x.name === "service");
   if (p) $("logs-service").innerHTML = (p.choices || []).map(s => `<option>${esc(s)}</option>`).join("");
+}
+
+// Pobla el selector de paneles del log de satélite desde el último snapshot.
+function fillLogsNodes() {
+  const nodes = entityChoices("node");
+  $("logs-node").innerHTML = nodes.length
+    ? nodes.map(n => `<option>${esc(n)}</option>`).join("")
+    : `<option value="">(sin paneles)</option>`;
 }
 
 // D5: polea el progreso del comando (logs en vivo del deploy) y lo muestra en streaming hasta

@@ -3437,7 +3437,7 @@ Objetivo: Llevar el backoffice cloud (FASE 33) de una única página SPA con tar
           el backoffice cloud debe ser mobile-friendly (responsive, mobile-first), ya que
           el acceso remoto egress-only es típicamente desde el celular — toda sección,
           sidebar y formulario de comandos debe funcionar y ser usable en pantalla chica.
-Estado:   EN CURSO (10/13 — hecho 37.1-37.8 + 37.12-mobile + 37.12-voiceid; pendientes 37.9-37.11).
+Estado:   EN CURSO (11/13 — hecho 37.1-37.8, 37.10, 37.12-mobile, 37.12-voiceid; pendientes 37.9, 37.11).
 Deps:     FASE 33 (backoffice cloud + bridge egress-only + RBAC — COMPLETA, base a extender),
           FASE 35 (dashboards de métricas — COMPLETA, ya viven en el cloud),
           FASE 34 (deploy remoto — la sección Deploy del sidebar consume su versión reportada).
@@ -3540,7 +3540,7 @@ PREMISA TRANSVERSAL DE UX (comandos): TODO lo relativo a comandos invocables —
             invocando las APIs/scripts del Brain ya existentes.
 
 #### Etapa F - Logs del satélite por panel (ambos backoffices)
-- [ ] 37.10 Ver los logs del satélite de CADA panel en LOS DOS backoffices (local LAN + cloud
+- [x] 37.10 Ver los logs del satélite de CADA panel en LOS DOS backoffices (local LAN + cloud
             egress-only). El log vive en el panel (`~/.satellite.log` en Termux). Mecanismo único
             reutilizable "traer N líneas del satélite del panel X" (ssh a Termux:8022 desde el
             Brain, o relay vía `audio_server`), invocado por: (a) backoffice local con selector de

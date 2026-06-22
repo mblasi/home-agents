@@ -55,6 +55,21 @@ def _logs_tail(p: dict) -> ExecResult:
     return _run(["journalctl", "--user", "-u", p["service"], "-n", lines, "--no-pager"], timeout=15)
 
 
+def _logs_satellite(p: dict) -> ExecResult:
+    """FASE 37.10: log del satélite de un panel. No duplica el fetch: llama al audio_server
+    (fuente única, que hace el ssh a Termux)."""
+    lines = int(p.get("lines", 100))
+    try:
+        r = requests.get(f"{AUDIO_URL}/nodes/{p['node_id']}/satellite-log",
+                         params={"lines": lines}, timeout=20)
+        if r.status_code != 200:
+            detail = (r.json().get("detail") if r.headers.get("content-type", "").startswith("application/json") else r.text)
+            return ExecResult(False, "", f"audio_server {r.status_code}: {str(detail)[:200]}")
+        return ExecResult(True, r.json().get("log", ""))
+    except Exception as exc:  # noqa: BLE001
+        return ExecResult(False, "", f"no se pudo traer el log del panel: {exc}")
+
+
 def _run_engine(services, repo_refs, emit=None) -> ExecResult:
     """Invoca el MOTOR único de deploy (FASE 34). El executor NO reimplementa lógica de deploy:
     sólo traduce comando→args, corre el motor in-process (el bridge corre EN el Brain) y reporta
@@ -212,6 +227,7 @@ HANDLERS = {
     "service.restart": _service_restart,
     "service.status": _service_status,
     "logs.tail": _logs_tail,
+    "logs.satellite": _logs_satellite,
     "deploy.run": _deploy_run,
     "deploy.release": _deploy_release,
     "deploy.cloud": _deploy_cloud,
