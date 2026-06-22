@@ -3437,7 +3437,7 @@ Objetivo: Llevar el backoffice cloud (FASE 33) de una única página SPA con tar
           el backoffice cloud debe ser mobile-friendly (responsive, mobile-first), ya que
           el acceso remoto egress-only es típicamente desde el celular — toda sección,
           sidebar y formulario de comandos debe funcionar y ser usable en pantalla chica.
-Estado:   EN CURSO (5/13 — hecho 37.1-37.4, 37.6; pendientes 37.5, 37.7-37.12).
+Estado:   EN CURSO (6/13 — hecho 37.1-37.6; pendientes 37.7-37.12).
 Deps:     FASE 33 (backoffice cloud + bridge egress-only + RBAC — COMPLETA, base a extender),
           FASE 35 (dashboards de métricas — COMPLETA, ya viven en el cloud),
           FASE 34 (deploy remoto — la sección Deploy del sidebar consume su versión reportada).
@@ -3512,7 +3512,7 @@ PREMISA TRANSVERSAL DE UX (comandos): TODO lo relativo a comandos invocables —
 - [x] 37.4  Secciones: Resumen, Servicios, Métricas, Alertas, Logs, Agentes, Actividad, Wake
             word, Paneles, Usuarios, Deploy, Auditoría. Cada vista gated por capacidad.
             (Logs queda como placeholder gated hasta el endpoint de 37.6.)
-- [ ] 37.5  Interfaz de comandos contextual (reemplaza el `<select>` + input JSON): acciones
+- [x] 37.5  Interfaz de comandos contextual (reemplaza el `<select>` + input JSON): acciones
             por entidad (restart/toggle/reboot/retrain/reload/run) con widgets propios,
             confirmación en destructivas y feedback inline del estado; formularios tipados para
             comandos sin entidad-ancla (ej. logs.tail), renderizados desde la metadata de

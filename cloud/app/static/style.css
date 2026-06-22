@@ -82,7 +82,16 @@ input, select {
   border-radius: 6px; padding: 8px; font-size: 14px;
 }
 form { display: flex; gap: 8px; flex-wrap: wrap; }
-#cmd-params { flex: 1; min-width: 240px; }
+
+/* ── Formularios tipados de comandos (37.5) ────────────────────────────────── */
+.form-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 8px 0; }
+.form-row label { display: flex; gap: 6px; align-items: center; font-size: 13px; }
+.cmd-fields { display: flex; flex-direction: column; gap: 12px; margin: 12px 0; }
+.field { display: flex; flex-direction: column; gap: 4px; max-width: 420px; }
+.field > label { font-size: 13px; color: var(--muted); }
+.req { color: #f0a020; }
+.checks { display: flex; gap: 12px; flex-wrap: wrap; }
+.chk { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; }
 .cmd-log { background:#0d1117; color:#cfc; padding:8px; border-radius:6px; max-height:320px;
   overflow:auto; font-size:12px; white-space:pre-wrap; }
 .advanced { margin-top: 8px; }
