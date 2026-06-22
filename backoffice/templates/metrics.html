@@ -225,11 +225,16 @@ async function loadLLM() {
     getJSON("/api/metrics/llm/by-agent?" + qs(extra)),
   ]);
   const rq = sum.requests || {}, lc = sum.llm_calls || {};
+  const bp = sum.bypass || {}, bt = bp.by_type || {};
+  const rate = t => fmtPct((bt[t] || {}).rate);
   $("llm-cards").innerHTML =
     card("Requests", fmtNum(rq.requests)) +
     card("Lat. total", rq.avg_total_latency_ms != null ? rq.avg_total_latency_ms + " ms" : "—") +
     card("Lat. coord", rq.avg_coordinator_ms != null ? rq.avg_coordinator_ms + " ms" : "—") +
     card("Fast-path", fmtPct(rq.fast_classifier_rate), "unknown " + fmtPct(rq.unknown_rate)) +
+    card("Bypass del planner", fmtPct(bp.bypass_rate),
+         "cap " + rate("capture") + " · fc " + rate("fast_classifier") +
+         " · close " + rate("close") + " · ack " + rate("ack")) +
     card("LLM calls", fmtNum(lc.calls), "lat " + fmtNum(lc.avg_latency_ms) + " ms") +
     card("Tokens", fmtNum((lc.prompt_tokens||0)+(lc.completion_tokens||0)),
          "p " + fmtNum(lc.prompt_tokens) + " / c " + fmtNum(lc.completion_tokens));

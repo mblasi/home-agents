@@ -211,6 +211,17 @@ de margen** top1-top2 (`CLASSIFIER_MARGIN`): si dos agentes empatan, la elecció
 difiere al planner LLM en vez de que el clasificador decida con poca evidencia (margen en
 `CoordinatorTrace.fast_margin`). Ninguno de los tres decide agente de forma sesgada.
 
+**Etapa E — observabilidad de bypass (40.6, resuelto).** Cada cortocircuito que evita el planner
+queda instrumentado para detectar regresiones de bias: `RequestTrace.bypass` + columna
+`request_metrics.bypass`. `server._record_bypass` marca close/ack/capture (que ocurren antes de
+`new_trace`) y el fast_classifier se deriva del coordinador. `metrics_store.bypass_rates()` expone
+total, requests que pasaron por el planner y conteo+tasa por tipo, vía `GET /metrics/llm/bypass` y
+dentro de `/metrics/llm/summary`. Ambos backoffices web (`/metrics` local y dashboard cloud)
+muestran la **tasa de bypass del planner** con desglose por tipo; un salto en `capture`/
+`fast_classifier` señala que el routing dejó de ser orgánico. Con esto **FASE 40 queda COMPLETA**:
+la elección de agente es siempre producto de la planeación del LLM sobre (prompt + AgentCards), sin
+cortocircuitos deterministas que secuestren el routing.
+
 #### Persistencia de datos (SQLite — FASE 32)
 
 Toda la data del sistema vive en **`~/.local/share/capitan/capitan.db`** (SQLite) vía

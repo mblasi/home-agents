@@ -599,10 +599,14 @@ async function loadMetrics() {
     ["#34d399", "#f87171"]);
 
   const ls = metrics.llm_summary || {}, rq = ls.requests || {}, lc = ls.llm_calls || {};
+  const bp = ls.bypass || {}, bt = bp.by_type || {};
+  const bRate = t => mPct((bt[t] || {}).rate);
   $("m-llm-summary").innerHTML =
     `<div><b>${mFmt(rq.requests)}</b> requests</div><div><b>${rq.avg_total_latency_ms ?? "—"}</b> ms lat</div>` +
     `<div><b>${mPct(rq.fast_classifier_rate)}</b> fast-path</div>` +
-    `<div><b>${mFmt((lc.prompt_tokens||0)+(lc.completion_tokens||0))}</b> tokens</div>`;
+    `<div><b>${mFmt((lc.prompt_tokens||0)+(lc.completion_tokens||0))}</b> tokens</div>` +
+    `<div title="cap ${bRate("capture")} · fc ${bRate("fast_classifier")} · close ${bRate("close")} · ack ${bRate("ack")}">` +
+    `<b>${mPct(bp.bypass_rate)}</b> bypass planner</div>`;
   if (!mLlmChart) mLlmChart = mkMetricChart("m-llm-chart", "line");
   setSeries(mLlmChart, metrics.llm_series || {}, ["#60a5fa", "#fbbf24"]);
 
