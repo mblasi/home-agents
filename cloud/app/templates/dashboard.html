@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Capitán · backoffice en la nube</title>
-  <link rel="stylesheet" href="/static/style.css?v=37">
+  <link rel="stylesheet" href="/static/style.css?v=38">
 </head>
 <body>
 
@@ -436,12 +436,45 @@ function renderPanels(state) {
     const upd = t.behind ? ` <span class="warn">⬆ desactualizado</span>` : "";
     const rms = n.rms != null ? ` · rms ${n.rms}` : "";
     const id = esc(n.id);
+    const cfg = n.config || {};
     const act = CAPS.emit
-      ? `<span><button class="mini" onclick="actReboot('${id}')">reiniciar</button> <span id="pan-${id}" class="muted"></span></span>` : "";
+      ? `<span><button class="mini" onclick="actReboot('${id}')">reiniciar</button>`
+        + ` <button class="mini" onclick="togglePanelCfg('${id}')">configurar</button>`
+        + ` <span id="pan-${id}" class="muted"></span></span>` : "";
+    // FASE 38: form de config contextual (apagado de pantalla + dashboard por defecto), oculto.
+    const curTo = cfg.screen_timeout_secs != null ? cfg.screen_timeout_secs : "";
+    const cfgForm = CAPS.emit
+      ? `<div id="cfg-${id}" class="panel-cfg hidden">`
+        + `<div class="field"><label>Apagar pantalla tras (seg, 0 = nunca)</label>`
+        + `<input id="cfgto-${id}" type="number" min="0" step="5" value="${curTo}" placeholder="120"></div>`
+        + `<div class="field"><label>Dashboard por defecto</label>`
+        + `<select id="cfgdash-${id}">${dashboardOptions(cfg.default_dashboard || "")}</select></div>`
+        + `<div><button class="mini" onclick="savePanelCfg('${id}')">guardar config</button> `
+        + `<span id="pancfg-${id}" class="muted"></span></div></div>` : "";
     return `<div class="tile"><b>${dot(n.online)} ${id}</b>`
       + `<span>${esc(n.ip || "sin ip")}${rms}</span>`
-      + `<span>${ver}${upd}</span>${act}</div>`;
+      + `<span>${ver}${upd}</span>${act}${cfgForm}</div>`;
   }).join("") + `</div>` : `<span class="muted">sin paneles registrados</span>`;
+}
+
+// FASE 38: muestra/oculta el form de config de un panel.
+function togglePanelCfg(id) {
+  const el = $("cfg-" + id);
+  if (el) el.classList.toggle("hidden");
+}
+
+// FASE 38: emite panel.config con lo cargado en el form contextual del panel.
+function savePanelCfg(id) {
+  const to = $("cfgto-" + id).value;
+  const dash = $("cfgdash-" + id).value;
+  const params = { node_id: id };
+  if (to !== "") params.screen_timeout_secs = parseInt(to, 10);
+  if (dash !== "") params.default_dashboard = dash;
+  if (params.screen_timeout_secs == null && !params.default_dashboard) {
+    $("pancfg-" + id).textContent = "nada para guardar";
+    return;
+  }
+  runCommand("panel.config", params, { label: `Configurar ${id}`, status: $("pancfg-" + id) });
 }
 
 function renderUsers(users) {
@@ -608,6 +641,13 @@ function entityChoices(kind) {
   return [];
 }
 
+// Opciones <option> de dashboards de HA (FASE 38), desde el snapshot. value=url, label=título.
+function dashboardOptions(selectedUrl) {
+  const dl = (LAST_STATE || {}).dashboards || [];
+  return `<option value="">— sin cambiar / login default —</option>`
+    + dl.map(d => `<option value="${esc(d.url)}"${d.url === selectedUrl ? " selected" : ""}>${esc(d.title)}</option>`).join("");
+}
+
 function fieldWidget(p) {
   const id = "f-" + p.name;
   const opt = (vals, withEmpty) =>
@@ -619,6 +659,8 @@ function fieldWidget(p) {
       w = `<select id="${id}">${opt(p.choices || [], true)}</select>`; break;
     case "node": case "user": case "agent":
       w = `<select id="${id}">${opt(entityChoices(p.kind), true)}</select>`; break;
+    case "dashboard":   // FASE 38: selector de dashboard de HA (value=url, label=título)
+      w = `<select id="${id}">${dashboardOptions("")}</select>`; break;
     case "multi":
       w = `<div id="${id}" class="checks">` + (p.choices || []).map(v =>
         `<label class="chk"><input type="checkbox" value="${esc(v)}"> ${esc(v)}</label>`).join("") + `</div>`; break;

@@ -59,8 +59,23 @@ graba inline (usando el stream del mic, evita conflicto OpenSLES) y reporta prog
 `POST /enroll-sample` (wake word), `POST /enroll-voice`, `POST /verify-voice`, `GET /wakeword/negatives`,
 `GET /wakeword/model[/version]` (propagación a nodos, 16.17).
 
-**Registro de paneles:** tabla `panels` en SQLite (name/room/ip/node_id/users/area_id, FASE 32).
+**Registro de paneles:** tabla `panels` en SQLite (name/room/ip/node_id/users/area_id/config, FASE 32).
 Alta/provisioning: `scripts/nspanel.sh provision` o backoffice `/panels`.
+
+**Configuración por panel (FASE 38):** cada panel tiene una `config` JSON (columna `panels.config`,
+fuente de verdad en core) administrable desde **ambos backoffices**. Claves iniciales (allow-list,
+extensible): `screen_timeout_secs` (segundos de inactividad para apagar la pantalla; `0` = nunca) y
+`default_dashboard` (deeplink de HA Companion que abre el panel). El **satélite hace PULL** de su
+config —mismo patrón que el auto-update de código/modelo— y la aplica en el dispositivo: el apagado
+de pantalla con el ajuste nativo de Android (`settings put system screen_off_timeout`, vía `su`) y
+el dashboard con `am start -d <url>`. Flujo: el backoffice (local) o el comando `panel.config` (cloud,
+egress-only) upsertan la config en core y marcan el nodo en `audio_server` (`POST /nodes/{id}/config-changed`);
+el próximo heartbeat (~30s) lleva `config_update: true` y el satélite consulta `GET /nodes/{id}/config`
+(proxy de `core /panels/config/{node_id}` + versión md5) y reaplica sólo si cambió. Sin el flag,
+converge igual en el ciclo de sync (`MODEL_SYNC_SECS`) y al arrancar. El selector de dashboard se
+puebla desde `GET /dashboards` (core consulta los dashboards de lovelace por WebSocket
+`lovelace/dashboards/list`, no expuesto en la REST API; cacheado). El satélite es el **único
+aplicador** del dashboard (no se toca `start-ha.sh`, que reescribe `nspanel.sh converge`).
 
 **Ambientes (16.7):** la fuente de verdad de los ambientes son las **áreas de Home Assistant**
 (`ha_client.get_areas()` vía `/api/template`, porque el area registry no está en la REST API de

@@ -62,6 +62,38 @@
                   class="text-xs text-red-400 hover:text-red-300">quitar</button>
         </td>
       </tr>
+      {# FASE 38: configuración del panel (apagado de pantalla + dashboard por defecto) #}
+      {% set cfg = p.config or {} %}
+      <tr class="border-t border-gray-800/50 bg-gray-900/40">
+        <td colspan="6" class="px-4 py-3">
+          <form hx-post="/panels/{{ p.name }}/config" hx-target="#cfg-st-{{ p.name }}"
+                hx-swap="innerHTML" class="flex flex-wrap items-end gap-4">
+            <input type="hidden" name="node_id" value="{{ p.node_id }}">
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">Apagar pantalla tras (seg, 0 = nunca)</label>
+              <input name="screen_timeout_secs" type="number" min="0" step="5"
+                     value="{{ cfg.screen_timeout_secs if cfg.screen_timeout_secs is not none else '' }}"
+                     placeholder="120"
+                     class="w-32 px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-200">
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">Dashboard por defecto</label>
+              <select name="default_dashboard"
+                      class="px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-200">
+                <option value="">— sin cambiar / login default —</option>
+                {% for d in dashboards %}
+                <option value="{{ d.url }}" {% if d.url == cfg.default_dashboard %}selected{% endif %}>{{ d.title }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <button type="submit"
+                    class="px-3 py-1.5 bg-blue-700 hover:bg-blue-600 text-white rounded-lg text-xs font-medium transition-colors">
+              Guardar config
+            </button>
+            <span id="cfg-st-{{ p.name }}" class="text-xs"></span>
+          </form>
+        </td>
+      </tr>
       {% else %}
       <tr><td colspan="6" class="px-4 py-6 text-center text-gray-600">Sin paneles registrados.</td></tr>
       {% endfor %}

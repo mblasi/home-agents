@@ -47,6 +47,9 @@ class WakewordNode(BaseModel):
     ip: str | None = None
     online: bool
     rms: int | None = None
+    # FASE 38: config vigente del panel (no PII): {screen_timeout_secs, default_dashboard}.
+    # Prefila el form de "Configurar panel" en el dashboard cloud.
+    config: dict[str, Any] = Field(default_factory=dict)
 
 
 class Wakeword(BaseModel):
@@ -76,6 +79,14 @@ class UserSummary(BaseModel):
     email: str | None = None   # login_email (identidad de acceso al dashboard), FASE 33.19
 
 
+class Dashboard(BaseModel):
+    """Dashboard de HA (lovelace) para el selector de 'dashboard por defecto' de un panel
+    (FASE 38). `url` es el deeplink que abre la HA Companion."""
+    title: str
+    url_path: str
+    url: str
+
+
 class StateSnapshot(BaseModel):
     """Snapshot que el bridge envía a POST /ingest/state (allow-list de campos)."""
     schema_version: int = SCHEMA_VERSION
@@ -91,6 +102,8 @@ class StateSnapshot(BaseModel):
     # y conteos agregados de intents/goals/rutinas/conversaciones (sin contenido en claro).
     alerts: list[str] = Field(default_factory=list)
     counts: Counts = Field(default_factory=Counts)
+    # FASE 38: dashboards de HA para poblar el selector del comando panel.config (no PII).
+    dashboards: list[Dashboard] = Field(default_factory=list)
     # Matriz unificada de targets (34.15): {targets: [{id,label,where,kind,version,url,latest,
     # latest_url,behind,command,params,advanced}], satellite_expected}. Opcional (retrocompat).
     versions: dict[str, Any] = Field(default_factory=dict)

@@ -402,3 +402,82 @@ def test_snapshot_versions_panels_y_ser9():
     assert byid["panel:comedor"]["command"] == "deploy.satellites"
     # los services del Brain también son targets (al menos core/backoffice)
     assert any(t["id"] == "core" and t["kind"] == "service" for t in v["targets"])
+
+
+# ── FASE 38: panel.config (executor + snapshot) ───────────────────────────────
+
+def test_executor_panel_config_upserts_core_and_flags_audio():
+    posts = []
+
+    class R:
+        def __init__(self, data=None):
+            self._d = data or {}
+        def raise_for_status(self): pass
+        def json(self): return self._d
+
+    def fake_get(url, timeout=8):
+        assert url.endswith("/panels")
+        return R([{"name": "comedor", "node_id": "nspanel-comedor"}])
+
+    def fake_post(url, json=None, timeout=10):
+        posts.append((url, json))
+        return R({"ok": True})
+
+    with patch.object(executor.requests, "get", fake_get), \
+         patch.object(executor.requests, "post", fake_post):
+        r = executor.execute("panel.config", {"node_id": "nspanel-comedor",
+                                              "screen_timeout_secs": 90})
+    assert r.ok
+    core_post = next(p for p in posts if p[0].endswith("/panels"))
+    assert core_post[1] == {"name": "comedor", "config": {"screen_timeout_secs": 90}}
+    assert any(u.endswith("/nodes/nspanel-comedor/config-changed") for u, _ in posts)
+
+
+def test_executor_panel_config_name_fallback_from_node_id():
+    posts = []
+
+    class R:
+        def raise_for_status(self): pass
+        def json(self): return []   # panel no registrado
+
+    def fake_post(url, json=None, timeout=10):
+        posts.append((url, json))
+        return R()
+
+    with patch.object(executor.requests, "get", lambda *a, **k: R()), \
+         patch.object(executor.requests, "post", fake_post):
+        r = executor.execute("panel.config", {"node_id": "nspanel-cocina",
+                                              "default_dashboard": "http://h/x/0"})
+    assert r.ok
+    core_post = next(p for p in posts if p[0].endswith("/panels"))
+    assert core_post[1]["name"] == "cocina"   # nspanel- stripped
+
+
+def test_executor_panel_config_no_params_rejected():
+    r = executor.execute("panel.config", {"node_id": "nspanel-comedor"})
+    assert not r.ok and "nada para configurar" in r.error
+
+
+def test_snapshot_nodes_carry_config_and_dashboards():
+    from app.models import StateSnapshot
+
+    dashboards = [{"title": "Comedor", "url_path": "lovelace-comedor",
+                   "url": "http://h/lovelace-comedor/0"}]
+
+    def fake_get(url, timeout=4):
+        if url.endswith("/nodes"):
+            return [{"node_id": "nspanel-comedor", "state": "active"}]
+        if url.endswith("/panels"):
+            return [{"name": "comedor", "node_id": "nspanel-comedor",
+                     "config": {"screen_timeout_secs": 120}}]
+        if url.endswith("/dashboards"):
+            return dashboards
+        return None
+
+    with patch.object(snapshot, "_get", fake_get), \
+         patch.object(snapshot, "_systemctl_active", lambda u: False):
+        snap = snapshot.build_snapshot()
+    node = snap["wakeword"]["nodes"][0]
+    assert node["config"] == {"screen_timeout_secs": 120}
+    assert snap["dashboards"] == dashboards
+    StateSnapshot(**snap)   # valida contra el contrato de la nube

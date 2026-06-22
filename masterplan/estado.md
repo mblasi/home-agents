@@ -3579,3 +3579,48 @@ PREMISA TRANSVERSAL DE UX (comandos): TODO lo relativo a comandos invocables —
             + endpoint, y el chart en local+cloud con `speaker_conf` vs la línea de threshold,
             distinguiendo known vs guest. Reusa el dato existente, sin nuevo pipeline de ingesta.
             Tests de la serie nueva y del threshold expuesto.
+
+### FASE 38 - Configuración por panel (administrable desde ambos backoffices)
+
+```
+Objetivo: Dar a cada panel NSPanel una sección de CONFIGURACIÓN administrable desde el backoffice
+          local (LAN) y el cloud (egress-only), 100% funcional. Empieza con dos parámetros y deja
+          lugar para más:
+            1. Tiempo de inactividad para apagar la pantalla (screen_timeout_secs, 0 = nunca).
+            2. Dashboard por defecto del panel (default_dashboard, deeplink de HA Companion).
+Estado:   COMPLETA (6/6). Pendiente sólo el deploy + verificación e2e en hardware (satélite/su/am).
+Deps:     FASE 16 (paneles + audio_server + heartbeat/auto-update), FASE 33/37 (cloud + comandos
+          tipados + snapshot egress-only), FASE 32 (tabla panels en SQLite).
+Decisiones tomadas:
+          - Pantalla: apagado NATIVO de Android (settings put system screen_off_timeout), no
+            atenuación por brillo. Un solo parámetro en segundos.
+          - Dashboard: dropdown poblado desde los dashboards reales de HA (lovelace, vía WebSocket
+            lovelace/dashboards/list); se guarda el deeplink completo que abre la Companion.
+          - Persistencia: columna `config` JSON en la tabla panels (no columnas tipadas) → se
+            agregan claves nuevas sin migración. Fuente de verdad en core.
+          - Aplicación: el SATÉLITE hace PULL de su config (mirror del auto-update de código) y la
+            aplica en caliente. Único aplicador del dashboard (no toca start-ha.sh → no pelea con
+            nspanel.sh converge). Egress-only: cero inbound; el flag /config-changed sólo da
+            inmediatez (converge igual en el ciclo de sync y al arrancar).
+```
+
+- [x] 38.1  core: columna `panels.config` (migración idempotente `_ensure_column`) + round-trip y
+            validación (merge parcial, allow-list) en `/panels`; `GET /panels/config/{node_id}`;
+            `ha_client.list_dashboards()` por WebSocket (`lovelace/dashboards/list`, + Overview,
+            cache) y `GET /dashboards`; dep `websocket-client`. Tests (`test_panels_api`,
+            `test_ha_client` con WS mockeado).
+- [x] 38.2  ear/audio_server: `GET /nodes/{id}/config` (proxy de core + versión md5),
+            `POST /nodes/{id}/config-changed` (flag de inmediatez, mirror de `/update`),
+            `config_update` en el heartbeat. Tests.
+- [x] 38.3  ear/satellite: `_check_config_update` (PULL, mirror de `_check_code_update`; al
+            arrancar + en el loop + on-flag por heartbeat) y `_apply_remote_config`
+            (`screen_off_timeout` vía `su` + dashboard vía `am start -d`). Tests con subprocess/HTTP
+            mockeados.
+- [x] 38.4  backoffice local: `POST /panels/{name}/config` (upsert en core + flag a audio_server)
+            + selector de dashboards (`/dashboards`) y form de config por panel en `panels.html`.
+- [x] 38.5  cloud: comando `panel.config` (CATALOG/PRESENTATION con kind `dashboard`) + executor
+            `_panel_config` (upsert core + flag audio_server) + snapshot (config por panel +
+            `dashboards`) + UI contextual "configurar" por panel en `dashboard.html`. Tests
+            (`test_commands`, `test_bridge`).
+- [x] 38.6  Docs: `arquitectura_funcional.md` (config de paneles + flujo pull), READMEs (raíz,
+            core, ear, cloud); lint de estado + sync de issues.
