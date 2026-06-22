@@ -166,6 +166,30 @@ def api_catalog(p: Principal = Depends(require_dashboard_user)):
     return {"catalog": catalog_summary()}
 
 
+@app.get("/api/alerts")
+def api_alerts(p: Principal = Depends(require_dashboard_user)):
+    """Alertas proactivas vigentes (FASE 37.6). Viajan en el snapshot (37.1/37.7); este
+    endpoint las expone aisladas para la sección Alertas. Gated por `access`."""
+    state = fdb.get_state()
+    alerts = (state or {}).get("alerts", []) if state else []
+    return {"alerts": alerts}
+
+
+# Tipos de comando que producen logs poleables por la sección Logs (37.6/37.10).
+_LOG_COMMANDS = ("logs.tail", "logs.satellite")
+
+
+@app.get("/api/logs")
+def api_logs(p: Principal = Depends(require_dashboard_user)):
+    """Último resultado de un comando de logs (poll del resultado de logs.tail). El front emite
+    el comando y luego polea acá el output ya ejecutado por el bridge. Gated por `emit`."""
+    _require_emit(p)
+    for c in fdb.recent_commands(limit=50):
+        if c.get("type") in _LOG_COMMANDS:
+            return {"log": c}
+    return {"log": None}
+
+
 @app.post("/api/commands")
 def api_emit_command(req: CommandRequest, p: Principal = Depends(require_dashboard_user)):
     _require_emit(p)
