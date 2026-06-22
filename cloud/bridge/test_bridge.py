@@ -291,6 +291,30 @@ def test_panel_reboot_unknown_node(monkeypatch):
     assert not r.ok and "IP" in r.error
 
 
+def test_logs_satellite_calls_audio_server(monkeypatch):
+    captured = {}
+
+    def fake_get(url, params=None, timeout=20):
+        captured.update(url=url, params=params)
+        return type("R", (), {"status_code": 200, "json": lambda self: {"log": "linea1\nlinea2"}})()
+
+    monkeypatch.setattr(executor.requests, "get", fake_get)
+    r = executor.execute("logs.satellite", {"node_id": "comedor", "lines": 50})
+    assert r.ok and r.output == "linea1\nlinea2"
+    assert captured["url"].endswith("/nodes/comedor/satellite-log")
+    assert captured["params"] == {"lines": 50}
+
+
+def test_logs_satellite_propagates_error(monkeypatch):
+    def fake_get(url, params=None, timeout=20):
+        return type("R", (), {"status_code": 404, "headers": {"content-type": "application/json"},
+                              "json": lambda self: {"detail": "panel sin IP"}})()
+
+    monkeypatch.setattr(executor.requests, "get", fake_get)
+    r = executor.execute("logs.satellite", {"node_id": "fantasma"})
+    assert not r.ok and "404" in r.error
+
+
 # ── Logs en vivo (D5): emit del executor + batching del bridge ─────────────────
 
 def test_execute_passes_emit_to_deploy(monkeypatch):

@@ -2102,7 +2102,19 @@ def devices_redirect():
 
 @app.get("/logs", response_class=HTMLResponse)
 def logs_page(request: Request):
-    return _render(request, "logs.html", "logs")
+    nodes = [n.get("node_id") for n in (_audio("/nodes") or []) if n.get("node_id")]
+    return _render(request, "logs.html", "logs", nodes=nodes)
+
+
+@app.get("/logs/satellite/{node_id}")
+def logs_satellite(node_id: str, lines: int = 100):
+    """Log del satélite de un panel (FASE 37.10): proxya al audio_server, que es la fuente única
+    del fetch (ssh a Termux). El backoffice está en la LAN, así que lo llama directo."""
+    lines = max(1, min(int(lines), 500))
+    data = _audio(f"/nodes/{node_id}/satellite-log?lines={lines}")
+    if data is None:
+        return JSONResponse({"detail": "audio_server no disponible o panel sin IP"}, status_code=502)
+    return JSONResponse(data)
 
 
 @app.get("/logs/stream")

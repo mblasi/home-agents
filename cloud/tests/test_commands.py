@@ -38,6 +38,15 @@ def test_optional_param_omitted():
     assert validate_command("service.status", {}) == {}
 
 
+def test_logs_satellite_requires_node():
+    assert validate_command("logs.satellite", {"node_id": "comedor", "lines": 50}) == {
+        "node_id": "comedor", "lines": 50}
+    with pytest.raises(CommandError):
+        validate_command("logs.satellite", {})            # falta node_id
+    with pytest.raises(CommandError):
+        validate_command("logs.satellite", {"node_id": "x", "lines": 9999})
+
+
 def test_logs_lines_range():
     assert validate_command("logs.tail", {"service": "capitan-wa", "lines": 100})["lines"] == 100
     with pytest.raises(CommandError):

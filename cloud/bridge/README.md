@@ -54,6 +54,9 @@ Comandos de operación (FASE 37.8 — acotados, sólo admin, validados en nube y
 - `panel.reboot {node_id}` — resuelve la IP del nodo en el audio_server (`/nodes`) y reusa
   `scripts/nspanel.sh reboot` (adb `su -c reboot`, único camino del firmware eWeLink). No
   reimplementa el reboot.
+- `logs.satellite {node_id, lines?}` — log del satélite de un panel. Llama al audio_server
+  (`GET /nodes/{id}/satellite-log`), fuente ÚNICA del fetch (ssh a Termux): el bridge no
+  duplica la lógica de ssh. El backoffice local llama el mismo endpoint directo (está en la LAN).
 
 ## Credencial (33.13)
 
