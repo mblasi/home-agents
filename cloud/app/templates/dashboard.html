@@ -71,6 +71,8 @@
             <h3>Voz</h3>
             <div id="m-voice-summary" class="grid"></div>
             <canvas id="m-voice-chart" height="80"></canvas>
+            <h3>Voice-ID <span class="muted" id="m-conf-thr"></span></h3>
+            <canvas id="m-conf-chart" height="80"></canvas>
             <h3>LLM / Agentes</h3>
             <div id="m-llm-summary" class="grid"></div>
             <canvas id="m-llm-chart" height="80"></canvas>
@@ -496,7 +498,7 @@ async function refresh() {
 }
 
 // ── Métricas (FASE 35.6) ──────────────────────────────────────────────────────
-let mVoiceChart = null, mLlmChart = null;
+let mVoiceChart = null, mLlmChart = null, mConfChart = null;
 const mLabel = (ts) => new Date(ts * 1000).toLocaleString("es", {day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
 
 function mkMetricChart(canvasId, type) {
@@ -543,6 +545,18 @@ async function loadMetrics() {
     `<div><b>${mFmt((lc.prompt_tokens||0)+(lc.completion_tokens||0))}</b> tokens</div>`;
   if (!mLlmChart) mLlmChart = mkMetricChart("m-llm-chart", "line");
   setSeries(mLlmChart, metrics.llm_series || {}, ["#60a5fa", "#fbbf24"]);
+
+  // Voice-ID: speaker_conf known/guest vs la línea de threshold (FASE 37.12, view_full).
+  const cs = metrics.voice_conf_series || {};
+  if (cs.labels && cs.labels.length) {
+    if (!mConfChart) mConfChart = mkMetricChart("m-conf-chart", "line");
+    const NAMES = { known_conf: "known", guest_conf: "guest", threshold: "threshold" };
+    setSeries(mConfChart,
+      { labels: cs.labels, series: (cs.series || []).map(s => ({ ...s, name: NAMES[s.name] || s.name })) },
+      ["#34d399", "#f87171", "#9ca3af"]);
+    const thr = (vs.speaker_threshold != null) ? vs.speaker_threshold : null;
+    $("m-conf-thr").textContent = thr != null ? `· threshold ${thr}` : "";
+  }
 
   // Tablas de detalle (sólo presentes para roles con view_full)
   const models = metrics.llm_by_model || [], agents = metrics.llm_by_agent || [];
