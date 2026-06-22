@@ -3735,7 +3735,7 @@ Objetivo: Garantizar que la elección de agente sea SIEMPRE producto de la plane
           observado: un `request` intent pendiente (típicamente un proactivo de finanzas, creado
           SIN `conversation_id`) captura cualquier enunciado siguiente como su respuesta y
           devuelve "Entendido, el plan 'X' queda sin cambios" ante, p.ej., una consulta de clima.
-Estado:   EN CURSO (3/6 — Etapas A y B completas).
+Estado:   EN CURSO (4/6 — Etapas A, B y C completas; quedan 40.5 y 40.6).
 Deps:     FASE 9  (coordinador LLM — el corazón agnóstico a preservar),
           FASE 22 (intents tipados + captura 22.5 — el path a corregir),
           FASE 36 (ContinuationState — el mecanismo CORRECTO de espera de respuesta),
@@ -3781,7 +3781,7 @@ Hallazgos de la auditoría inicial (ya realizada — base de esta fase):
             explícita. Tests.
 
 #### Etapa C - Decisión agnóstica respuesta-vs-comando
-- [ ] 40.4  Hacer agnóstica la decisión "¿respuesta a lo pendiente o comando nuevo?": pasar la
+- [x] 40.4  Hacer agnóstica la decisión "¿respuesta a lo pendiente o comando nuevo?": pasar la
             pregunta pendiente como CONTEXTO al coordinador y dejar que el plan resuelva el destino
             (incluida la opción "es la respuesta al intent X" como un resultado más del planner),
             en vez de precedencia dura pre-LLM. Conservar a lo sumo un fast-path barato para

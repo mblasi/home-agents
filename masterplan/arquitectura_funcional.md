@@ -192,6 +192,16 @@ fija el id de la conversación canónica de WhatsApp y la marca a la espera del 
 lo sellan al `conversation_id` del turno (`apply_agent_updates`). La pregunta "¿esto es la respuesta
 o un comando nuevo dentro de la MISMA conversación?" queda para la Etapa C (40.4).
 
+**Etapa C — decisión agnóstica respuesta-vs-comando (40.4, resuelto).** Erradica la última
+precedencia dura pre-LLM. Dentro de una conversación que espera un reply: (a) un sí/no **pelado**
+(`conversations.is_bare_yes_no`) se captura por **fast-path** sin llamar al planner —un sí/no suelto
+nunca es un comando, y se evalúa **antes** del ack porque "sí"/"ok"/"dale" son a la vez ack y
+respuesta; (b) cualquier otro enunciado lo decide el **planner**: se le pasa la pregunta pendiente
+como contexto (`coordinator.coordinate(pending_question=...)`) y devuelve `{"reply_to_pending": true}`
+si es la respuesta, o un plan normal si es un comando nuevo (el `fast_classifier` se saltea cuando
+hay pregunta pendiente). En WhatsApp, `wa_inbound` sólo captura el quoted-reply **dirigido**
+(intent_id explícito); sin intent_id la decisión la toma `process()` por el mismo camino agnóstico.
+
 #### Persistencia de datos (SQLite — FASE 32)
 
 Toda la data del sistema vive en **`~/.local/share/capitan/capitan.db`** (SQLite) vía
