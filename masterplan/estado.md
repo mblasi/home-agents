@@ -3735,7 +3735,7 @@ Objetivo: Garantizar que la elección de agente sea SIEMPRE producto de la plane
           observado: un `request` intent pendiente (típicamente un proactivo de finanzas, creado
           SIN `conversation_id`) captura cualquier enunciado siguiente como su respuesta y
           devuelve "Entendido, el plan 'X' queda sin cambios" ante, p.ej., una consulta de clima.
-Estado:   Pendiente.
+Estado:   EN CURSO (1/6 — Etapa A completa).
 Deps:     FASE 9  (coordinador LLM — el corazón agnóstico a preservar),
           FASE 22 (intents tipados + captura 22.5 — el path a corregir),
           FASE 36 (ContinuationState — el mecanismo CORRECTO de espera de respuesta),
@@ -3762,7 +3762,7 @@ Hallazgos de la auditoría inicial (ya realizada — base de esta fase):
 ```
 
 #### Etapa A - Auditoría documentada
-- [ ] 40.1  Documentar en `arquitectura_funcional.md` el flujo real de ejecución de un comando
+- [x] 40.1  Documentar en `arquitectura_funcional.md` el flujo real de ejecución de un comando
             (voz y WhatsApp) end-to-end, enumerando TODOS los puntos donde se elige o se puentea el
             agente (los 4 cortocircuitos + fast_classifier + aggregation) con file:line, y marcando
             cada uno como agnóstico / no-agnóstico contra el principio rector.
