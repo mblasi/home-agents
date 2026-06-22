@@ -121,4 +121,12 @@ canvas { max-width: 100%; }
   .brand { justify-content: space-between; }
   main { padding: 14px; }
   .userbox #useremail { display: none; }   /* el email no entra en portrait */
+  /* Tablas anchas (auditoría, métricas): scrollean DENTRO de su card, sin scroll horizontal
+     de página. La grid de tiles colapsa a una columna fluida. */
+  .card { overflow-x: auto; }
+  .grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+  /* Targets táctiles: los botones mini siguen siendo tocables en pantalla chica. */
+  button.mini { padding: 6px 10px; font-size: 12px; }
+  nav a { padding: 12px 18px; }            /* links del drawer más altos al tacto */
+  .field { max-width: 100%; }
 }
