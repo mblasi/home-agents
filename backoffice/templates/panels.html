@@ -74,15 +74,18 @@
           <form hx-post="/panels/{{ p.name }}/config" hx-target="#cfg-st-{{ p.name }}"
                 hx-swap="innerHTML" class="flex flex-wrap items-end gap-4">
             <input type="hidden" name="node_id" value="{{ p.node_id }}">
+            {% set dash_title = (dashboards | selectattr('url', 'equalto', dev.default_dashboard) | map(attribute='title') | first) if dev.default_dashboard else None %}
             <div>
-              <label class="block text-xs text-gray-500 mb-1">Apagar pantalla tras (seg, 0 = nunca)</label>
+              <label class="block text-xs text-gray-500 mb-1">Apagar pantalla tras (seg, 0 = nunca)
+                {% if dev and dev.screen_timeout_secs is not none %}<span class="text-gray-600">· en el dispositivo: {{ 'nunca' if dev.screen_timeout_secs == 0 else dev.screen_timeout_secs ~ 's' }}</span>{% endif %}</label>
               <input name="screen_timeout_secs" type="number" min="0" step="5"
                      value="{{ cur_to if cur_to is not none else '' }}"
                      placeholder="120"
                      class="w-32 px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-200">
             </div>
             <div>
-              <label class="block text-xs text-gray-500 mb-1">Dashboard por defecto</label>
+              <label class="block text-xs text-gray-500 mb-1">Dashboard por defecto
+                {% if dev %}<span class="text-gray-600">· en el dispositivo: {{ dash_title or (dev.default_dashboard if dev.default_dashboard else 'sin fijar desde el sistema') }}</span>{% endif %}</label>
               <select name="default_dashboard"
                       class="px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-200">
                 <option value="">— sin cambiar / login default —</option>
@@ -96,7 +99,6 @@
               Guardar config
             </button>
             <span id="cfg-st-{{ p.name }}" class="text-xs"></span>
-            {% if dev %}<span class="text-xs text-gray-500">· en el dispositivo: {{ dev.screen_timeout_secs if dev.screen_timeout_secs is not none else '?' }}s</span>{% endif %}
           </form>
         </td>
       </tr>
