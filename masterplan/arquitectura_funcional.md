@@ -152,7 +152,35 @@ inversión de control.
   RBAC (admin escribe; familiar/adolescente read-only). `BACKOFFICE_TOKEN` queda como
   bootstrap de emergencia offline. Identidad de login = `User.email` (o `gcal_email`).
 
-Contrato y modelo de amenazas: `masterplan/fase33_cloud_backoffice.md`.
+**SPA con sidebar + secciones (FASE 37).** El dashboard cloud pasó de una página única con
+tarjetas apiladas a un **SPA con sidebar** (taxonomía del backoffice local: Monitoreo / Sistema
+/ Administración), router client-side por hash y cada link/vista gated por capacidad. Secciones:
+Resumen, Servicios, Métricas, Alertas, Logs, Actividad, Agentes, Wake word, Paneles, Deploy,
+Usuarios, Acciones, Auditoría. **Mobile-first**: la sidebar colapsa a drawer en viewport chico,
+las tablas anchas scrollean dentro de su card (el acceso remoto es típicamente desde el celular).
+
+- **RBAC ampliado**: nueva capacidad `view_pii` (admin-only, distinta de `view_full`). Sin ella,
+  `filter_state` redacta el **contenido** (texto de comandos en `recent_commands`) dejando la
+  metadata y los conteos. El snapshot sólo lleva conteos de intents/goals/rutinas/conversaciones
+  (nunca el contenido), más `alerts` (texto, vía `/alerts/recent` no-consumible del core) y
+  `wakeword.status`.
+- **UI de comandos final-user (37.5/37.6)**: se eliminó el `<select>` + JSON crudo. Acciones
+  contextuales junto a la entidad (reiniciar servicio, activar/desactivar y correr agente,
+  reiniciar panel, reentrenar wake word) con confirmación en destructivos y feedback inline del
+  estado; y un formulario tipado para comandos sin entidad-ancla, con widgets renderizados desde
+  la metadata de presentación de `/api/catalog` (enum→dropdown, int→número, bool→toggle,
+  node/user/agent→selector). Comandos de operación nuevos en el catálogo: `agent.toggle`,
+  `panel.reboot`, `proactive.run`, `logs.satellite`.
+- **Logs del satélite (37.10)**: `audio_server` es la fuente única del fetch del log del panel
+  (`GET /nodes/{id}/satellite-log`, ssh a Termux); el backoffice local lo llama directo (LAN) y el
+  cloud vía el comando `logs.satellite` → bridge. Sin duplicar la lógica.
+- **Observabilidad de detección (37.11/37.12)**: serie temporal del **score de wake word** vs
+  threshold (el satélite reporta los frames `>= SCORE_LOG_MIN` → `audio_server` → core
+  `ww_scores`) y del **voice-id** (`speaker_conf` known/guest vs `SPEAKER_THRESHOLD`), con charts
+  en Métricas de ambos backoffices (view_full). Viajan por el push de métricas egress-only.
+
+Contrato y modelo de amenazas: `masterplan/fase33_cloud_backoffice.md`. Paridad de secciones y
+detalle de FASE 37: `masterplan/estado.md`.
 
 ---
 

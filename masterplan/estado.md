@@ -3437,7 +3437,7 @@ Objetivo: Llevar el backoffice cloud (FASE 33) de una única página SPA con tar
           el backoffice cloud debe ser mobile-friendly (responsive, mobile-first), ya que
           el acceso remoto egress-only es típicamente desde el celular — toda sección,
           sidebar y formulario de comandos debe funcionar y ser usable en pantalla chica.
-Estado:   EN CURSO (12/13 — hecho 37.1-37.8, 37.10, 37.11, 37.12-mobile, 37.12-voiceid; queda 37.9).
+Estado:   COMPLETA (13/13). Pendiente sólo el deploy/verificación e2e en hardware (satélite/ssh).
 Deps:     FASE 33 (backoffice cloud + bridge egress-only + RBAC — COMPLETA, base a extender),
           FASE 35 (dashboards de métricas — COMPLETA, ya viven en el cloud),
           FASE 34 (deploy remoto — la sección Deploy del sidebar consume su versión reportada).
@@ -3550,9 +3550,9 @@ PREMISA TRANSVERSAL DE UX (comandos): TODO lo relativo a comandos invocables —
             local y bridge. Tests con ssh mockeado.
 
 #### Etapa E - Tests y documentación
-- [ ] 37.9  Tests cloud (`cloud/tests`) + bridge (`cloud/bridge/test_bridge.py`) de todo lo
+- [x] 37.9  Tests cloud (`cloud/tests`) + bridge (`cloud/bridge/test_bridge.py`) de todo lo
             nuevo; docs en `masterplan/arquitectura_funcional.md`, `cloud/README.md` y `README`;
-            lint de estado + sync de issues.
+            lint de estado + sync de issues. (Suites: cloud 143, core 734, ear 106.)
 
 #### Etapa G - Observabilidad de detección: score WW + voice-id en el tiempo (ambos backoffices)
 - [x] 37.11 Visualizar el comportamiento del SCORE de wake word vs el threshold a lo largo del

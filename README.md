@@ -102,7 +102,14 @@ The core exposes a read-only metrics API (`GET /metrics/{voice,llm}/*`: summarie
 series as `{labels, series}`, by-model, by-agent, retrains) with range/model/agent/node
 filters. The **local backoffice** renders it at `/metrics` (Chart.js, filters, auto-refresh);
 the **cloud backoffice** shows an equivalent view, fed by the egress-only bridge that pushes
-aggregates to `POST /ingest/metrics` and gated by the FASE 33 RBAC.
+aggregates to `POST /ingest/metrics` and gated by the FASE 33 RBAC. Both also chart **wake-word
+score** and **voice-id confidence** against their thresholds over time (FASE 37).
+
+The cloud backoffice (FASE 37) is a **mobile-first SPA** with a sidebar (Monitoreo / Sistema /
+Administración), hash router and per-capability gating, with full parity with the local
+backoffice for everything that's safe to expose egress-only. Its command UI is end-user grade:
+contextual actions per entity and typed forms rendered from `/api/catalog` (no raw JSON). A new
+admin-only `view_pii` capability gates content (command text); the snapshot only carries counts.
 
 ---
 
