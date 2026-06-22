@@ -48,6 +48,13 @@ Comandos de deploy (catálogo tipado, validados en nube y bridge):
 Versionado: tras un deploy sano, tag semver por repo (gate `DEPLOY_TAG_RELEASES`). Estado
 persistido en `~/.local/share/capitan/deploy_state.json` (matriz de versiones + último release).
 
+Comandos de operación (FASE 37.8 — acotados, sólo admin, validados en nube y bridge):
+- `agent.toggle {agent_id, status}` — `PATCH /agents/{id}/status` del core (active/planned/unavailable).
+- `proactive.run {agent_id}` — `POST /proactive/{id}/run` del core (dispara el ciclo proactivo).
+- `panel.reboot {node_id}` — resuelve la IP del nodo en el audio_server (`/nodes`) y reusa
+  `scripts/nspanel.sh reboot` (adb `su -c reboot`, único camino del firmware eWeLink). No
+  reimplementa el reboot.
+
 ## Credencial (33.13)
 
 La SA del bridge (`capitan-bridge@<project>.iam.gserviceaccount.com`) **no tiene

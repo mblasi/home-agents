@@ -3437,7 +3437,7 @@ Objetivo: Llevar el backoffice cloud (FASE 33) de una única página SPA con tar
           el backoffice cloud debe ser mobile-friendly (responsive, mobile-first), ya que
           el acceso remoto egress-only es típicamente desde el celular — toda sección,
           sidebar y formulario de comandos debe funcionar y ser usable en pantalla chica.
-Estado:   EN CURSO (7/13 — hecho 37.1-37.7; pendientes 37.8-37.12).
+Estado:   EN CURSO (8/13 — hecho 37.1-37.8; pendientes 37.9-37.12).
 Deps:     FASE 33 (backoffice cloud + bridge egress-only + RBAC — COMPLETA, base a extender),
           FASE 35 (dashboards de métricas — COMPLETA, ya viven en el cloud),
           FASE 34 (deploy remoto — la sección Deploy del sidebar consume su versión reportada).
@@ -3533,7 +3533,7 @@ PREMISA TRANSVERSAL DE UX (comandos): TODO lo relativo a comandos invocables —
 - [x] 37.7  `cloud/bridge/snapshot.py`: emitir los campos nuevos reusando datos que ya computan
             core/backoffice (sin PII en claro; sólo conteos). No reimplementar lógica.
             (Alertas vía `/alerts/recent` no-consumible —core—, no `/alerts` que drena el TTS.)
-- [ ] 37.8  `cloud/bridge/executor.py`: implementar `agent.toggle`, `panel.reboot`,
+- [x] 37.8  `cloud/bridge/executor.py`: implementar `agent.toggle`, `panel.reboot`,
             `proactive.run` (tipo→función concreta, sin eval; auditoría como los existentes),
             invocando las APIs/scripts del Brain ya existentes.
 
