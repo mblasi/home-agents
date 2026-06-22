@@ -425,6 +425,9 @@ function renderWakeword(ww) {
 }
 
 function renderPanels(state) {
+  // No re-renderizar mientras un form de config está abierto: el refresh periódico colapsaría
+  // el form y perdería lo que el usuario está tipeando (FASE 38). Se re-renderiza al cerrarlo.
+  if (document.querySelector("#panels .panel-cfg:not(.hidden)")) return;
   const nodes = (state.wakeword || {}).nodes || [];
   // versión/al-día por panel desde la matriz de targets (kind satellite)
   const tgt = {};
@@ -445,15 +448,21 @@ function renderPanels(state) {
         + ` <span id="pan-${id}" class="muted"></span></span>` : "";
     // FASE 38: form de config contextual (apagado de pantalla + dashboard por defecto), oculto.
     const curTo = cfg.screen_timeout_secs != null ? cfg.screen_timeout_secs : "";
+    // Hints del estado REAL del dispositivo (lo que reporta el satélite).
+    const toHint = dev.screen_timeout_secs != null
+      ? ` <span class="muted">· en el dispositivo: ${dev.screen_timeout_secs === 0 ? "nunca" : dev.screen_timeout_secs + "s"}</span>` : "";
+    const dashTitle = (((LAST_STATE || {}).dashboards || []).find(d => d.url === dev.default_dashboard) || {}).title;
+    const dashHint = dev.default_dashboard
+      ? ` <span class="muted">· en el dispositivo: ${esc(dashTitle || dev.default_dashboard)}</span>`
+      : ` <span class="muted">· sin dashboard fijado desde el sistema</span>`;
     const cfgForm = CAPS.emit
       ? `<div id="cfg-${id}" class="panel-cfg hidden">`
-        + `<div class="field"><label>Apagar pantalla tras (seg, 0 = nunca)</label>`
+        + `<div class="field"><label>Apagar pantalla tras (seg, 0 = nunca)${toHint}</label>`
         + `<input id="cfgto-${id}" type="number" min="0" step="5" value="${curTo}" placeholder="120"></div>`
-        + `<div class="field"><label>Dashboard por defecto</label>`
+        + `<div class="field"><label>Dashboard por defecto${dashHint}</label>`
         + `<select id="cfgdash-${id}">${dashboardOptions(cfg.default_dashboard || "")}</select></div>`
         + `<div><button class="mini" onclick="savePanelCfg('${id}')">guardar config</button> `
         + `<span id="pancfg-${id}" class="muted"></span>`
-        + (dev.screen_timeout_secs != null ? ` <span class="muted">· en el dispositivo: ${dev.screen_timeout_secs}s</span>` : "")
         + `</div></div>` : "";
     return `<div class="tile"><b>${dot(n.online)} ${id}</b>`
       + `<span>${esc(n.ip || "sin ip")}${rms}</span>`
