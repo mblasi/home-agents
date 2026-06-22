@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Capitán · backoffice en la nube</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/style.css?v=37">
 </head>
 <body>
 
@@ -516,7 +516,9 @@ const mLabel = (ts) => new Date(ts * 1000).toLocaleString("es", {day:"2-digit",m
 function mkMetricChart(canvasId, type) {
   return new Chart($(canvasId), {
     type, data: {labels: [], datasets: []},
-    options: {responsive: true, maintainAspectRatio: false,
+    // maintainAspectRatio:true evita que el canvas crezca sin tope dentro de una card de altura
+    // no acotada (el bug del "recuadro blanco infinito"). El height del <canvas> fija el ratio.
+    options: {responsive: true, maintainAspectRatio: true,
       plugins: {legend: {labels: {boxWidth: 12}}}, scales: {y: {beginAtZero: true}}},
   });
 }
