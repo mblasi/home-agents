@@ -436,7 +436,9 @@ function renderPanels(state) {
     const upd = t.behind ? ` <span class="warn">⬆ desactualizado</span>` : "";
     const rms = n.rms != null ? ` · rms ${n.rms}` : "";
     const id = esc(n.id);
-    const cfg = n.config || {};
+    // FASE 38: prefill con la config REAL del dispositivo (device_config) si está; si no, la guardada.
+    const cfg = Object.assign({}, n.config || {}, n.device_config || {});
+    const dev = n.device_config || {};
     const act = CAPS.emit
       ? `<span><button class="mini" onclick="actReboot('${id}')">reiniciar</button>`
         + ` <button class="mini" onclick="togglePanelCfg('${id}')">configurar</button>`
@@ -450,7 +452,9 @@ function renderPanels(state) {
         + `<div class="field"><label>Dashboard por defecto</label>`
         + `<select id="cfgdash-${id}">${dashboardOptions(cfg.default_dashboard || "")}</select></div>`
         + `<div><button class="mini" onclick="savePanelCfg('${id}')">guardar config</button> `
-        + `<span id="pancfg-${id}" class="muted"></span></div></div>` : "";
+        + `<span id="pancfg-${id}" class="muted"></span>`
+        + (dev.screen_timeout_secs != null ? ` <span class="muted">· en el dispositivo: ${dev.screen_timeout_secs}s</span>` : "")
+        + `</div></div>` : "";
     return `<div class="tile"><b>${dot(n.online)} ${id}</b>`
       + `<span>${esc(n.ip || "sin ip")}${rms}</span>`
       + `<span>${ver}${upd}</span>${act}${cfgForm}</div>`;

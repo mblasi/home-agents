@@ -76,6 +76,11 @@ converge igual en el ciclo de sync (`MODEL_SYNC_SECS`) y al arrancar. El selecto
 puebla desde `GET /dashboards` (core consulta los dashboards de lovelace por WebSocket
 `lovelace/dashboards/list`, no expuesto en la REST API; cacheado). El satélite es el **único
 aplicador** del dashboard (no se toca `start-ha.sh`, que reescribe `nspanel.sh converge`).
+El form se **prellena con la config REAL del dispositivo** (38.7): el satélite lee su
+`screen_off_timeout` vigente (`settings get`) y reporta su config aplicada en el heartbeat
+(`dev_screen_timeout_secs`/`dev_dashboard`); `audio_server` la expone en `/nodes` como
+`device_config` y viaja en el snapshot. Ambos backoffices prefieren ese valor (estado real) sobre
+la config guardada en core, así el admin ve lo que efectivamente corre en el panel.
 
 **Ambientes (16.7):** la fuente de verdad de los ambientes son las **áreas de Home Assistant**
 (`ha_client.get_areas()` vía `/api/template`, porque el area registry no está en la REST API de

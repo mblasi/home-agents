@@ -120,7 +120,8 @@ def _wakeword(nodes: list[dict]) -> dict:
                 "ip": n.get("ip") or None,
                 "online": n.get("state") == "active",
                 "rms": None,
-                "config": configs.get(n.get("node_id"), {}),   # FASE 38
+                "config": configs.get(n.get("node_id"), {}),   # FASE 38: config guardada (core)
+                "device_config": n.get("device_config") or {}, # FASE 38: config REAL del dispositivo
             }
             for n in nodes
         ],

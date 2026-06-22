@@ -481,3 +481,24 @@ def test_snapshot_nodes_carry_config_and_dashboards():
     assert node["config"] == {"screen_timeout_secs": 120}
     assert snap["dashboards"] == dashboards
     StateSnapshot(**snap)   # valida contra el contrato de la nube
+
+
+def test_snapshot_nodes_carry_device_config():
+    from app.models import StateSnapshot
+
+    def fake_get(url, timeout=4):
+        if url.endswith("/nodes"):
+            return [{"node_id": "nspanel-comedor", "state": "active",
+                     "device_config": {"screen_timeout_secs": 120}}]
+        if url.endswith("/panels"):
+            return [{"name": "comedor", "node_id": "nspanel-comedor", "config": {}}]
+        if url.endswith("/dashboards"):
+            return []
+        return None
+
+    with patch.object(snapshot, "_get", fake_get), \
+         patch.object(snapshot, "_systemctl_active", lambda u: False):
+        snap = snapshot.build_snapshot()
+    node = snap["wakeword"]["nodes"][0]
+    assert node["device_config"] == {"screen_timeout_secs": 120}
+    StateSnapshot(**snap)

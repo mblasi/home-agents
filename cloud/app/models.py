@@ -50,6 +50,8 @@ class WakewordNode(BaseModel):
     # FASE 38: config vigente del panel (no PII): {screen_timeout_secs, default_dashboard}.
     # Prefila el form de "Configurar panel" en el dashboard cloud.
     config: dict[str, Any] = Field(default_factory=dict)
+    # FASE 38: config REAL leída del dispositivo (heartbeat del satélite); prevalece para el prefill.
+    device_config: dict[str, Any] = Field(default_factory=dict)
 
 
 class Wakeword(BaseModel):
