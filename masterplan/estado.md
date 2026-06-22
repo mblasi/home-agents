@@ -3735,7 +3735,7 @@ Objetivo: Garantizar que la elección de agente sea SIEMPRE producto de la plane
           observado: un `request` intent pendiente (típicamente un proactivo de finanzas, creado
           SIN `conversation_id`) captura cualquier enunciado siguiente como su respuesta y
           devuelve "Entendido, el plan 'X' queda sin cambios" ante, p.ej., una consulta de clima.
-Estado:   EN CURSO (1/6 — Etapa A completa).
+Estado:   EN CURSO (3/6 — Etapas A y B completas).
 Deps:     FASE 9  (coordinador LLM — el corazón agnóstico a preservar),
           FASE 22 (intents tipados + captura 22.5 — el path a corregir),
           FASE 36 (ContinuationState — el mecanismo CORRECTO de espera de respuesta),
@@ -3768,13 +3768,13 @@ Hallazgos de la auditoría inicial (ya realizada — base de esta fase):
             cada uno como agnóstico / no-agnóstico contra el principio rector.
 
 #### Etapa B - Fix del secuestro de captura
-- [ ] 40.2  Corregir el hijack: la captura de un request pendiente (server.py 3c) sólo procede
+- [x] 40.2  Corregir el hijack: la captura de un request pendiente (server.py 3c) sólo procede
             cuando la conversación está EFECTIVAMENTE esperando esa respuesta — acoplar a
             `ContinuationState.waiting` (FASE 36) con match estricto de `conversation_id`; nunca
             capturar contra un intent sin `conversation_id` en otra conversación. Test de regresión:
             con un request proactivo pendiente, "¿cómo está el clima?" debe ir al planner y rutear
             a weather, NO a finance.
-- [ ] 40.3  Los `request` intents proactivos deben sellar el `conversation_id` del canal/turno
+- [x] 40.3  Los `request` intents proactivos deben sellar el `conversation_id` del canal/turno
             donde se ENTREGAN (no nacer sin él): al entregarse por WhatsApp (`wa_notifier`) o al
             inyectarse en un turno de voz, fijar el `conversation_id` en ese momento.
             `get_pending_request` deja de matchear "cualquier conversación" salvo intención
