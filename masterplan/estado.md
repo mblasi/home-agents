@@ -3881,3 +3881,29 @@ Plan:     `.claude/plans/quizzical-snacking-teacup.md`.
             producción al árbol recursivo es decisión del usuario por el trade-off de latencia; al
             flipear (env `AGENT_RUNTIME_RECURSIVE=true` + restart) recién ahí se elimina el path viejo
             (coordinator + fast_classifier). Smoke de voz/WhatsApp real queda para después del flip.
+
+### FASE 42 - Optimización de latencia del runtime recursivo (pre-flip)
+
+```
+Objetivo: Bajar la latencia del árbol de agentes recursivo (FASE 41) antes de flipear el flag a
+          producción. La validación e2e dio ~12-17s en queries de dominio (vs ~3-5s del path FASE
+          40) por la multiplicación de llamadas LLM (raíz plan + hijo plan + hijo consolidación +
+          raíz consolidación). Sin sacrificar el principio agnóstico (no se reintroducen
+          cortocircuitos deterministas).
+Estado:   Pendiente.
+Deps:     FASE 41 (runtime recursivo desplegado dormido, flag AGENT_RUNTIME_RECURSIVE).
+```
+
+#### Etapa A - Palancas de latencia
+- [ ] 42.1  Saltear la consolidación cuando un nodo delegó a UN solo sub-agente y no produjo prosa
+            propia ni otras tools: devolver la respuesta del hijo directa (ahorra una llamada LLM por
+            nivel). En el runtime, agnóstico. Tests.
+- [ ] 42.2  Modelo por tier: las hojas de dominio usan un modelo más chico/rápido (configurable
+            `AGENT_LEAF_MODEL`); el raíz mantiene el modelo grande para el routing. Tests.
+- [ ] 42.3  Hint de routing: pasar la sugerencia del fast_classifier como CONTEXTO (no bypass) en el
+            prompt del raíz, para acelerar/acertar la delegación (menos iteraciones del tool-loop).
+            Sigue decidiendo el LLM. Tests.
+
+#### Etapa B - Validación
+- [ ] 42.4  Re-validar la latencia contra el Ollama real del Brain (standalone, read-only) y reportar.
+            Dejar listo para el flip (decisión del usuario).
