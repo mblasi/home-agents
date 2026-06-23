@@ -702,9 +702,36 @@ def agent_edit_page(request: Request, agent_id: str, connected: str = "", oauth_
                    all_agents=all_agents)
 
 
+def _parse_config_from_form(form, schema: dict) -> dict:
+    """Construye el dict de config desde el form según el config_schema del agente.
+    Soporta float/int/bool(checkbox)/str. Los bool se setean SIEMPRE (checked→True, ausente→False)."""
+    config: dict = {}
+    for key, meta in schema.items():
+        t = meta.get("type", "str")
+        raw_val = form.get(f"config_{key}")
+        if t == "bool":
+            config[key] = bool(raw_val)  # checkbox: presente=on→True, ausente→False
+            continue
+        if raw_val is None:
+            continue
+        val_str = str(raw_val).strip()
+        try:
+            if t == "float":
+                config[key] = float(val_str)
+            elif t == "int":
+                config[key] = int(val_str)
+            else:
+                config[key] = val_str
+        except (ValueError, TypeError):
+            config[key] = val_str
+    return config
+
+
 @app.post("/agents/{agent_id}/edit")
 async def agent_edit_submit(request: Request, agent_id: str):
     form = await request.form()
+    agent_info = _core(f"/agents/{agent_id}") or {}
+    is_orchestrator = agent_info.get("kind") == "orchestrator"
 
     # Nombre, nombre de fantasía, icono y descripción (agent card)
     name       = str(form.get("name", "")).strip()
@@ -716,6 +743,15 @@ async def agent_edit_submit(request: Request, agent_id: str):
               json={"name": name or None, "fancy_name": fancy_name or None,
                     "icon": icon or None, "desc": desc or None})
 
+    # Config: campos dinámicos según config_schema del agente (model/system_prompt/guards...)
+    config = _parse_config_from_form(form, agent_info.get("config_schema") or {})
+    if config:
+        _core(f"/agents/{agent_id}/config", method="PATCH", json=config)
+
+    # 43.5: el orquestador sólo edita metadata + config (no status/examples/afinidades/RBAC/etc.).
+    if is_orchestrator:
+        return RedirectResponse(f"/agents/{agent_id}/edit?saved=1", status_code=303)
+
     # Status
     status = str(form.get("status", "")).strip()
     if status:
@@ -725,28 +761,6 @@ async def agent_edit_submit(request: Request, agent_id: str):
     ex_raw = str(form.get("examples", ""))
     examples = [e.strip().strip('"\'') for e in ex_raw.splitlines() if e.strip()]
     _core(f"/agents/{agent_id}/examples", method="PATCH", json={"examples": examples})
-
-    # Config: campos dinámicos según config_schema del agente
-    agent_info = _core(f"/agents/{agent_id}") or {}
-    schema = agent_info.get("config_schema") or {}
-    config: dict = {}
-    for key, meta in schema.items():
-        raw_val = form.get(f"config_{key}")
-        if raw_val is None:
-            continue
-        val_str = str(raw_val).strip()
-        t = meta.get("type", "str")
-        try:
-            if t == "float":
-                config[key] = float(val_str)
-            elif t == "int":
-                config[key] = int(val_str)
-            else:
-                config[key] = val_str
-        except (ValueError, TypeError):
-            config[key] = val_str
-    if config:
-        _core(f"/agents/{agent_id}/config", method="PATCH", json=config)
 
     # User context schema (9.21)
     schema_json = str(form.get("user_context_schema_json", "")).strip()

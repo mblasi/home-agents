@@ -18,6 +18,17 @@
 {% endif %}
 
 <form method="POST" action="/agents/{{ agent_id }}/edit">
+  {% set is_orch = agent.kind == 'orchestrator' %}
+
+  {% if is_orch %}
+  <div class="bg-indigo-900/20 border border-indigo-800/50 rounded-xl p-4 mb-5">
+    <p class="text-xs text-indigo-300">
+      🎼 <span class="font-semibold">Orquestador</span> — agente raíz del árbol recursivo. Recibe el
+      pedido, planifica y delega en los agentes de dominio. Es configurable (modelo LLM, prompt,
+      guards) pero no se desactiva, no es proactivo y ningún agente delega en él.
+    </p>
+  </div>
+  {% endif %}
 
   <!-- Sección 0: Nombre e icono -->
   <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-5">
@@ -46,6 +57,7 @@
   </div>
 
   <!-- Sección 1: Status -->
+  {% if not is_orch %}
   <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-5">
     <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Estado</h2>
     <div class="flex gap-4">
@@ -85,6 +97,7 @@
     </p>
     {% endif %}
   </div>
+  {% endif %}
 
   <!-- Sección 2: Carta del Coordinador -->
   <div id="card" class="bg-gray-900 border border-indigo-900/50 rounded-xl p-5 mb-5">
@@ -107,6 +120,7 @@
     </div>
 
     <!-- Ejemplos -->
+    {% if not is_orch %}
     <div>
       <label class="block text-xs font-medium text-gray-400 mb-1">Ejemplos de activación</label>
       <textarea
@@ -120,6 +134,7 @@
         3-5 ejemplos variados mejoran significativamente la precisión del routing.
       </p>
     </div>
+    {% endif %}
   </div>
 
   <!-- Sección 3: Backends -->
@@ -179,7 +194,10 @@
   {% if agent.config_schema %}
   <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-5">
     <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-1">Configuración</h2>
-    <p class="text-xs text-gray-600 mb-4">Los cambios de configuración aplican al reiniciar el core.</p>
+    <p class="text-xs text-gray-600 mb-4">
+      {% if is_orch %}Los cambios aplican de inmediato (el orquestador lee su config en cada pedido).
+      {% else %}Los cambios de configuración aplican al reiniciar el core.{% endif %}
+    </p>
     <div class="grid grid-cols-1 gap-4">
       {% for key, meta in agent.config_schema.items() %}
       {% set cur_val = agent.config.get(key, meta.default) %}
@@ -215,6 +233,13 @@
           {% if meta.type == 'float' %}step="any"{% endif %}
           class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200
                  focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500">
+        {% elif meta.type == 'bool' %}
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" name="config_{{ key }}" value="1"
+                 {% if cur_val %}checked{% endif %}
+                 class="rounded border-gray-700 bg-gray-800 text-indigo-500 focus:ring-indigo-500">
+          <span class="text-sm text-gray-300">Activado</span>
+        </label>
         {% else %}
         <input
           type="text"
@@ -272,6 +297,7 @@
   {% endif %}
 
   <!-- Sección 7: Afinidades entre agentes -->
+  {% if not is_orch %}
   <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-5">
     <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-1">Afinidades entre agentes</h2>
     <p class="text-xs text-gray-600 mb-4">
@@ -302,7 +328,7 @@
       {% set current_affinities = agent.get('affinities') or [] %}
       {% if all_agents %}
       <div class="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-1">
-        {% for aid, ainfo in all_agents.items() if aid != agent_id %}
+        {% for aid, ainfo in all_agents.items() if aid != agent_id and ainfo.get('kind') != 'orchestrator' %}
         <label class="flex items-center gap-2 px-3 py-2 bg-gray-800/50 rounded-lg cursor-pointer hover:bg-gray-800 transition-colors">
           <input type="checkbox" name="affinity_{{ aid }}" value="1"
                  {% if aid in current_affinities %}checked{% endif %}
@@ -319,8 +345,10 @@
       {% endif %}
     </div>
   </div>
+  {% endif %}
 
   <!-- Sección 8: Acceso por rol -->
+  {% if not is_orch %}
   <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-5">
     <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-1">Acceso por rol</h2>
     <p class="text-xs text-gray-600 mb-3">Qué roles tienen acceso a este agente por defecto.</p>
@@ -339,6 +367,7 @@
       {% endfor %}
     </div>
   </div>
+  {% endif %}
 
   <div class="flex gap-3">
     <button type="submit"
