@@ -67,8 +67,12 @@ fuente de verdad en core) administrable desde **ambos backoffices**. Claves inic
 extensible): `screen_timeout_secs` (segundos de inactividad para apagar la pantalla; `0` = nunca) y
 `default_dashboard` (deeplink de HA Companion que abre el panel). El **satélite hace PULL** de su
 config —mismo patrón que el auto-update de código/modelo— y la aplica en el dispositivo: el apagado
-de pantalla con el ajuste nativo de Android (`settings put system screen_off_timeout`, vía `su`) y
-el dashboard con `am start -d <url>`. Flujo: el backoffice (local) o el comando `panel.config` (cloud,
+de pantalla con DOS ajustes nativos de Android vía `su` — `screen_off_timeout` (ms) y, crítico,
+`stay_on_while_plugged_in` (bitmask AC|USB|WIRELESS): un timeout finito pone `stay_on=0` para que la
+pantalla efectivamente se apague (con `stay_on!=0`, default del firmware eWeLink en algunos paneles,
+Android no duerme la pantalla enchufada y el timeout sólo la ATENÚA, nunca off), y `0`=nunca usa
+`stay_on=7` + 24h de respaldo. El wake-word sigue activo con la pantalla apagada por el
+PARTIAL_WAKE_LOCK de Termux. El dashboard se aplica con `am start -d <url>`. Flujo: el backoffice (local) o el comando `panel.config` (cloud,
 egress-only) upsertan la config en core y marcan el nodo en `audio_server` (`POST /nodes/{id}/config-changed`);
 el próximo heartbeat (~30s) lleva `config_update: true` y el satélite consulta `GET /nodes/{id}/config`
 (proxy de `core /panels/config/{node_id}` + versión md5) y reaplica sólo si cambió. Sin el flag,
