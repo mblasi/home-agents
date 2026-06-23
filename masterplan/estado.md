@@ -3939,7 +3939,7 @@ Objetivo: Cerrar el refactor del runtime recursivo (FASE 41/42) formalizando al 
           POR-AGENTE (subsume el tier env-only de 42.2); (d) lo expone y edita desde AMBOS
           backoffices (form local + comando tipado cloud egress-only). Mantiene su naturaleza
           especial sin romper la recursión.
-Estado:   EN CURSO (3/7 — Etapa A completa: 43.1 catálogo + 43.2 config raíz + 43.3 modelo por-agente).
+Estado:   EN CURSO (4/7 — Etapa A (43.1-43.3) + Etapa B (43.4 API) completas; falta UI local/cloud + docs).
 Deps:     FASE 41 (runtime recursivo — RecursiveAgent, build_root_agent, resolver),
           FASE 42 (AGENT_LEAF_MODEL — se subsume en config por-agente),
           FASE 14 (agent_config + edición de agentes desde backoffice — patrón a reusar),
@@ -3985,11 +3985,10 @@ Decisiones tomadas:
             `build_recursive`). Tests unitarios + e2e. (PR core #236)
 
 #### Etapa B - core: API
-- [ ] 43.4  Endpoints: `GET /agents` incluye al `orchestrator` con su config y su kind; el PATCH
-            `/agents/{id}/config` y `/agents/{id}/metadata` lo operan con allow-list que PROTEGE lo no
-            editable (status, delegabilidad, proactive). `GET /models` (proxy de `ollama list`) para
-            poblar el dropdown. Tests (config round-trip; desactivar/togglear-proactive el orquestador
-            falla o se ignora; `/models` mockeado).
+- [x] 43.4  Endpoints: `GET /agents` usa `get_catalog()` → incluye al `orchestrator` con su config y
+            kind; `PATCH /config` y `/metadata` lo operan (config con allow-list al schema); `/status`
+            y `/proactive` lo rechazan con 400 explícito. `GET /models` (proxy de Ollama `/api/tags`).
+            Tests TestClient (catálogo, allow-list, rechazos, /models up/down). (PR core #237)
 
 #### Etapa C - backoffice local
 - [ ] 43.5  UI: el `orchestrator` aparece en `/agents` con badge especial; su detail/edit muestra y
