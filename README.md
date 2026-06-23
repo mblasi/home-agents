@@ -111,6 +111,16 @@ iGPU** (Radeon 780M / ROCm): a qwen3 8b+4b pair exceeds the ~8 GB GTT ceiling an
 qwen2.5 7b+3b pair loads but the leaf's tool-constrained generation aborts intermittently — so the
 tree runs single-model. A dedicated GPU would unlock the tier and cut latency.
 
+**Orchestrator as a first-class agent (Phase 43).** The root agent is no longer a hardcoded runtime
+construct: it lives in the catalog (`agent_registry.get_catalog()` = domain `get_registry()` + a
+synthetic `orchestrator` entry of `kind="orchestrator"` — not delegable, not proactive, not
+disableable) and its config (LLM `model`, `system_prompt`, and guards `max_iters`/`max_depth`/
+`llm_budget`/`routing_hint_enabled`) lives in `agent_config`, hot-editable like any agent.
+`build_root_agent` reads it; the per-agent model now wins over the global `AGENT_LEAF_MODEL` env
+(generalizing Phase 42's env-only tier). It's editable from both backoffices: the local one shows it
+in `/agents` with an edit form; the cloud one with the typed `agent.config` command (model picker fed
+by `GET /models` via the snapshot).
+
 ---
 
 ## Observability (Phase 35)

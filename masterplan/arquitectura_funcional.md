@@ -273,6 +273,36 @@ calls: raíz→haos→tool→consolidación). Es el costo aceptado de que el pla
 Observabilidad en FASE 41.9: llamadas LLM y tool_calls por request, profundidad del árbol, y uso de
 las tools de housekeeping (la métrica `bypass_rate` de 40.6 tiende a 0 y se deprecó).
 
+#### Orquestador como agente de primera clase (FASE 43)
+
+Cerrando el refactor recursivo, el **orquestador (agente raíz) deja de ser un constructo runtime
+hardcodeado** y pasa a ser un agente más, configurable y presente en el catálogo:
+
+- **En el catálogo.** `agent_registry.get_catalog()` = `get_registry()` (sólo agentes de dominio
+  delegables, intacto — lo consumen el scheduler proactivo, las agent cards y el clasificador) **+**
+  una entry sintética del orquestador (`ORCHESTRATOR_ID = "orchestrator"`, `kind="orchestrator"`).
+  El orquestador es **kind especial**: no delegable (excluido de los `sub_agents` y de los enums de
+  `call_agent` de todo nodo — no rompe la recursión), no proactivo, y no desactivable (status fijo
+  `active`).
+- **Config en `agent_config`** (SQLite, editable en caliente como cualquier agente), con su
+  `config_schema`: `model` (backend LLM), `system_prompt` (override del `_ROOT_SYSTEM`), `max_iters`,
+  `max_depth`, `llm_budget`, `routing_hint_enabled`. `build_root_agent` lee la config efectiva
+  (`agent_registry.orchestrator_config()`); el RunContext del server toma `max_depth`/`llm_budget` de
+  ahí; el hint del clasificador (42.3) se gatea con `routing_hint_enabled`. Defaults derivados del
+  runtime/env (`AGENT_MODEL`, `AGENT_MAX_ITERS`, …).
+- **Modelo POR-AGENTE** (generaliza y subsume el tier env-only de 42.2). Cada `RecursiveAgent` toma su
+  `model` de su config efectiva; el resolver del server (`_resolve_agent_model`) ya no pisa
+  `child.model` con la env global: prioriza override explícito en `agent_config` > `AGENT_LEAF_MODEL`
+  (tier global) > el modelo del propio agente. `AGENT_LEAF_MODEL` queda como default global (su uso
+  efectivo sigue gateado por el hardware — la iGPU 780M no sostiene dos modelos concurrentes).
+- **API y backoffices.** Core: `GET /agents` (y `/agents-meta`) lo incluyen vía `get_catalog`;
+  `PATCH /agents/orchestrator/config` y `/metadata` lo editan (config con allow-list al schema);
+  `/status` y `/proactive` lo rechazan (400); `GET /models` lista los modelos de Ollama. El
+  **backoffice local** lo muestra en `/agents` con badge 🎼 y form de edición (modelo/prompt/guards,
+  `routing_hint_enabled` como checkbox). El **backoffice cloud** lo opera egress-only con el comando
+  tipado `agent.config` (widget `model` poblado por `snapshot.models`); el orquestador y su config
+  viajan en el snapshot (sin secretos).
+
 #### Persistencia de datos (SQLite — FASE 32)
 
 Toda la data del sistema vive en **`~/.local/share/capitan/capitan.db`** (SQLite) vía

@@ -61,6 +61,15 @@ la pantalla con `screen_off_timeout` y abre el dashboard con `am start -d`. Egre
 inbound; el panel hace el PULL. El snapshot lleva la config vigente de cada panel (no PII) para
 prellenar el form.
 
+**Configurar el orquestador / agentes (FASE 43).** La sección Agentes incluye, por agente (rol
+`emit`), un botón "configurar" que abre el form tipado en el comando `agent.config`: modelo LLM
+(selector poblado desde `snapshot.models`, kind de presentación `model`), `system_prompt` y guards
+(`max_iters`/`max_depth`/`llm_budget`/`routing_hint_enabled`). El bridge lo ejecuta como
+`PATCH /agents/{id}/config` en core (allow-list al `config_schema`). El **orquestador** (agente raíz)
+aparece con badge 🎼 — configurable pero sin activar/desactivar (no es delegable ni proactivo ni
+desactivable); su `kind` y su config efectiva viajan en el snapshot (sin secretos) para prellenar el
+form.
+
 ## Deploy de servicios (FASE 34)
 
 El dashboard incluye una **matriz de targets**: una fila por componente que corre (core,
