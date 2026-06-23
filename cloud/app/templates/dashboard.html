@@ -306,16 +306,24 @@ function renderVersions(v) {
     const avail = t.behind
       ? `<span class="warn">⬆ ${link(t.latest || "?", t.latest_url)}</span>`
       : `<span class="muted">al día</span>`;
-    return `<div>${t.behind ? "⚠️" : "🟢"} ${WHERE_ICON[t.where] || ""} <b>${esc(t.label)}</b> `
-      + `<span class="muted">${esc(t.where)}</span> ${run} · ${avail}`
-      + btn(t.behind ? "⬆ actualizar" : "deploy", t.id) + `</div>`;
+    return `<tr>`
+      + `<td>${t.behind ? "⚠️" : "🟢"} ${WHERE_ICON[t.where] || ""}</td>`
+      + `<td><b>${esc(t.label)}</b></td>`
+      + `<td class="muted">${esc(t.where)}</td>`
+      + `<td>${run}</td>`
+      + `<td>${avail}</td>`
+      + `<td style="text-align:right">${btn(t.behind ? "⬆ actualizar" : "deploy", t.id)}</td>`
+      + `</tr>`;
   };
+  const table = (rows) => `<table><thead><tr>`
+    + `<th></th><th>Componente</th><th>Dónde</th><th>Versión</th><th>Disponible</th><th></th>`
+    + `</tr></thead><tbody>${rows}</tbody></table>`;
   const main = all.filter(t => !t.advanced).map(row).join("");
   const adv  = all.filter(t => t.advanced).map(row).join("");
   $("versions").innerHTML =
-    `<div class="grid">${main || "<span class='muted'>sin datos</span>"}</div>`
+    (main ? table(main) : "<span class='muted'>sin datos</span>")
     + (adv ? `<details class="advanced"><summary class="muted">avanzado (wa · bridge)</summary>`
-             + `<div class="grid">${adv}</div></details>` : "");
+             + table(adv) + `</details>` : "");
 }
 
 // Comandos que reinician/alteran producción → piden confirmación.
