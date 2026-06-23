@@ -3358,8 +3358,8 @@ Objetivo: Una capa de conversación como COLUMNA VERTEBRAL de la continuidad, ch
           contexto y rutee al agente dueño; (c) identificar al usuario una vez por sesión
           (no por conversación); (d) dar a cada agente un contexto consistente (user_context
           por-agente + historial reciente). Reemplaza y expande el épico 18.16 (#532).
-Estado:   EN CURSO (5/11 — Etapa A completa: 36.1, 36.2, 36.3; Etapa B: 36.4, 36.5 listas,
-          falta 36.6 deploy+e2e contra NSPanel físico).
+Estado:   EN CURSO (6/11 — Etapa A completa: 36.1, 36.2, 36.3; Etapa B: 36.4, 36.5 listas,
+          falta 36.6 deploy+e2e contra NSPanel físico; Etapa C: 36.7 lista, falta 36.8).
 Deps:     conversations.py (FASE 9/22), intent_state + proactivo (FASE 22/27), 19.4 (ruteo WA
           por intent_id — base del frente proactivo), FASE 16 (audio_server/satellite), FASE 35
           (métricas, para 36.10).
@@ -3406,9 +3406,12 @@ Modelo conceptual (decisiones de diseño):
             re-wake; sin regresiones de falsos positivos.
 
 #### Etapa C - Continuidad en WhatsApp (core)
-- [ ] 36.7  Conversación activa en WA: TTL largo; un mensaje entrante reanuda la última
+- [x] 36.7  Conversación activa en WA: TTL largo; un mensaje entrante reanuda la última
             conversación activa del remitente si existe (no crea una nueva por gap temporal).
-            Tests.
+            `wa_inbound` resuelve el conversation_id con `resume_latest(source)` cuando no viene
+            uno explícito (ambas ramas texto/media); revive incluso conversaciones `expired`
+            dentro del TTL del canal (6h). Cerradas o fuera de TTL → arranca fresca; el id
+            explícito (quoted-reply) tiene precedencia. PR core #240. Tests (test_wa_continuity.py).
 - [ ] 36.8  Proactivos como turnos: las notificaciones proactivas (advise/goal/request)
             registran un turno `assistant` en una conversación con su `intent_id`; el reply
             (quoted-reply o por recencia) se liga a esa conversación y rutea al agente dueño
