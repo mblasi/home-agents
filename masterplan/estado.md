@@ -3939,7 +3939,7 @@ Objetivo: Cerrar el refactor del runtime recursivo (FASE 41/42) formalizando al 
           POR-AGENTE (subsume el tier env-only de 42.2); (d) lo expone y edita desde AMBOS
           backoffices (form local + comando tipado cloud egress-only). Mantiene su naturaleza
           especial sin romper la recursión.
-Estado:   EN CURSO (6/7 — Etapas A-D completas (core + UI local + UI cloud); falta sólo docs (43.7)).
+Estado:   COMPLETA (7/7).
 Deps:     FASE 41 (runtime recursivo — RecursiveAgent, build_root_agent, resolver),
           FASE 42 (AGENT_LEAF_MODEL — se subsume en config por-agente),
           FASE 14 (agent_config + edición de agentes desde backoffice — patrón a reusar),
@@ -4008,6 +4008,6 @@ Decisiones tomadas:
             (`test_commands`, `test_bridge`: validación, executor, snapshot valida el contrato).
 
 #### Etapa E - documentación
-- [ ] 43.7  Docs: `arquitectura_funcional.md` (orquestador como agente configurable + modelo
-            por-agente que subsume el tier de 42.2), READMEs (core, cloud, raíz); lint de estado +
-            sync de issues.
+- [x] 43.7  Docs: `arquitectura_funcional.md` (nueva sección "Orquestador como agente de primera
+            clase" + modelo por-agente que subsume el tier de 42.2), READMEs (core: endpoints +
+            `/models`; raíz: párrafo FASE 43; cloud: comando `agent.config`); lint de estado + sync.
