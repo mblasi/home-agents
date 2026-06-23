@@ -3593,7 +3593,9 @@ Deps:     FASE 16 (paneles + audio_server + heartbeat/auto-update), FASE 33/37 (
           tipados + snapshot egress-only), FASE 32 (tabla panels en SQLite).
 Decisiones tomadas:
           - Pantalla: apagado NATIVO de Android (settings put system screen_off_timeout), no
-            atenuación por brillo. Un solo parámetro en segundos.
+            atenuación por brillo. Un solo parámetro en segundos. NOTA: el satélite también ajusta
+            `stay_on_while_plugged_in` (0 con timeout finito, 7 con 'nunca') — sin esto, en paneles
+            donde el firmware lo deja !=0 la pantalla se ATENÚA enchufada pero nunca se apaga.
           - Dashboard: dropdown poblado desde los dashboards reales de HA (lovelace, vía WebSocket
             lovelace/dashboards/list); se guarda el deeplink completo que abre la Companion.
           - Persistencia: columna `config` JSON en la tabla panels (no columnas tipadas) → se

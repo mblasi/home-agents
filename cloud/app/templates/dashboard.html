@@ -433,7 +433,7 @@ function renderPanels(state) {
   const tgt = {};
   ((state.versions || {}).targets || []).filter(t => t.kind === "satellite")
     .forEach(t => { tgt[t.label] = t; });
-  $("panels").innerHTML = nodes.length ? `<div class="grid">` + nodes.map(n => {
+  $("panels").innerHTML = nodes.length ? `<div class="grid panels-grid">` + nodes.map(n => {
     const t = tgt[n.id] || {};
     const ver = t.version ? `<span class="muted">${esc(t.version)}</span>` : "";
     const upd = t.behind ? ` <span class="warn">⬆ desactualizado</span>` : "";
@@ -444,7 +444,7 @@ function renderPanels(state) {
     const dev = n.device_config || {};
     const act = CAPS.emit
       ? `<span><button class="mini" onclick="actReboot('${id}')">reiniciar</button>`
-        + ` <button class="mini" onclick="togglePanelCfg('${id}')">configurar</button>`
+        + ` <button id="cfgbtn-${id}" class="mini" onclick="togglePanelCfg('${id}')">configurar</button>`
         + ` <span id="pan-${id}" class="muted"></span></span>` : "";
     // FASE 38: form de config contextual (apagado de pantalla + dashboard por defecto), oculto.
     const curTo = cfg.screen_timeout_secs != null ? cfg.screen_timeout_secs : "";
@@ -457,11 +457,12 @@ function renderPanels(state) {
       : ` <span class="muted">· sin dashboard fijado desde el sistema</span>`;
     const cfgForm = CAPS.emit
       ? `<div id="cfg-${id}" class="panel-cfg hidden">`
+        + `<div class="panel-cfg-title">Ajustes de ${id}</div>`
         + `<div class="field"><label>Apagar pantalla tras (seg, 0 = nunca)${toHint}</label>`
         + `<input id="cfgto-${id}" type="number" min="0" step="5" value="${curTo}" placeholder="120"></div>`
         + `<div class="field"><label>Dashboard por defecto${dashHint}</label>`
         + `<select id="cfgdash-${id}">${dashboardOptions(cfg.default_dashboard || "")}</select></div>`
-        + `<div><button class="mini" onclick="savePanelCfg('${id}')">guardar config</button> `
+        + `<div><button class="mini" onclick="savePanelCfg('${id}')">guardar</button> `
         + `<span id="pancfg-${id}" class="muted"></span>`
         + `</div></div>` : "";
     return `<div class="tile"><b>${dot(n.online)} ${id}</b>`
@@ -470,10 +471,13 @@ function renderPanels(state) {
   }).join("") + `</div>` : `<span class="muted">sin paneles registrados</span>`;
 }
 
-// FASE 38: muestra/oculta el form de config de un panel.
+// FASE 38: muestra/oculta el form de config de un panel y refleja el estado en el botón.
 function togglePanelCfg(id) {
   const el = $("cfg-" + id);
-  if (el) el.classList.toggle("hidden");
+  if (!el) return;
+  el.classList.toggle("hidden");
+  const btn = $("cfgbtn-" + id);
+  if (btn) btn.textContent = el.classList.contains("hidden") ? "configurar" : "cancelar";
 }
 
 // FASE 38: emite panel.config con lo cargado en el form contextual del panel.
