@@ -3939,7 +3939,7 @@ Objetivo: Cerrar el refactor del runtime recursivo (FASE 41/42) formalizando al 
           POR-AGENTE (subsume el tier env-only de 42.2); (d) lo expone y edita desde AMBOS
           backoffices (form local + comando tipado cloud egress-only). Mantiene su naturaleza
           especial sin romper la recursión.
-Estado:   EN CURSO (1/7 — 43.1 lista; el orquestador ya está en el catálogo vía get_catalog).
+Estado:   EN CURSO (2/7 — 43.1 catálogo + 43.2 config en agent_config listas).
 Deps:     FASE 41 (runtime recursivo — RecursiveAgent, build_root_agent, resolver),
           FASE 42 (AGENT_LEAF_MODEL — se subsume en config por-agente),
           FASE 14 (agent_config + edición de agentes desde backoffice — patrón a reusar),
@@ -3973,11 +3973,12 @@ Decisiones tomadas:
             `get_registry()` — éste lo consumen el scheduler proactivo, las agent cards y el
             clasificador y debe quedar domain-only. Helpers `is_orchestrator`/`is_delegable`; guard en
             `_allowed_agent_ids` (el orquestador nunca es sub-agente). Tests. (PR core #234)
-- [ ] 43.2  Cablear `build_root_agent` a `agent_config`: lee la config efectiva
-            (`get_effective_config("orchestrator", schema)`) para model/system_prompt/guards, con
-            defaults desde env; `routing_hint` gateado por `routing_hint_enabled`. Quitar el hardcode
-            env-only del modelo y el `_ROOT_SYSTEM` fijo (pasa a default del schema). Tests (config
-            overridea env; fallback a env/default sin config; hint on/off).
+- [x] 43.2  Cablear `build_root_agent` a `agent_config`: lee la config efectiva
+            (`agent_registry.orchestrator_config()` → `get_effective_config`) para
+            model/system_prompt/max_iters; el RunContext del server toma max_depth/llm_budget de la
+            misma config; `routing_hint` gateado por `routing_hint_enabled` (ni se computa si off).
+            Defaults desde env; el param explícito `model` mantiene prioridad. Tests (override de
+            model/prompt/iters; fallback a default; hint on/off). (PR core #235)
 - [ ] 43.3  Modelo por-agente (subsume 42.2): cada `RecursiveAgent` toma su `model` de su config
             efectiva con fallback a `AGENT_LEAF_MODEL`/`AGENT_MODEL`; el resolver deja de pisar
             `child.model` con la env global. Tests (override por-agente respetado; fallback correcto).
