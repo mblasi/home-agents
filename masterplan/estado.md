@@ -3894,8 +3894,12 @@ Objetivo: Bajar la latencia del árbol de agentes recursivo (FASE 41) antes de f
           40) por la multiplicación de llamadas LLM (raíz plan + hijo plan + hijo consolidación +
           raíz consolidación). Sin sacrificar el principio agnóstico (no se reintroducen
           cortocircuitos deterministas).
-Estado:   COMPLETA (optimizaciones aplicadas; AGENT_LEAF_MODEL pendiente de pull de un modelo chico).
-Deps:     FASE 41 (runtime recursivo desplegado dormido, flag AGENT_RUNTIME_RECURSIVE).
+Estado:   COMPLETA. El flip a producción YA OCURRIÓ (2026-06-23 ~10:08, commit 5b9566e):
+          AGENT_RUNTIME_RECURSIVE=true en el Brain — el árbol recursivo atiende todo el tráfico.
+          Optimizaciones 42.1/42.3 activas. La palanca 42.2 (AGENT_LEAF_MODEL) queda IMPLEMENTADA
+          pero INACTIVA: el hardware ya relevado (iGPU Radeon 780M, ~8GB GTT) NO permite un segundo
+          modelo concurrente — mecanismo listo para una futura mejora de hardware (ver decisión abajo).
+Deps:     FASE 41 (runtime recursivo, flag AGENT_RUNTIME_RECURSIVE — ya flipeado a true).
 ```
 
 #### Etapa A - Palancas de latencia
@@ -3911,9 +3915,93 @@ Deps:     FASE 41 (runtime recursivo desplegado dormido, flag AGENT_RUNTIME_RECU
 #### Etapa B - Validación
 - [x] 42.4  Re-validar la latencia contra el Ollama real del Brain (standalone, read-only) y reportar.
             Dejar listo para el flip (decisión del usuario).
-            RESULTADO: core optimizado desplegado (v0.1.7, flag OFF). Skip-consolidación (42.1) y hint
-            de routing (42.3) activos; modelo por tier (42.2) listo pero el Brain sólo tiene
-            qwen2.5:7b → AGENT_LEAF_MODEL no aplicable hasta `ollama pull` de un modelo chico
-            (ej. qwen2.5:3b). Con 7b-only la latencia de dominio sigue ~14-16s (el costo son las
-            múltiples llamadas al 7b). Para bajarla de verdad: pull de modelo chico + AGENT_LEAF_MODEL
-            en las hojas, luego re-medir y flipear. Flip sigue postergado (decisión del usuario).
+            RESULTADO: core optimizado desplegado (v0.1.7). Skip-consolidación (42.1) y hint
+            de routing (42.3) activos; modelo por tier (42.2) IMPLEMENTADO pero INACTIVO. El flip a
+            producción se hizo después de esta validación (2026-06-23 ~10:08): AGENT_RUNTIME_RECURSIVE
+            =true, el árbol atiende todo el tráfico a ~14-16s en dominio. Con 7b-only la latencia es ese
+            costo (múltiples llamadas al 7b). AGENT_LEAF_MODEL bajaría la latencia, PERO el hardware ya
+            relevado (iGPU Radeon 780M, ~8GB GTT compartida) no sostiene dos modelos grandes en GTT a la
+            vez → un segundo modelo concurrente no es viable hoy. Decisión: dejar el mecanismo listo
+            (configurable por env) para una futura mejora de hardware; NO se hace `ollama pull` de un
+            modelo chico por ahora. Re-medir y activar AGENT_LEAF_MODEL cuando el hardware lo permita.
+
+### FASE 43 - Orquestador como agente de primera clase (configurable + en el catálogo)
+
+```
+Objetivo: Cerrar el refactor del runtime recursivo (FASE 41/42) formalizando al ORQUESTADOR (el
+          agente raíz) como UN AGENTE MÁS en todos los aspectos. Hoy es un constructo runtime
+          hardcodeado (`build_root_agent` en server.py por-request): no está en el catálogo, su
+          modelo LLM sale sólo de `AGENT_MODEL` env, su system_prompt es `_ROOT_SYSTEM` hardcodeado
+          y sus guards (max_iters/max_depth/budget/routing_hint) no se tocan. Esta fase: (a) lo
+          mete en el catálogo (`get_registry`) como entry de kind especial; (b) lleva su
+          configuración a `agent_config` (SQLite, editable en caliente como cualquier agente):
+          MODELO LLM como mínimo + system_prompt + guards; (c) generaliza el modelo a config
+          POR-AGENTE (subsume el tier env-only de 42.2); (d) lo expone y edita desde AMBOS
+          backoffices (form local + comando tipado cloud egress-only). Mantiene su naturaleza
+          especial sin romper la recursión.
+Estado:   Pendiente.
+Deps:     FASE 41 (runtime recursivo — RecursiveAgent, build_root_agent, resolver),
+          FASE 42 (AGENT_LEAF_MODEL — se subsume en config por-agente),
+          FASE 14 (agent_config + edición de agentes desde backoffice — patrón a reusar),
+          FASE 37 (backoffice cloud + comandos tipados + snapshot egress-only),
+          FASE 38 (config administrable desde ambos backoffices — patrón de referencia).
+Decisiones tomadas:
+          - agent_id reservado `orchestrator`. NO es un REGISTRY de dominio (no se instancia por el
+            resolver como target de delegación): `get_registry()` inyecta una entry SINTÉTICA de kind
+            especial (`kind="orchestrator"`). Su AgentCard describe el rol; sin examples de delegación.
+          - NO DELEGABLE: `orchestrator` se excluye explícitamente de los `sub_agents` y de los enums
+            de `call_agent` de TODO nodo del árbol → ningún agente puede delegarle (evita recursión
+            degenerada). NO proactivo. NO desactivable: status fijo `active` (read-only en la UI/API).
+          - Config del raíz en `agent_config` con `config_schema` propio: `model` (backend LLM),
+            `system_prompt` (override de `_ROOT_SYSTEM`), `max_iters`, `max_depth`, `llm_budget`,
+            `routing_hint_enabled` (bool — gatea la inyección del hint del fast_classifier de 42.3).
+            Defaults desde env (`AGENT_MODEL`, `DEFAULT_MAX_ITERS/DEPTH`, budget); la config overridea.
+          - Modelo POR-AGENTE (generaliza 42.2): cada `RecursiveAgent` toma su `model` de su config
+            efectiva con fallback a `AGENT_LEAF_MODEL`/`AGENT_MODEL`. El resolver deja de PISAR
+            `child.model` con la env global; respeta el override por-agente. Env = default global.
+          - Lista de modelos disponibles: `GET /models` en core (proxy de `ollama list`/`/api/tags`)
+            para poblar el dropdown de modelo; al cloud llega por snapshot (egress-only).
+          - Egress-only intacto: el orquestador y su config viajan en el snapshot de agentes
+            (sin secretos); la edición desde el cloud es por comando-poll tipado admin-only.
+```
+
+#### Etapa A - core: catálogo + configuración del orquestador
+- [ ] 43.1  Catálogo: `get_registry()` incluye al `orchestrator` como entry sintética de kind especial
+            (no delegable, no proactivo, status fijo `active`) con su AgentCard y `config_schema`
+            (model/system_prompt/max_iters/max_depth/llm_budget/routing_hint_enabled). Guard: excluir
+            `orchestrator` de los `sub_agents` y de los enums de `call_agent` en todo nodo. Tests
+            (el catálogo lo lista; ningún agente puede delegarle; no es proactivo ni desactivable).
+- [ ] 43.2  Cablear `build_root_agent` a `agent_config`: lee la config efectiva
+            (`get_effective_config("orchestrator", schema)`) para model/system_prompt/guards, con
+            defaults desde env; `routing_hint` gateado por `routing_hint_enabled`. Quitar el hardcode
+            env-only del modelo y el `_ROOT_SYSTEM` fijo (pasa a default del schema). Tests (config
+            overridea env; fallback a env/default sin config; hint on/off).
+- [ ] 43.3  Modelo por-agente (subsume 42.2): cada `RecursiveAgent` toma su `model` de su config
+            efectiva con fallback a `AGENT_LEAF_MODEL`/`AGENT_MODEL`; el resolver deja de pisar
+            `child.model` con la env global. Tests (override por-agente respetado; fallback correcto).
+
+#### Etapa B - core: API
+- [ ] 43.4  Endpoints: `GET /agents` incluye al `orchestrator` con su config y su kind; el PATCH
+            `/agents/{id}/config` y `/agents/{id}/metadata` lo operan con allow-list que PROTEGE lo no
+            editable (status, delegabilidad, proactive). `GET /models` (proxy de `ollama list`) para
+            poblar el dropdown. Tests (config round-trip; desactivar/togglear-proactive el orquestador
+            falla o se ignora; `/models` mockeado).
+
+#### Etapa C - backoffice local
+- [ ] 43.5  UI: el `orchestrator` aparece en `/agents` con badge especial; su detail/edit muestra y
+            edita `model` (dropdown desde `/models`), `system_prompt` y los guards
+            (max_iters/max_depth/llm_budget/routing_hint_enabled). Oculta los toggles que no aplican
+            (proactive, delegabilidad, status). Reusa el form de FASE 14.
+
+#### Etapa D - backoffice cloud
+- [ ] 43.6  Comando tipado `agent.config` (CATALOG/PRESENTATION/validación, admin-only): params
+            agent_id + claves de config (`model` kind enum poblado por el snapshot de modelos
+            disponibles, `system_prompt` text, guards numéricos, `routing_hint_enabled` bool) +
+            executor que llama el PATCH del core. Snapshot: incluir al `orchestrator` con su config
+            (egress-safe) + lista de modelos disponibles. UI contextual "configurar" del orquestador
+            en `dashboard.html`. Tests (`test_commands`, `test_bridge`).
+
+#### Etapa E - documentación
+- [ ] 43.7  Docs: `arquitectura_funcional.md` (orquestador como agente configurable + modelo
+            por-agente que subsume el tier de 42.2), READMEs (core, cloud, raíz); lint de estado +
+            sync de issues.
