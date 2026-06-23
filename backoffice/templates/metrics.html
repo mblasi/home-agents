@@ -226,12 +226,16 @@ async function loadLLM() {
   ]);
   const rq = sum.requests || {}, lc = sum.llm_calls || {};
   const bp = sum.bypass || {}, bt = bp.by_type || {};
+  const rt = sum.runtime || {};
   const rate = t => fmtPct((bt[t] || {}).rate);
   $("llm-cards").innerHTML =
     card("Requests", fmtNum(rq.requests)) +
     card("Lat. total", rq.avg_total_latency_ms != null ? rq.avg_total_latency_ms + " ms" : "—") +
     card("Lat. coord", rq.avg_coordinator_ms != null ? rq.avg_coordinator_ms + " ms" : "—") +
     card("Fast-path", fmtPct(rq.fast_classifier_rate), "unknown " + fmtPct(rq.unknown_rate)) +
+    card("Árbol de agentes", (rt.avg_llm_calls != null ? rt.avg_llm_calls : "—") + " LLM/req",
+         "tools " + (rt.avg_tool_calls != null ? rt.avg_tool_calls : "—") + "/req · prof " +
+         (rt.avg_depth != null ? rt.avg_depth : "—") + " (máx " + (rt.max_depth || 0) + ")") +
     card("Bypass del planner", fmtPct(bp.bypass_rate),
          "cap " + rate("capture") + " · fc " + rate("fast_classifier") +
          " · close " + rate("close") + " · ack " + rate("ack")) +
