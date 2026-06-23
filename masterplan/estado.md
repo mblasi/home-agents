@@ -3815,7 +3815,7 @@ Objetivo: Eliminar TODA heurística determinista pre-planner y unificar el siste
           agente raíz: que "chau" cierre la conversación es decisión orgánica del LLM, no una keyword.
           Sin fast_classifier, sin cortocircuitos. El usuario recibe una respuesta consolidada
           construida por un árbol de agentes orquestados.
-Estado:   EN CURSO (7/10 — Etapas A-D completas; resta E-G).
+Estado:   EN CURSO (8/10 — Etapas A-E completas; resta F-G).
 Deps:     FASE 40 (orquestación agnóstica — esta fase erradica los cortes que 40 sólo acotó),
           FASE 9  (coordinador/aggregate — referencia del prompt de consolidación),
           agent_loop.run_loop (núcleo del loop LLM↔tools a generalizar),
@@ -3859,7 +3859,7 @@ Plan:     `.claude/plans/quizzical-snacking-teacup.md`.
             (system ya usa run_loop). ToolDefs + dispatch + system_prompt + afinidades. Tests por agente.
 
 #### Etapa E - Reemplazo del hot-path
-- [ ] 41.8  `server.py`: quitar de `process()`/`process_stream()` los cortocircuitos (close/ack/
+- [x] 41.8  `server.py`: quitar de `process()`/`process_stream()` los cortocircuitos (close/ack/
             capture) y enrutar todo al `RecursiveAgent` raíz. Eliminar `fast_classifier` y retirar
             `coordinator.coordinate`/`_run_plan` del hot-path (el árbol los subsume). Flip del flag.
             Tests e2e (LLM mockeado): close/ignore/capture/clarify, single-domain, multi-domain.
