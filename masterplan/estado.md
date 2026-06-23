@@ -3939,7 +3939,7 @@ Objetivo: Cerrar el refactor del runtime recursivo (FASE 41/42) formalizando al 
           POR-AGENTE (subsume el tier env-only de 42.2); (d) lo expone y edita desde AMBOS
           backoffices (form local + comando tipado cloud egress-only). Mantiene su naturaleza
           especial sin romper la recursión.
-Estado:   Pendiente.
+Estado:   EN CURSO (1/7 — 43.1 lista; el orquestador ya está en el catálogo vía get_catalog).
 Deps:     FASE 41 (runtime recursivo — RecursiveAgent, build_root_agent, resolver),
           FASE 42 (AGENT_LEAF_MODEL — se subsume en config por-agente),
           FASE 14 (agent_config + edición de agentes desde backoffice — patrón a reusar),
@@ -3966,11 +3966,13 @@ Decisiones tomadas:
 ```
 
 #### Etapa A - core: catálogo + configuración del orquestador
-- [ ] 43.1  Catálogo: `get_registry()` incluye al `orchestrator` como entry sintética de kind especial
-            (no delegable, no proactivo, status fijo `active`) con su AgentCard y `config_schema`
-            (model/system_prompt/max_iters/max_depth/llm_budget/routing_hint_enabled). Guard: excluir
-            `orchestrator` de los `sub_agents` y de los enums de `call_agent` en todo nodo. Tests
-            (el catálogo lo lista; ningún agente puede delegarle; no es proactivo ni desactivable).
+- [x] 43.1  Catálogo: el `orchestrator` entra como entry sintética de kind especial (no delegable,
+            no proactivo, status fijo `active`) con su AgentCard y `config_schema`
+            (model/system_prompt/max_iters/max_depth/llm_budget/routing_hint_enabled). Implementado vía
+            `get_catalog()` (= `get_registry()` domain-only + orquestador) en vez de tocar
+            `get_registry()` — éste lo consumen el scheduler proactivo, las agent cards y el
+            clasificador y debe quedar domain-only. Helpers `is_orchestrator`/`is_delegable`; guard en
+            `_allowed_agent_ids` (el orquestador nunca es sub-agente). Tests. (PR core #234)
 - [ ] 43.2  Cablear `build_root_agent` a `agent_config`: lee la config efectiva
             (`get_effective_config("orchestrator", schema)`) para model/system_prompt/guards, con
             defaults desde env; `routing_hint` gateado por `routing_hint_enabled`. Quitar el hardcode
