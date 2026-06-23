@@ -252,15 +252,19 @@ def _versions(nodes: list[dict]) -> dict:
             if t.kind == "cloudrun":
                 cs = cloud_state.get(t.id, {})
                 run_ver, run_url = cs.get("tag") or cs.get("version"), cs.get("url")
-                run_sha = cs.get("version")
             else:
-                run_ver, run_url, run_sha = ri.get("tag") or ri.get("sha"), ri.get("url"), ri.get("sha")
+                run_ver, run_url = ri.get("tag") or ri.get("sha"), ri.get("url")
+            latest_ver = ri.get("latest_tag") or ri.get("latest_sha")
             out["targets"].append({
                 "id": t.id, "label": t.label, "where": t.where, "kind": t.kind,
                 "advanced": t.advanced,
                 "version": run_ver, "url": run_url,
-                "latest": ri.get("latest_tag") or ri.get("latest_sha"), "latest_url": ri.get("latest_url"),
-                "behind": bool(run_sha and ri.get("latest_sha") and run_sha != ri["latest_sha"]),
+                "latest": latest_ver, "latest_url": ri.get("latest_url"),
+                # `behind` compara EXACTAMENTE lo que se muestra (tag vs tag, o sha vs sha si no hay
+                # tag) — no el tag visible contra el sha de origin/main. Si no, un target tagueado a
+                # la última release pero con main adelantado sin nuevo tag mostraba "misma versión +
+                # rezagado".
+                "behind": bool(run_ver and latest_ver and run_ver != latest_ver),
                 "command": t.command, "params": t.params,
             })
     except Exception:
