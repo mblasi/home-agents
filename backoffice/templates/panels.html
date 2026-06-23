@@ -52,6 +52,9 @@
         <td class="px-4 py-2 text-gray-400 text-xs">{{ p.users | join(", ") or "—" }}</td>
         <td class="px-4 py-2 text-right whitespace-nowrap">
           <span id="reboot-{{ p.name }}" class="mr-2"></span>
+          <button type="button"
+                  onclick="document.getElementById('cfg-{{ p.name }}-row').classList.toggle('hidden')"
+                  class="text-xs text-blue-400 hover:text-blue-300 mr-3">configurar</button>
           <button hx-post="/panels/{{ p.name }}/reboot"
                   hx-target="#reboot-{{ p.name }}" hx-swap="innerHTML"
                   hx-confirm="¿Reiniciar {{ p.name }}?"
@@ -69,7 +72,7 @@
       {% set cfg = p.config or {} %}
       {% set cur_to = dev.screen_timeout_secs if dev.screen_timeout_secs is not none else cfg.screen_timeout_secs %}
       {% set cur_dash = dev.default_dashboard or cfg.default_dashboard %}
-      <tr class="border-t border-gray-800/50 bg-gray-900/40">
+      <tr id="cfg-{{ p.name }}-row" class="border-t border-gray-800/50 bg-gray-900/40 hidden">
         <td colspan="6" class="px-4 py-3">
           <form hx-post="/panels/{{ p.name }}/config" hx-target="#cfg-st-{{ p.name }}"
                 hx-swap="innerHTML" class="flex flex-wrap items-end gap-4">
