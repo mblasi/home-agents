@@ -69,6 +69,9 @@ main { max-width: 1000px; width: 100%; margin: 0 auto; padding: 20px; }
 /* FASE 38: form de config contextual por panel */
 .panel-cfg { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line);
   display: flex; flex-direction: column; gap: 8px; }
+/* .panel-cfg{display:flex} le ganaba a .hidden{display:none} (misma especificidad, definido
+   después) → el form quedaba siempre visible y el toggle no hacía nada. Regla compuesta. */
+.panel-cfg.hidden { display: none; }
 .panel-cfg-title { font-weight: 600; font-size: 13px; }
 .panel-cfg .field { max-width: 100%; }
 .panel-cfg input, .panel-cfg select { font-size: 13px; }
