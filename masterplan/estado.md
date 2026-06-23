@@ -3815,7 +3815,7 @@ Objetivo: Eliminar TODA heurística determinista pre-planner y unificar el siste
           agente raíz: que "chau" cierre la conversación es decisión orgánica del LLM, no una keyword.
           Sin fast_classifier, sin cortocircuitos. El usuario recibe una respuesta consolidada
           construida por un árbol de agentes orquestados.
-Estado:   Pendiente.
+Estado:   EN CURSO (1/10 — Etapa A completa).
 Deps:     FASE 40 (orquestación agnóstica — esta fase erradica los cortes que 40 sólo acotó),
           FASE 9  (coordinador/aggregate — referencia del prompt de consolidación),
           agent_loop.run_loop (núcleo del loop LLM↔tools a generalizar),
@@ -3829,7 +3829,7 @@ Plan:     `.claude/plans/quizzical-snacking-teacup.md`.
 ```
 
 #### Etapa A - Diseño documentado
-- [ ] 41.1  Documentar en `arquitectura_funcional.md` el modelo recursivo (agente=orquestador), el
+- [x] 41.1  Documentar en `arquitectura_funcional.md` el modelo recursivo (agente=orquestador), el
             loop unificado LLM↔tools, las fases plan/ejecución/consolidación, los guards
             (max_depth/max_iters/budget/visited) y las tools de housekeeping. Reemplaza la sección de
             cortocircuitos de FASE 40.

@@ -222,6 +222,53 @@ muestran la **tasa de bypass del planner** con desglose por tipo; un salto en `c
 la elección de agente es siempre producto de la planeación del LLM sobre (prompt + AgentCards), sin
 cortocircuitos deterministas que secuestren el routing.
 
+#### Runtime de agentes recursivo (FASE 41 — diseño/objetivo)
+
+FASE 40 acotó los cortocircuitos pero no los erradicó (close/ack/captura y `fast_classifier` siguen
+siendo heurística determinista, y el plan es plano de un solo nivel). FASE 41 los **elimina por
+completo** y unifica el sistema bajo **una sola abstracción de agente recursiva**. Se construye
+detrás del flag `AGENT_RUNTIME_RECURSIVE` (el path FASE 40 queda como fallback hasta la Etapa E).
+
+**Principio: cada agente ES un orquestador.** No hay un "coordinador" separado de los "agentes": hay
+una única clase `RecursiveAgent` (satisface el Protocol `BaseAgent`) configurada por agente con:
+- `system_prompt`,
+- `tools` (`tool_store.ToolDef`) — sus interacciones con backends (+ housekeeping, sólo el raíz),
+- `dispatch` — ejecuta sus tools (envuelve los backends ya existentes: `ha_client`, openmeteo,
+  `yfinance`, `calendar_client`, `maps_client`, …),
+- `sub_agents` — agentes afines a los que puede delegar (`agent_config` afinidades),
+- `model`.
+
+**El loop unificado** (`core/agent_runtime.py`, generalización de `agent_loop.run_loop`). Cada
+`process(text, source, conv)` corre un loop LLM↔tools:
+1. **Plan**: se llama al LLM con el contexto del agente (prompt + `user_context_from(source)` + las
+   cards de sus sub-agentes afines + las specs de sus tools). El LLM elige tools.
+2. **Ejecución**: cada `tool_call` se ejecuta vía `dispatch`. La delegación a un sub-agente es una
+   tool más, `call_agent(agent_id, query)`, cuyo dispatch invoca **recursivamente**
+   `child.process(...)` y devuelve la respuesta del hijo como resultado de la tool. Los `tool_calls`
+   independientes de un mismo turno corren en paralelo.
+3. **Consolidación**: cuando el LLM deja de pedir tools, su turno final de prosa **es** la respuesta
+   consolidada. No hay fase aparte: el loop subsume plan + ejecución + consolidación.
+
+Así el usuario recibe una respuesta construida por un **árbol de agentes orquestados**, donde en cada
+nodo pudieron ejecutarse tools (backends) y delegaciones a hijos.
+
+**Housekeeping como tools del raíz.** No hay `is_close_phrase`/`is_acknowledgment`/captura por
+keyword. El agente raíz expone las tools `close_conversation`, `ignore`, `capture_reply`, `clarify`
+(implementadas con `conversations.manager.close`, `intent_state.capture_reply/get_pending_request`,
+`conv.set_continuation`). Que `"chau"` cierre la conversación, o que `"sí"` capture la respuesta a un
+request pendiente (cuya pregunta se inyecta en el contexto del raíz), es una **decisión orgánica del
+LLM** que llama la tool — supeditada al no-determinismo del modelo, sin atajos.
+
+**Guards (seguridad del runtime, no heurísticas de routing).** Para que la recursión no loopee ni
+explote: `max_depth` (profundidad del árbol), `max_iters` (iteraciones de tool-loop por nodo),
+presupuesto global de llamadas LLM por request, y un set de agentes `visited` para cortar ciclos. No
+sesgan qué agente atiende; sólo acotan el runtime.
+
+**Trade-off — latencia.** El árbol multiplica las llamadas LLM (un "prendé la luz" pasa de ~2 a ~3-4
+calls: raíz→haos→tool→consolidación). Es el costo aceptado de que el plan sea siempre orgánico.
+Observabilidad en FASE 41.9: llamadas LLM y tool_calls por request, profundidad del árbol, y uso de
+las tools de housekeeping (la métrica `bypass_rate` de 40.6 tiende a 0 y se deprecó).
+
 #### Persistencia de datos (SQLite — FASE 32)
 
 Toda la data del sistema vive en **`~/.local/share/capitan/capitan.db`** (SQLite) vía
