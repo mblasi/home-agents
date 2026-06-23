@@ -3815,7 +3815,7 @@ Objetivo: Eliminar TODA heurística determinista pre-planner y unificar el siste
           agente raíz: que "chau" cierre la conversación es decisión orgánica del LLM, no una keyword.
           Sin fast_classifier, sin cortocircuitos. El usuario recibe una respuesta consolidada
           construida por un árbol de agentes orquestados.
-Estado:   EN CURSO (3/10 — Etapas A-C completas).
+Estado:   EN CURSO (4/10 — Etapas A-C + 41.4 completas).
 Deps:     FASE 40 (orquestación agnóstica — esta fase erradica los cortes que 40 sólo acotó),
           FASE 9  (coordinador/aggregate — referencia del prompt de consolidación),
           agent_loop.run_loop (núcleo del loop LLM↔tools a generalizar),
@@ -3848,7 +3848,7 @@ Plan:     `.claude/plans/quizzical-snacking-teacup.md`.
             ("chau"→close, "ok"→ignore, "sí"→capture, ambiguo→clarify).
 
 #### Etapa D - Migración de agentes de dominio (big-bang)
-- [ ] 41.4  Migrar weather + travel + maps a `RecursiveAgent`: ToolDefs (openmeteo/geocoding/
+- [x] 41.4  Migrar weather + travel + maps a `RecursiveAgent`: ToolDefs (openmeteo/geocoding/
             maps_client) + dispatch (envolviendo backends existentes) + system_prompt + afinidades
             (maps→weather). Tests por agente con backends mockeados.
 - [ ] 41.5  Migrar haos a `RecursiveAgent`: tools `find_entity`/`get_state`/`call_service`
