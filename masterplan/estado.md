@@ -3890,12 +3890,12 @@ Objetivo: Bajar la latencia del árbol de agentes recursivo (FASE 41) antes de f
           40) por la multiplicación de llamadas LLM (raíz plan + hijo plan + hijo consolidación +
           raíz consolidación). Sin sacrificar el principio agnóstico (no se reintroducen
           cortocircuitos deterministas).
-Estado:   Pendiente.
+Estado:   EN CURSO (1/4 — 42.1 completa).
 Deps:     FASE 41 (runtime recursivo desplegado dormido, flag AGENT_RUNTIME_RECURSIVE).
 ```
 
 #### Etapa A - Palancas de latencia
-- [ ] 42.1  Saltear la consolidación cuando un nodo delegó a UN solo sub-agente y no produjo prosa
+- [x] 42.1  Saltear la consolidación cuando un nodo delegó a UN solo sub-agente y no produjo prosa
             propia ni otras tools: devolver la respuesta del hijo directa (ahorra una llamada LLM por
             nivel). En el runtime, agnóstico. Tests.
 - [ ] 42.2  Modelo por tier: las hojas de dominio usan un modelo más chico/rápido (configurable
