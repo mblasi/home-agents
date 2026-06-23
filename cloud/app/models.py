@@ -32,6 +32,8 @@ class AgentState(BaseModel):
     id: str
     active: bool
     proactive: bool = False
+    kind: str = "domain"            # FASE 43: "orchestrator" para el agente raíz
+    config: dict = Field(default_factory=dict)  # config efectiva (model/system_prompt/guards)
 
 
 class RecentCommand(BaseModel):
@@ -106,6 +108,8 @@ class StateSnapshot(BaseModel):
     counts: Counts = Field(default_factory=Counts)
     # FASE 38: dashboards de HA para poblar el selector del comando panel.config (no PII).
     dashboards: list[Dashboard] = Field(default_factory=list)
+    # FASE 43: modelos LLM disponibles en Ollama, para poblar el selector del comando agent.config.
+    models: list[str] = Field(default_factory=list)
     # Matriz unificada de targets (34.15): {targets: [{id,label,where,kind,version,url,latest,
     # latest_url,behind,command,params,advanced}], satellite_expected}. Opcional (retrocompat).
     versions: dict[str, Any] = Field(default_factory=dict)

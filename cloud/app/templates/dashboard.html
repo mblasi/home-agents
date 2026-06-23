@@ -387,6 +387,21 @@ const actToggle = (id, status) =>
     { label: `Poner ${id} en ${status}`, status: $("act-" + id) });
 const actProactive = (id) =>
   runCommand("proactive.run", { agent_id: id }, { label: `Correr ${id}`, status: $("act-" + id) });
+// 43.6: abre el form tipado en agent.config, prellenado con el agente y su config actual.
+function actConfig(id) {
+  location.hash = "acciones";
+  setTimeout(() => {
+    const sel = $("cmd-type"); if (!sel) return;
+    sel.value = "agent.config"; renderFields();
+    const set = (n, v) => { const e = $("f-" + n); if (e == null || v == null) return;
+      if (e.type === "checkbox") e.checked = !!v; else e.value = v; };
+    set("agent_id", id);
+    const a = ((LAST_STATE || {}).agents || []).find(x => x.id === id) || {};
+    const c = a.config || {};
+    ["model", "system_prompt", "max_iters", "max_depth", "llm_budget"].forEach(k => set(k, c[k]));
+    if ("routing_hint_enabled" in c) set("routing_hint_enabled", c.routing_hint_enabled);
+  }, 0);
+}
 const actReboot = (id) =>
   runCommand("panel.reboot", { node_id: id }, { label: `Reiniciar panel ${id}`, status: $("pan-" + id) });
 const actRetrain = () =>
@@ -531,15 +546,22 @@ async function refresh() {
     $("agents").innerHTML = (state.agents || [])
       .map(a => {
         const id = esc(a.id);
+        const isOrch = a.kind === "orchestrator";
         let act = "";
         if (CAPS.emit) {
-          const toggle = a.active
-            ? `<button class="mini" onclick="actToggle('${id}','planned')">desactivar</button>`
-            : `<button class="mini" onclick="actToggle('${id}','active')">activar</button>`;
-          const proa = a.proactive ? ` <button class="mini" onclick="actProactive('${id}')">correr</button>` : "";
-          act = ` ${toggle}${proa} <span id="act-${id}" class="muted"></span>`;
+          const cfg = `<button class="mini" onclick="actConfig('${id}')">configurar</button>`;
+          if (isOrch) {
+            // 43.6: el orquestador no se activa/desactiva ni corre proactivo — sólo se configura.
+            act = ` ${cfg} <span id="act-${id}" class="muted"></span>`;
+          } else {
+            const toggle = a.active
+              ? `<button class="mini" onclick="actToggle('${id}','planned')">desactivar</button>`
+              : `<button class="mini" onclick="actToggle('${id}','active')">activar</button>`;
+            const proa = a.proactive ? ` <button class="mini" onclick="actProactive('${id}')">correr</button>` : "";
+            act = ` ${toggle}${proa} ${cfg} <span id="act-${id}" class="muted"></span>`;
+          }
         }
-        return `<div>${dot(a.active)} <b>${id}</b>${a.proactive ? " ⚡" : ""}${act}</div>`;
+        return `<div>${isOrch ? "🎼" : dot(a.active)} <b>${id}</b>${isOrch ? " <span class=\"muted\">(orquestador)</span>" : ""}${a.proactive ? " ⚡" : ""}${act}</div>`;
       }).join("");
     renderWakeword(state.wakeword || {});
     renderPanels(state);
@@ -679,6 +701,11 @@ function dashboardOptions(selectedUrl) {
     + dl.map(d => `<option value="${esc(d.url)}"${d.url === selectedUrl ? " selected" : ""}>${esc(d.title)}</option>`).join("");
 }
 
+// Modelos LLM disponibles (FASE 43), desde el snapshot. Para el selector del comando agent.config.
+function modelOptions() {
+  return ((LAST_STATE || {}).models || []).map(m => m);
+}
+
 function fieldWidget(p) {
   const id = "f-" + p.name;
   const opt = (vals, withEmpty) =>
@@ -692,6 +719,8 @@ function fieldWidget(p) {
       w = `<select id="${id}">${opt(entityChoices(p.kind), true)}</select>`; break;
     case "dashboard":   // FASE 38: selector de dashboard de HA (value=url, label=título)
       w = `<select id="${id}">${dashboardOptions("")}</select>`; break;
+    case "model":       // FASE 43: selector de modelo LLM (poblado del snapshot)
+      w = `<select id="${id}">${opt(modelOptions(), true)}</select>`; break;
     case "multi":
       w = `<div id="${id}" class="checks">` + (p.choices || []).map(v =>
         `<label class="chk"><input type="checkbox" value="${esc(v)}"> ${esc(v)}</label>`).join("") + `</div>`; break;

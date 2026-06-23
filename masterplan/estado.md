@@ -3939,7 +3939,7 @@ Objetivo: Cerrar el refactor del runtime recursivo (FASE 41/42) formalizando al 
           POR-AGENTE (subsume el tier env-only de 42.2); (d) lo expone y edita desde AMBOS
           backoffices (form local + comando tipado cloud egress-only). Mantiene su naturaleza
           especial sin romper la recursión.
-Estado:   EN CURSO (5/7 — Etapas A+B+C (UI local) completas; falta UI cloud (43.6) + docs (43.7)).
+Estado:   EN CURSO (6/7 — Etapas A-D completas (core + UI local + UI cloud); falta sólo docs (43.7)).
 Deps:     FASE 41 (runtime recursivo — RecursiveAgent, build_root_agent, resolver),
           FASE 42 (AGENT_LEAF_MODEL — se subsume en config por-agente),
           FASE 14 (agent_config + edición de agentes desde backoffice — patrón a reusar),
@@ -3999,12 +3999,13 @@ Decisiones tomadas:
             entry (PR core #238). Tests del parser de config (backoffice).
 
 #### Etapa D - backoffice cloud
-- [ ] 43.6  Comando tipado `agent.config` (CATALOG/PRESENTATION/validación, admin-only): params
-            agent_id + claves de config (`model` kind enum poblado por el snapshot de modelos
-            disponibles, `system_prompt` text, guards numéricos, `routing_hint_enabled` bool) +
-            executor que llama el PATCH del core. Snapshot: incluir al `orchestrator` con su config
-            (egress-safe) + lista de modelos disponibles. UI contextual "configurar" del orquestador
-            en `dashboard.html`. Tests (`test_commands`, `test_bridge`).
+- [x] 43.6  Comando tipado `agent.config` (CATALOG/PRESENTATION/validación, admin-only via `emit`):
+            agent_id + config (kind `model` NUEVO poblado por el snapshot, system_prompt, guards int,
+            routing_hint_enabled bool); executor `_agent_config` → PATCH /config del core. Snapshot:
+            `models` (de `GET /models`) + el orquestador con `kind` y su `config` (egress-safe).
+            `AgentState`/`StateSnapshot` extendidos. UI: botón "configurar" por agente + `actConfig`
+            que prellena el form tipado; el orquestador con badge 🎼 sin toggle. Tests
+            (`test_commands`, `test_bridge`: validación, executor, snapshot valida el contrato).
 
 #### Etapa E - documentación
 - [ ] 43.7  Docs: `arquitectura_funcional.md` (orquestador como agente configurable + modelo

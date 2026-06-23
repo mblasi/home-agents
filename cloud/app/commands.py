@@ -110,6 +110,16 @@ CATALOG: dict[str, dict[str, tuple[Callable[[Any], Any], bool]]] = {
                         "status": (_enum("status", AGENT_STATUSES), True)},
     "panel.reboot":    {"node_id": (_str("node_id"), True)},
     "proactive.run":   {"agent_id": (_str("agent_id"), True)},
+    # FASE 43.6: configurar un agente (en particular el ORQUESTADOR): modelo LLM + guards +
+    # system_prompt. El core valida con allow-list al config_schema del agente; acá sólo se
+    # tipa. Todos los params de config son opcionales (merge parcial).
+    "agent.config":    {"agent_id": (_str("agent_id"), True),
+                        "model": (_str("model"), False),
+                        "system_prompt": (_str("system_prompt"), False),
+                        "max_iters": (_int_range("max_iters", 1, 20), False),
+                        "max_depth": (_int_range("max_depth", 1, 10), False),
+                        "llm_budget": (_int_range("llm_budget", 1, 100), False),
+                        "routing_hint_enabled": (_bool("routing_hint_enabled"), False)},
     # FASE 38: config por panel (apagado de pantalla por inactividad + dashboard por defecto).
     # El bridge upserta en core y marca el nodo en audio_server; el satélite la reaplica.
     "panel.config":    {"node_id": (_str("node_id"), True),
@@ -155,6 +165,7 @@ def validate_command(cmd_type: str, params: dict[str, Any] | None) -> dict[str, 
 #         user   → selector de usuario
 #         agent  → selector de agente
 #         dashboard → selector de dashboard de HA (poblado desde snapshot.dashboards, FASE 38)
+#         model  → selector de modelo LLM (poblado desde snapshot.models, FASE 43)
 # Comandos con entidad-ancla (agent.toggle/panel.reboot/proactive.run/...) se invocan como
 # acciones contextuales en su sección; igual se exponen aquí para completitud.
 CMD_LABELS: dict[str, str] = {
@@ -173,6 +184,7 @@ CMD_LABELS: dict[str, str] = {
     "panel.reboot": "Reiniciar panel",
     "proactive.run": "Correr agente proactivo",
     "panel.config": "Configurar panel",
+    "agent.config": "Configurar agente / orquestador",
 }
 
 PRESENTATION: dict[str, dict[str, dict[str, Any]]] = {
@@ -197,6 +209,13 @@ PRESENTATION: dict[str, dict[str, dict[str, Any]]] = {
                         "status": {"kind": "enum", "label": "Estado", "choices": AGENT_STATUSES}},
     "panel.reboot":    {"node_id": {"kind": "node", "label": "Panel"}},
     "proactive.run":   {"agent_id": {"kind": "agent", "label": "Agente"}},
+    "agent.config":    {"agent_id": {"kind": "agent", "label": "Agente"},
+                        "model": {"kind": "model", "label": "Modelo LLM"},
+                        "system_prompt": {"kind": "str", "label": "System prompt"},
+                        "max_iters": {"kind": "int", "label": "Máx. iteraciones por nodo", "min": 1, "max": 20},
+                        "max_depth": {"kind": "int", "label": "Máx. profundidad de delegación", "min": 1, "max": 10},
+                        "llm_budget": {"kind": "int", "label": "Presupuesto LLM (árbol)", "min": 1, "max": 100},
+                        "routing_hint_enabled": {"kind": "bool", "label": "Usar hint de routing"}},
     "panel.config":    {"node_id": {"kind": "node", "label": "Panel"},
                         "screen_timeout_secs": {"kind": "int", "label": "Apagar pantalla tras (seg, 0 = nunca)",
                                                 "min": 0, "max": 86400, "default": 120},
