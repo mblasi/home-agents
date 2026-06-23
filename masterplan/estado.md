@@ -3815,7 +3815,7 @@ Objetivo: Eliminar TODA heurística determinista pre-planner y unificar el siste
           agente raíz: que "chau" cierre la conversación es decisión orgánica del LLM, no una keyword.
           Sin fast_classifier, sin cortocircuitos. El usuario recibe una respuesta consolidada
           construida por un árbol de agentes orquestados.
-Estado:   EN CURSO (5/10 — Etapas A-C + 41.4-41.5 completas).
+Estado:   EN CURSO (6/10 — Etapas A-C + 41.4-41.6 completas).
 Deps:     FASE 40 (orquestación agnóstica — esta fase erradica los cortes que 40 sólo acotó),
           FASE 9  (coordinador/aggregate — referencia del prompt de consolidación),
           agent_loop.run_loop (núcleo del loop LLM↔tools a generalizar),
@@ -3853,7 +3853,7 @@ Plan:     `.claude/plans/quizzical-snacking-teacup.md`.
             (maps→weather). Tests por agente con backends mockeados.
 - [x] 41.5  Migrar haos a `RecursiveAgent`: tools `find_entity`/`get_state`/`call_service`
             (ha_client) + RAG de entidades + dispatch + system_prompt. Tests con ha_client mockeado.
-- [ ] 41.6  Migrar finance + mercadolibre a `RecursiveAgent`: tools dolarapi/yfinance/ml_client/
+- [x] 41.6  Migrar finance + mercadolibre a `RecursiveAgent`: tools dolarapi/yfinance/ml_client/
             portfolio + dispatch + system_prompt + afinidades. Tests con backends mockeados.
 - [ ] 41.7  Migrar scheduler (calendar_client) + profile + user_mgmt + system a `RecursiveAgent`
             (system ya usa run_loop). ToolDefs + dispatch + system_prompt + afinidades. Tests por agente.
