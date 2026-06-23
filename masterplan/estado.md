@@ -3815,7 +3815,7 @@ Objetivo: Eliminar TODA heurística determinista pre-planner y unificar el siste
           agente raíz: que "chau" cierre la conversación es decisión orgánica del LLM, no una keyword.
           Sin fast_classifier, sin cortocircuitos. El usuario recibe una respuesta consolidada
           construida por un árbol de agentes orquestados.
-Estado:   EN CURSO (8/10 — Etapas A-E completas; resta F-G).
+Estado:   EN CURSO (9/10 — Etapas A-F completas; resta 41.10 deploy).
 Deps:     FASE 40 (orquestación agnóstica — esta fase erradica los cortes que 40 sólo acotó),
           FASE 9  (coordinador/aggregate — referencia del prompt de consolidación),
           agent_loop.run_loop (núcleo del loop LLM↔tools a generalizar),
@@ -3865,7 +3865,7 @@ Plan:     `.claude/plans/quizzical-snacking-teacup.md`.
             Tests e2e (LLM mockeado): close/ignore/capture/clarify, single-domain, multi-domain.
 
 #### Etapa F - Observabilidad del árbol
-- [ ] 41.9  `trace_store`/`metrics_store`: trace anidado (depth, subárbol, tool_calls por nodo) +
+- [x] 41.9  `trace_store`/`metrics_store`: trace anidado (depth, subárbol, tool_calls por nodo) +
             métricas nuevas (llamadas LLM por request, tool_calls por request, profundidad máxima,
             uso de tools de housekeeping). Deprecar `bypass_rate` (tiende a 0) y reemplazar en
             `/metrics` (ambos backoffices). Tests de ingesta.
