@@ -3939,7 +3939,7 @@ Objetivo: Cerrar el refactor del runtime recursivo (FASE 41/42) formalizando al 
           POR-AGENTE (subsume el tier env-only de 42.2); (d) lo expone y edita desde AMBOS
           backoffices (form local + comando tipado cloud egress-only). Mantiene su naturaleza
           especial sin romper la recursión.
-Estado:   EN CURSO (2/7 — 43.1 catálogo + 43.2 config en agent_config listas).
+Estado:   EN CURSO (3/7 — Etapa A completa: 43.1 catálogo + 43.2 config raíz + 43.3 modelo por-agente).
 Deps:     FASE 41 (runtime recursivo — RecursiveAgent, build_root_agent, resolver),
           FASE 42 (AGENT_LEAF_MODEL — se subsume en config por-agente),
           FASE 14 (agent_config + edición de agentes desde backoffice — patrón a reusar),
@@ -3979,9 +3979,10 @@ Decisiones tomadas:
             misma config; `routing_hint` gateado por `routing_hint_enabled` (ni se computa si off).
             Defaults desde env; el param explícito `model` mantiene prioridad. Tests (override de
             model/prompt/iters; fallback a default; hint on/off). (PR core #235)
-- [ ] 43.3  Modelo por-agente (subsume 42.2): cada `RecursiveAgent` toma su `model` de su config
-            efectiva con fallback a `AGENT_LEAF_MODEL`/`AGENT_MODEL`; el resolver deja de pisar
-            `child.model` con la env global. Tests (override por-agente respetado; fallback correcto).
+- [x] 43.3  Modelo por-agente (subsume 42.2): `_resolve_agent_model` prioriza override explícito en
+            agent_config > `AGENT_LEAF_MODEL` (tier global) > modelo configurado del propio agente; el
+            resolver ya no pisa `child.model` con la env global (los agentes ya leían su model en
+            `build_recursive`). Tests unitarios + e2e. (PR core #236)
 
 #### Etapa B - core: API
 - [ ] 43.4  Endpoints: `GET /agents` incluye al `orchestrator` con su config y su kind; el PATCH
