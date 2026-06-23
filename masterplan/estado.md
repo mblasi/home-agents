@@ -3815,7 +3815,7 @@ Objetivo: Eliminar TODA heurística determinista pre-planner y unificar el siste
           agente raíz: que "chau" cierre la conversación es decisión orgánica del LLM, no una keyword.
           Sin fast_classifier, sin cortocircuitos. El usuario recibe una respuesta consolidada
           construida por un árbol de agentes orquestados.
-Estado:   EN CURSO (9/10 — Etapas A-F completas; resta 41.10 deploy).
+Estado:   COMPLETA (flip del flag postergado — pendiente de decisión por latencia; ver 41.10).
 Deps:     FASE 40 (orquestación agnóstica — esta fase erradica los cortes que 40 sólo acotó),
           FASE 9  (coordinador/aggregate — referencia del prompt de consolidación),
           agent_loop.run_loop (núcleo del loop LLM↔tools a generalizar),
@@ -3871,5 +3871,13 @@ Plan:     `.claude/plans/quizzical-snacking-teacup.md`.
             `/metrics` (ambos backoffices). Tests de ingesta.
 
 #### Etapa G - Deploy + verificación
-- [ ] 41.10 Validar tras flag, flip, `bash scripts/deploy.sh core` (health-gate + rollback), smoke de
+- [x] 41.10 Validar tras flag, flip, `bash scripts/deploy.sh core` (health-gate + rollback), smoke de
             voz/WhatsApp y revisión de latencia real en el Brain.
+            HECHO: core desplegado (v0.1.6) con el flag `AGENT_RUNTIME_RECURSIVE` en **OFF** (runtime
+            recursivo dormido; producción sigue en el path FASE 40). Validado standalone contra el
+            Ollama real del Brain: el árbol responde correcto (clima/dólar con datos reales,
+            "chau"→cierre vía tool). **Latencia ~12-17s en queries de dominio** (vs ~3-5s del path
+            viejo) por la multiplicación de llamadas LLM; "chau" ~2.2s. **FLIP POSTERGADO**: pasar
+            producción al árbol recursivo es decisión del usuario por el trade-off de latencia; al
+            flipear (env `AGENT_RUNTIME_RECURSIVE=true` + restart) recién ahí se elimina el path viejo
+            (coordinator + fast_classifier). Smoke de voz/WhatsApp real queda para después del flip.
