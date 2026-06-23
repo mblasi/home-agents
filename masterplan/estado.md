@@ -3890,7 +3890,7 @@ Objetivo: Bajar la latencia del árbol de agentes recursivo (FASE 41) antes de f
           40) por la multiplicación de llamadas LLM (raíz plan + hijo plan + hijo consolidación +
           raíz consolidación). Sin sacrificar el principio agnóstico (no se reintroducen
           cortocircuitos deterministas).
-Estado:   EN CURSO (1/4 — 42.1 completa).
+Estado:   EN CURSO (3/4 — 42.1-42.3 completas; resta 42.4 validación).
 Deps:     FASE 41 (runtime recursivo desplegado dormido, flag AGENT_RUNTIME_RECURSIVE).
 ```
 
@@ -3898,9 +3898,9 @@ Deps:     FASE 41 (runtime recursivo desplegado dormido, flag AGENT_RUNTIME_RECU
 - [x] 42.1  Saltear la consolidación cuando un nodo delegó a UN solo sub-agente y no produjo prosa
             propia ni otras tools: devolver la respuesta del hijo directa (ahorra una llamada LLM por
             nivel). En el runtime, agnóstico. Tests.
-- [ ] 42.2  Modelo por tier: las hojas de dominio usan un modelo más chico/rápido (configurable
+- [x] 42.2  Modelo por tier: las hojas de dominio usan un modelo más chico/rápido (configurable
             `AGENT_LEAF_MODEL`); el raíz mantiene el modelo grande para el routing. Tests.
-- [ ] 42.3  Hint de routing: pasar la sugerencia del fast_classifier como CONTEXTO (no bypass) en el
+- [x] 42.3  Hint de routing: pasar la sugerencia del fast_classifier como CONTEXTO (no bypass) en el
             prompt del raíz, para acelerar/acertar la delegación (menos iteraciones del tool-loop).
             Sigue decidiendo el LLM. Tests.
 
