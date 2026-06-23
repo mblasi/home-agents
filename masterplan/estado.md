@@ -3815,7 +3815,7 @@ Objetivo: Eliminar TODA heurística determinista pre-planner y unificar el siste
           agente raíz: que "chau" cierre la conversación es decisión orgánica del LLM, no una keyword.
           Sin fast_classifier, sin cortocircuitos. El usuario recibe una respuesta consolidada
           construida por un árbol de agentes orquestados.
-Estado:   EN CURSO (2/10 — Etapas A-B completas).
+Estado:   EN CURSO (3/10 — Etapas A-C completas).
 Deps:     FASE 40 (orquestación agnóstica — esta fase erradica los cortes que 40 sólo acotó),
           FASE 9  (coordinador/aggregate — referencia del prompt de consolidación),
           agent_loop.run_loop (núcleo del loop LLM↔tools a generalizar),
@@ -3841,7 +3841,7 @@ Plan:     `.claude/plans/quizzical-snacking-teacup.md`.
             mockeados.
 
 #### Etapa C - Tools de housekeeping + agente raíz
-- [ ] 41.3  ToolDefs + dispatch `close_conversation`/`ignore`/`capture_reply`/`clarify` sobre
+- [x] 41.3  ToolDefs + dispatch `close_conversation`/`ignore`/`capture_reply`/`clarify` sobre
             conv/intents (reusa `manager.close`, `intent_state.capture_reply/get_pending_request`,
             `conv.set_continuation`). Raíz = `RecursiveAgent(sub_agents=RBAC, tools=housekeeping)`;
             inyección de la pregunta pendiente. Tests: el LLM mock elige cada tool
