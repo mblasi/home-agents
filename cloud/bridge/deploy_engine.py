@@ -492,22 +492,40 @@ TARGETS: list[Target] = [
 ]
 
 
-def run_cloud_release(targets: list[str], emit: Optional[LogEmit] = None) -> ReleaseResult:
+def run_cloud_release(targets: list[str], emit: Optional[LogEmit] = None,
+                      repo_refs: Optional[dict[str, Optional[str]]] = None) -> ReleaseResult:
     """Despliega targets de Cloud Run (cloud-bo, …) por-target con health-gate y rollback a la
     revisión previa si falla. Atomicidad por-target (D7). Reusa ReleaseResult (campo `services`)."""
     result = ReleaseResult(ok=True)
     state = load_state()
+    repo_refs = repo_refs or {}
 
     def _emit(line: str) -> None:
         result.log.append(line)
         if emit:
             emit(line)
 
+    # PIN del repo fuente (umbrella) a origin/main ANTES de buildear. Sin esto, `gcloud run deploy
+    # --source` buildeaba el checkout SIN actualizar → redeployaba el HEAD viejo y la versión nunca
+    # avanzaba (a diferencia de run_release, que pinea cada repo). Una vez por repo fuente.
+    pinned: dict[str, bool] = {}
+    for name in targets:
+        t = CLOUDRUN_TARGETS.get(name)
+        if t and t.source_repo in REPOS and t.source_repo not in pinned:
+            r = t.source_repo
+            _emit(f"--- pin {r}: → {repo_refs.get(r) or 'origin/main'}")
+            pinned[r] = REPOS[r].pin(repo_refs.get(r), _emit)
+
     for name in targets:
         if name not in CLOUDRUN_TARGETS:
             raise ValueError(f"target cloudrun desconocido: {name!r} (conocidos: {sorted(CLOUDRUN_TARGETS)})")
         t = CLOUDRUN_TARGETS[name]
-        # sha del repo fuente (umbrella) en el checkout que se buildea → versión que correrá el target.
+        if t.source_repo in REPOS and not pinned.get(t.source_repo, True):
+            result.ok = False
+            result.services[name] = {"ok": False, "error": f"pin de {t.source_repo} falló"}
+            _emit(f"  ✗ pin de {t.source_repo} falló — no se despliega {name}")
+            continue
+        # sha del repo fuente (umbrella) en el checkout YA pineado → versión que correrá el target.
         src_sha = REPOS[t.source_repo].head(_emit) if t.source_repo in REPOS else None
         prev = t.active_revision(_emit)
         _emit(f"=== deploy cloudrun {name} ({t.service}) — revisión previa {prev or '?'} ===")
