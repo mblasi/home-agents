@@ -333,6 +333,29 @@ def test_cloud_release_health_fail_rollback(state_tmp, monkeypatch):
     assert de.load_state().get("cloud", {}).get("cloud-bo", {}).get("ok") is False
 
 
+def test_cloud_release_pins_source_before_build(state_tmp, monkeypatch):
+    # Regresión: cloud-bo buildeaba el checkout SIN pinear → redeployaba el HEAD viejo y la
+    # versión nunca avanzaba. Ahora el repo fuente se fetchea+pinea a origin/main ANTES del build.
+    fake = _FakeGcloud(revision="capitan-cloud-00010")
+    monkeypatch.setattr(de, "_run", fake)
+    monkeypatch.setattr(de, "_http_ok", lambda *a, **k: True)
+    de.run_cloud_release(["cloud-bo"])
+    assert fake.did("fetch", "origin")
+    assert fake.did("checkout", "origin/main")
+    idx_pin = next(i for i, c in enumerate(fake.calls) if "checkout" in " ".join(c))
+    idx_deploy = next(i for i, c in enumerate(fake.calls) if "deploy" in c and "--source" in " ".join(c))
+    assert idx_pin < idx_deploy   # el pin ocurre antes del build
+
+
+def test_cloud_release_pin_fail_skips_deploy(state_tmp, monkeypatch):
+    fake = _FakeGcloud(fail=("fetch",))   # el fetch del pin falla
+    monkeypatch.setattr(de, "_run", fake)
+    monkeypatch.setattr(de, "_http_ok", lambda *a, **k: True)
+    res = de.run_cloud_release(["cloud-bo"])
+    assert res.ok is False
+    assert not fake.did("run", "deploy", "--source")   # no buildeó con el repo sin actualizar
+
+
 def test_cloud_release_unknown_target(state_tmp):
     import pytest
     with pytest.raises(ValueError):
