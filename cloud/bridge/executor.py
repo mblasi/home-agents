@@ -180,6 +180,21 @@ def _agent_toggle(p: dict) -> ExecResult:
         return ExecResult(False, "", f"no se pudo cambiar el agente: {exc}")
 
 
+def _agent_config(p: dict) -> ExecResult:
+    """FASE 43.6: configura un agente (en particular el ORQUESTADOR) — PATCH /agents/{id}/config
+    del core. Los params (menos agent_id) son el merge parcial de config; el core aplica su
+    allow-list al config_schema del agente."""
+    body = {k: v for k, v in p.items() if k != "agent_id"}
+    if not body:
+        return ExecResult(False, "", "no se especificó ningún campo de configuración")
+    try:
+        r = requests.patch(f"{CORE_URL}/agents/{p['agent_id']}/config", json=body, timeout=10)
+        r.raise_for_status()
+        return ExecResult(True, f"{p['agent_id']}: {', '.join(sorted(body))} actualizado")
+    except Exception as exc:  # noqa: BLE001
+        return ExecResult(False, "", f"no se pudo configurar el agente: {exc}")
+
+
 def _proactive_run(p: dict) -> ExecResult:
     """FASE 37.8: dispara el ciclo proactivo de un agente (POST /proactive/{id}/run del core)."""
     try:
@@ -265,6 +280,7 @@ HANDLERS = {
     "wakeword.retrain": _wakeword_retrain,
     "voice.reenroll": _voice_reenroll,
     "agent.toggle": _agent_toggle,
+    "agent.config": _agent_config,
     "panel.reboot": _panel_reboot,
     "proactive.run": _proactive_run,
     "panel.config": _panel_config,

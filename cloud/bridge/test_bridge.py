@@ -502,3 +502,49 @@ def test_snapshot_nodes_carry_device_config():
     node = snap["wakeword"]["nodes"][0]
     assert node["device_config"] == {"screen_timeout_secs": 120}
     StateSnapshot(**snap)
+
+
+def test_agent_config_patches_core_config(monkeypatch):
+    captured = {}
+
+    def fake_patch(url, json=None, timeout=10):
+        captured.update(url=url, json=json)
+        return _resp()
+
+    monkeypatch.setattr(executor.requests, "patch", fake_patch)
+    r = executor.execute("agent.config", {"agent_id": "orchestrator",
+                                          "model": "qwen2.5:3b", "max_iters": 6})
+    assert r.ok and captured["url"].endswith("/agents/orchestrator/config")
+    assert captured["json"] == {"model": "qwen2.5:3b", "max_iters": 6}  # sin agent_id
+
+
+def test_agent_config_no_fields_fails():
+    r = executor.execute("agent.config", {"agent_id": "orchestrator"})
+    assert not r.ok and "configuraci" in r.error.lower()
+
+
+def test_snapshot_includes_models_and_orchestrator():
+    from app.models import StateSnapshot
+
+    def fake_get(url, timeout=4):
+        if url.endswith("/agents"):
+            return {
+                "haos": {"status": "active", "proactive_enabled": True, "kind": "domain"},
+                "orchestrator": {"status": "active", "kind": "orchestrator",
+                                 "config": {"model": "qwen2.5:7b", "max_iters": 5,
+                                            "routing_hint_enabled": True}},
+            }
+        if url.endswith("/models"):
+            return {"models": ["qwen2.5:3b", "qwen2.5:7b"]}
+        return None
+
+    with patch.object(snapshot, "_get", fake_get), \
+         patch.object(snapshot, "_systemctl_active", lambda u: False):
+        snap = snapshot.build_snapshot()
+
+    assert snap["models"] == ["qwen2.5:3b", "qwen2.5:7b"]
+    orch = next(a for a in snap["agents"] if a["id"] == "orchestrator")
+    assert orch["kind"] == "orchestrator" and orch["config"]["model"] == "qwen2.5:7b"
+    haos = next(a for a in snap["agents"] if a["id"] == "haos")
+    assert haos["kind"] == "domain" and "config" not in haos  # config sólo para el orquestador
+    StateSnapshot(**snap)   # valida contra el contrato de la nube

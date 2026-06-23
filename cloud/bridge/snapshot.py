@@ -75,12 +75,26 @@ def _agents() -> list[dict]:
     for aid, meta in data.items():
         if not isinstance(meta, dict):
             continue
-        out.append({
+        kind = meta.get("kind", "domain")
+        entry = {
             "id": aid,
             "active": meta.get("status") == "active",
             "proactive": bool(meta.get("proactive") or meta.get("proactive_enabled")),
-        })
+            "kind": kind,
+        }
+        # FASE 43: la config efectiva del orquestador viaja para prellenar el form de agent.config.
+        # Sin secretos (model/system_prompt/guards). Sólo el orquestador la necesita en la UI.
+        if kind == "orchestrator":
+            entry["config"] = meta.get("config") or {}
+        out.append(entry)
     return out
+
+
+def _models() -> list[str]:
+    """Modelos LLM disponibles en Ollama (FASE 43), para el selector del comando agent.config."""
+    data = _get(f"{CORE_URL}/models")
+    models = data.get("models") if isinstance(data, dict) else None
+    return models if isinstance(models, list) else []
 
 
 def _nodes() -> list[dict]:
@@ -307,4 +321,5 @@ def build_snapshot() -> dict:
         "alerts": _alerts(),
         "counts": _counts(),
         "dashboards": _dashboards(),   # FASE 38: selector de dashboard del comando panel.config
+        "models": _models(),           # FASE 43: selector de modelo del comando agent.config
     }

@@ -254,3 +254,40 @@ def test_panel_config_presentation_kinds():
     assert _param("panel.config", "node_id")["kind"] == "node"
     assert _param("panel.config", "screen_timeout_secs")["kind"] == "int"
     assert _param("panel.config", "default_dashboard")["kind"] == "dashboard"
+
+
+# ── FASE 43.6: agent.config (orquestador configurable) ────────────────────────
+
+def test_agent_config_ok():
+    out = validate_command("agent.config", {
+        "agent_id": "orchestrator", "model": "qwen2.5:3b", "system_prompt": "SOS X.",
+        "max_iters": 6, "max_depth": 3, "llm_budget": 12, "routing_hint_enabled": False})
+    assert out["agent_id"] == "orchestrator" and out["model"] == "qwen2.5:3b"
+    assert out["routing_hint_enabled"] is False and out["max_iters"] == 6
+
+
+def test_agent_config_requires_agent_id():
+    with pytest.raises(CommandError):
+        validate_command("agent.config", {"model": "qwen2.5:7b"})
+
+
+def test_agent_config_partial_is_ok():
+    # config parcial: sólo el modelo (merge en el core)
+    assert validate_command("agent.config", {"agent_id": "orchestrator", "model": "qwen2.5:7b"}) == {
+        "agent_id": "orchestrator", "model": "qwen2.5:7b"}
+
+
+def test_agent_config_int_out_of_range():
+    with pytest.raises(CommandError):
+        validate_command("agent.config", {"agent_id": "orchestrator", "max_iters": 999})
+
+
+def test_agent_config_unknown_param_rejected():
+    with pytest.raises(CommandError):
+        validate_command("agent.config", {"agent_id": "orchestrator", "status": "unavailable"})
+
+
+def test_agent_config_param_kinds():
+    assert _param("agent.config", "agent_id")["kind"] == "agent"
+    assert _param("agent.config", "model")["kind"] == "model"
+    assert _param("agent.config", "routing_hint_enabled")["kind"] == "bool"
