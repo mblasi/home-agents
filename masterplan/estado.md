@@ -3890,7 +3890,7 @@ Objetivo: Bajar la latencia del árbol de agentes recursivo (FASE 41) antes de f
           40) por la multiplicación de llamadas LLM (raíz plan + hijo plan + hijo consolidación +
           raíz consolidación). Sin sacrificar el principio agnóstico (no se reintroducen
           cortocircuitos deterministas).
-Estado:   EN CURSO (3/4 — 42.1-42.3 completas; resta 42.4 validación).
+Estado:   COMPLETA (optimizaciones aplicadas; AGENT_LEAF_MODEL pendiente de pull de un modelo chico).
 Deps:     FASE 41 (runtime recursivo desplegado dormido, flag AGENT_RUNTIME_RECURSIVE).
 ```
 
@@ -3905,5 +3905,11 @@ Deps:     FASE 41 (runtime recursivo desplegado dormido, flag AGENT_RUNTIME_RECU
             Sigue decidiendo el LLM. Tests.
 
 #### Etapa B - Validación
-- [ ] 42.4  Re-validar la latencia contra el Ollama real del Brain (standalone, read-only) y reportar.
+- [x] 42.4  Re-validar la latencia contra el Ollama real del Brain (standalone, read-only) y reportar.
             Dejar listo para el flip (decisión del usuario).
+            RESULTADO: core optimizado desplegado (v0.1.7, flag OFF). Skip-consolidación (42.1) y hint
+            de routing (42.3) activos; modelo por tier (42.2) listo pero el Brain sólo tiene
+            qwen2.5:7b → AGENT_LEAF_MODEL no aplicable hasta `ollama pull` de un modelo chico
+            (ej. qwen2.5:3b). Con 7b-only la latencia de dominio sigue ~14-16s (el costo son las
+            múltiples llamadas al 7b). Para bajarla de verdad: pull de modelo chico + AGENT_LEAF_MODEL
+            en las hojas, luego re-medir y flipear. Flip sigue postergado (decisión del usuario).
