@@ -101,14 +101,15 @@ keep the tree bounded. All 10 domain agents expose a `build_recursive()` view; t
 (Phase 42): skip the consolidation turn on single-child delegation, per-tier model (`AGENT_LEAF_MODEL`),
 and a non-binding routing hint from the classifier.
 
-**Status: shipped behind the `AGENT_RUNTIME_RECURSIVE` flag (default OFF). Production runs the
-Phase 9 coordinator path above.** Validated end-to-end against the real model on the Brain (routing,
-delegation, housekeeping all work), but each domain query costs ~12–17 s vs ~5 s on the coordinator
-path because the tree multiplies LLM calls. The per-tier model lever (small model on leaves) is
-**not usable on the current iGPU** (Radeon 780M / ROCm): a qwen3 8b+4b pair exceeds the ~8 GB GTT
-ceiling and won't load; a qwen2.5 7b+3b pair loads but the leaf's tool-constrained generation aborts
-intermittently. So the recursive tree would run on a single `qwen2.5:7b`. The flag flip awaits a
-latency path (dedicated GPU, or accepting the latency). Until then the runtime is dormant.
+**Status: ACTIVE in production** (`AGENT_RUNTIME_RECURSIVE=true` in `core/.env` on the Brain since
+2026-06-23). The recursive tree serves all traffic on a single `qwen2.5:7b`; routing, delegation and
+housekeeping work end-to-end. Each domain query costs ~14 s vs ~5 s on the old coordinator path
+because the tree multiplies LLM calls — accepted trade-off for fully organic orchestration. The
+Phase 9 coordinator path remains as a fallback (revert = set the flag OFF and restart `capitan-core`).
+The per-tier model lever (small model on leaves, `AGENT_LEAF_MODEL`) is **not usable on the current
+iGPU** (Radeon 780M / ROCm): a qwen3 8b+4b pair exceeds the ~8 GB GTT ceiling and won't load; a
+qwen2.5 7b+3b pair loads but the leaf's tool-constrained generation aborts intermittently — so the
+tree runs single-model. A dedicated GPU would unlock the tier and cut latency.
 
 ---
 
@@ -225,5 +226,6 @@ See [`masterplan/estado.md`](masterplan/estado.md) for the full task list and de
 See [`masterplan/arquitectura_funcional.md`](masterplan/arquitectura_funcional.md) for the detailed functional documentation.
 
 Phases 1–40 complete and in production. Phase 41 (recursive agent runtime) + Phase 42 (latency
-optimizations) are built, tested and deployed **dormant** behind `AGENT_RUNTIME_RECURSIVE` (default
-OFF) — see "Recursive agent runtime" above; production runs the Phase 9 coordinator path.
+optimizations) are **active in production** (`AGENT_RUNTIME_RECURSIVE=true` on the Brain) — the
+recursive agent tree now serves all traffic; the Phase 9 coordinator path remains as a fallback.
+See "Recursive agent runtime" above.
