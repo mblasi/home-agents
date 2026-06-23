@@ -87,6 +87,31 @@ Every agent inherits `ProactiveMixin`, enabling autonomous intent detection by s
 
 ---
 
+## Recursive agent runtime (Phase 41 — built, deployed dormant)
+
+Phase 41 unifies the whole system under **one recursive agent abstraction** (`core/agent_runtime.py`,
+`RecursiveAgent`): every agent *is* an orchestrator. Its `process()` runs an LLM↔tools loop — the
+agent's tools are backend interactions; delegating to an affine sub-agent is the recursive
+`call_agent(agent_id, query)` tool; the loop's final turn is the consolidated answer. Channel
+housekeeping (close / ignore / capture-reply / clarify) are **tools of the root agent**, so "chau"
+closing a conversation is an organic LLM decision, not a keyword. No deterministic pre-planner
+short-circuits, no `fast_classifier`. Guards (max depth/iters, global LLM-call budget, cycle set)
+keep the tree bounded. All 10 domain agents expose a `build_recursive()` view; tree-level metrics
+(LLM calls / tool calls / depth per request) feed `/metrics/llm/runtime`. Latency optimizations
+(Phase 42): skip the consolidation turn on single-child delegation, per-tier model (`AGENT_LEAF_MODEL`),
+and a non-binding routing hint from the classifier.
+
+**Status: shipped behind the `AGENT_RUNTIME_RECURSIVE` flag (default OFF). Production runs the
+Phase 9 coordinator path above.** Validated end-to-end against the real model on the Brain (routing,
+delegation, housekeeping all work), but each domain query costs ~12–17 s vs ~5 s on the coordinator
+path because the tree multiplies LLM calls. The per-tier model lever (small model on leaves) is
+**not usable on the current iGPU** (Radeon 780M / ROCm): a qwen3 8b+4b pair exceeds the ~8 GB GTT
+ceiling and won't load; a qwen2.5 7b+3b pair loads but the leaf's tool-constrained generation aborts
+intermittently. So the recursive tree would run on a single `qwen2.5:7b`. The flag flip awaits a
+latency path (dedicated GPU, or accepting the latency). Until then the runtime is dormant.
+
+---
+
 ## Observability (Phase 35)
 
 Voice and LLM metrics are centralized in SQLite by `core/metrics_store.py`, separate from
@@ -199,4 +224,6 @@ bash ~/workspace/home-agents/ear/dashboard.sh
 See [`masterplan/estado.md`](masterplan/estado.md) for the full task list and decisions.
 See [`masterplan/arquitectura_funcional.md`](masterplan/arquitectura_funcional.md) for the detailed functional documentation.
 
-Phases 1–26 complete. Active development on Phase 27+.
+Phases 1–40 complete and in production. Phase 41 (recursive agent runtime) + Phase 42 (latency
+optimizations) are built, tested and deployed **dormant** behind `AGENT_RUNTIME_RECURSIVE` (default
+OFF) — see "Recursive agent runtime" above; production runs the Phase 9 coordinator path.
