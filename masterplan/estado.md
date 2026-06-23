@@ -3939,7 +3939,7 @@ Objetivo: Cerrar el refactor del runtime recursivo (FASE 41/42) formalizando al 
           POR-AGENTE (subsume el tier env-only de 42.2); (d) lo expone y edita desde AMBOS
           backoffices (form local + comando tipado cloud egress-only). Mantiene su naturaleza
           especial sin romper la recursión.
-Estado:   EN CURSO (4/7 — Etapa A (43.1-43.3) + Etapa B (43.4 API) completas; falta UI local/cloud + docs).
+Estado:   EN CURSO (5/7 — Etapas A+B+C (UI local) completas; falta UI cloud (43.6) + docs (43.7)).
 Deps:     FASE 41 (runtime recursivo — RecursiveAgent, build_root_agent, resolver),
           FASE 42 (AGENT_LEAF_MODEL — se subsume en config por-agente),
           FASE 14 (agent_config + edición de agentes desde backoffice — patrón a reusar),
@@ -3991,10 +3991,12 @@ Decisiones tomadas:
             Tests TestClient (catálogo, allow-list, rechazos, /models up/down). (PR core #237)
 
 #### Etapa C - backoffice local
-- [ ] 43.5  UI: el `orchestrator` aparece en `/agents` con badge especial; su detail/edit muestra y
-            edita `model` (dropdown desde `/models`), `system_prompt` y los guards
-            (max_iters/max_depth/llm_budget/routing_hint_enabled). Oculta los toggles que no aplican
-            (proactive, delegabilidad, status). Reusa el form de FASE 14.
+- [x] 43.5  UI local: el `orchestrator` aparece en `/agents` con badge 🎼 (status fijo, sin
+            toggle ni eliminar); su detail oculta el toggle proactivo; su edit edita `model`
+            (dropdown desde `/models`), `system_prompt` y los guards (incl. `routing_hint_enabled`
+            como checkbox `bool` nuevo) y oculta status/ejemplos/afinidades/RBAC. El submit sólo
+            manda metadata+config para el orquestador. Core: `/agents-meta` lo incluye + `kind` por
+            entry (PR core #238). Tests del parser de config (backoffice).
 
 #### Etapa D - backoffice cloud
 - [ ] 43.6  Comando tipado `agent.config` (CATALOG/PRESENTATION/validación, admin-only): params
