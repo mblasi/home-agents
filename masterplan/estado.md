@@ -3815,7 +3815,9 @@ Objetivo: Eliminar TODA heurística determinista pre-planner y unificar el siste
           agente raíz: que "chau" cierre la conversación es decisión orgánica del LLM, no una keyword.
           Sin fast_classifier, sin cortocircuitos. El usuario recibe una respuesta consolidada
           construida por un árbol de agentes orquestados.
-Estado:   COMPLETA (flip del flag postergado — pendiente de decisión por latencia; ver 41.10).
+Estado:   COMPLETA y ACTIVA EN PRODUCCIÓN (flag AGENT_RUNTIME_RECURSIVE=true en core/.env del Brain
+          desde 2026-06-23; el árbol recursivo atiende todo el tráfico, modelo único qwen2.5:7b,
+          latencia ~14s en dominio. El path FASE 40 queda como fallback: revert = flag OFF + restart).
 Deps:     FASE 40 (orquestación agnóstica — esta fase erradica los cortes que 40 sólo acotó),
           FASE 9  (coordinador/aggregate — referencia del prompt de consolidación),
           agent_loop.run_loop (núcleo del loop LLM↔tools a generalizar),
