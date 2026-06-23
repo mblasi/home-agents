@@ -404,6 +404,40 @@ def test_snapshot_versions_panels_y_ser9():
     assert any(t["id"] == "core" and t["kind"] == "service" for t in v["targets"])
 
 
+def test_snapshot_versions_service_behind_compares_displayed_version():
+    """Un service tagueado a la última release NO está rezagado aunque origin/main haya avanzado
+    sin nuevo tag: `behind` compara lo que se muestra (tag vs tag), no el tag contra el sha de
+    origin/main. Repro del bug 'misma versión + ⬆ rezagado'."""
+    def fake_get(url, timeout=4):
+        if url.endswith("/satellite/version"):
+            return {"version": "abc123def456"}
+        if url.endswith("/nodes"):
+            return []
+        if url.endswith("/health"):
+            return {"status": "ok", "nodes": 0}
+        return None
+
+    # tag corriendo == último tag, pero el sha de origin/main difiere (main avanzó sin release)
+    at_latest = {"sha": "aaaaaa", "tag": "v0.1.7", "url": "u",
+                 "latest_sha": "bbbbbb", "latest_tag": "v0.1.7", "latest_url": "lu"}
+    behind = {"sha": "aaaaaa", "tag": "v0.1.7", "url": "u",
+              "latest_sha": "bbbbbb", "latest_tag": "v0.1.8", "latest_url": "lu"}
+
+    def run(repo_info):
+        with patch.object(snapshot, "_get", fake_get), \
+             patch.object(snapshot, "_systemctl_active", lambda u: True), \
+             patch.object(snapshot, "_maybe_fetch", lambda *a, **k: None), \
+             patch.object(snapshot, "_repo_git_info", lambda de, repo: repo_info):
+            snap = snapshot.build_snapshot()
+        return {t["id"]: t for t in snap["versions"]["targets"]}
+
+    core = run(at_latest)["core"]
+    assert core["version"] == core["latest"] == "v0.1.7"
+    assert core["behind"] is False                       # mismo tag → al día
+
+    assert run(behind)["core"]["behind"] is True          # tag distinto → rezagado
+
+
 # ── FASE 38: panel.config (executor + snapshot) ───────────────────────────────
 
 def test_executor_panel_config_upserts_core_and_flags_audio():
