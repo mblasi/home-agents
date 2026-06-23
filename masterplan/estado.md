@@ -3802,3 +3802,74 @@ Hallazgos de la auditoría inicial (ya realizada — base de esta fase):
             regresiones de bias. Tests de ingesta.
             (panel zellij N/A: `ear/dashboard.kdl` y `panel_*.py` ya no existen — pipeline laptop
             reemplazado en FASE 21; la observabilidad persistida vive en los `/metrics` web.)
+
+### FASE 41 - Runtime de agentes recursivo (extensión de FASE 40)
+
+```
+Objetivo: Eliminar TODA heurística determinista pre-planner y unificar el sistema bajo UNA sola
+          abstracción de agente recursiva: cada agente ES un orquestador. Su process() (1) pide un
+          plan al LLM en un loop LLM↔tools con su contexto (prompt + user_context + cards de agentes
+          afines + specs de tools); (2) ejecuta cada delegación a un sub-agente como la tool
+          `call_agent`, recursivamente y en paralelo cuando son independientes; (3) consolida en el
+          turno final del loop. El housekeeping (cerrar/ignorar/capturar/clarificar) son TOOLS del
+          agente raíz: que "chau" cierre la conversación es decisión orgánica del LLM, no una keyword.
+          Sin fast_classifier, sin cortocircuitos. El usuario recibe una respuesta consolidada
+          construida por un árbol de agentes orquestados.
+Estado:   Pendiente.
+Deps:     FASE 40 (orquestación agnóstica — esta fase erradica los cortes que 40 sólo acotó),
+          FASE 9  (coordinador/aggregate — referencia del prompt de consolidación),
+          agent_loop.run_loop (núcleo del loop LLM↔tools a generalizar),
+          tool_store/tool_hydrator (specs de tools), agent_config afinidades (sub-agentes).
+DECISIÓN: big-bang — se migran TAMBIÉN todos los agentes de dominio a la interfaz recursiva.
+          Behind feature-flag (AGENT_RUNTIME_RECURSIVE) hasta validar e2e; path viejo como fallback.
+RIESGO:   latencia (el árbol multiplica llamadas LLM; aceptado), hot-path reescrito (mitigado por
+          flag + health-gate + rollback), no-determinismo del cierre/ack/captura (comportamiento
+          pedido; guards de runtime evitan loops/explosión, no fuerzan routing).
+Plan:     `.claude/plans/quizzical-snacking-teacup.md`.
+```
+
+#### Etapa A - Diseño documentado
+- [ ] 41.1  Documentar en `arquitectura_funcional.md` el modelo recursivo (agente=orquestador), el
+            loop unificado LLM↔tools, las fases plan/ejecución/consolidación, los guards
+            (max_depth/max_iters/budget/visited) y las tools de housekeeping. Reemplaza la sección de
+            cortocircuitos de FASE 40.
+
+#### Etapa B - Runtime recursivo (núcleo)
+- [ ] 41.2  `core/agent_runtime.py`: `RecursiveAgent` (satisface el Protocol BaseAgent) + loop
+            extendido de `run_loop` con la tool `call_agent(agent_id, query)` recursiva, paralelismo
+            de tool_calls, guards de recursión y tracing de árbol. Tests con LLM y agentes hijos
+            mockeados.
+
+#### Etapa C - Tools de housekeeping + agente raíz
+- [ ] 41.3  ToolDefs + dispatch `close_conversation`/`ignore`/`capture_reply`/`clarify` sobre
+            conv/intents (reusa `manager.close`, `intent_state.capture_reply/get_pending_request`,
+            `conv.set_continuation`). Raíz = `RecursiveAgent(sub_agents=RBAC, tools=housekeeping)`;
+            inyección de la pregunta pendiente. Tests: el LLM mock elige cada tool
+            ("chau"→close, "ok"→ignore, "sí"→capture, ambiguo→clarify).
+
+#### Etapa D - Migración de agentes de dominio (big-bang)
+- [ ] 41.4  Migrar weather + travel + maps a `RecursiveAgent`: ToolDefs (openmeteo/geocoding/
+            maps_client) + dispatch (envolviendo backends existentes) + system_prompt + afinidades
+            (maps→weather). Tests por agente con backends mockeados.
+- [ ] 41.5  Migrar haos a `RecursiveAgent`: tools `find_entity`/`get_state`/`call_service`
+            (ha_client) + RAG de entidades + dispatch + system_prompt. Tests con ha_client mockeado.
+- [ ] 41.6  Migrar finance + mercadolibre a `RecursiveAgent`: tools dolarapi/yfinance/ml_client/
+            portfolio + dispatch + system_prompt + afinidades. Tests con backends mockeados.
+- [ ] 41.7  Migrar scheduler (calendar_client) + profile + user_mgmt + system a `RecursiveAgent`
+            (system ya usa run_loop). ToolDefs + dispatch + system_prompt + afinidades. Tests por agente.
+
+#### Etapa E - Reemplazo del hot-path
+- [ ] 41.8  `server.py`: quitar de `process()`/`process_stream()` los cortocircuitos (close/ack/
+            capture) y enrutar todo al `RecursiveAgent` raíz. Eliminar `fast_classifier` y retirar
+            `coordinator.coordinate`/`_run_plan` del hot-path (el árbol los subsume). Flip del flag.
+            Tests e2e (LLM mockeado): close/ignore/capture/clarify, single-domain, multi-domain.
+
+#### Etapa F - Observabilidad del árbol
+- [ ] 41.9  `trace_store`/`metrics_store`: trace anidado (depth, subárbol, tool_calls por nodo) +
+            métricas nuevas (llamadas LLM por request, tool_calls por request, profundidad máxima,
+            uso de tools de housekeeping). Deprecar `bypass_rate` (tiende a 0) y reemplazar en
+            `/metrics` (ambos backoffices). Tests de ingesta.
+
+#### Etapa G - Deploy + verificación
+- [ ] 41.10 Validar tras flag, flip, `bash scripts/deploy.sh core` (health-gate + rollback), smoke de
+            voz/WhatsApp y revisión de latencia real en el Brain.
