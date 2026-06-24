@@ -3358,8 +3358,8 @@ Objetivo: Una capa de conversación como COLUMNA VERTEBRAL de la continuidad, ch
           contexto y rutee al agente dueño; (c) identificar al usuario una vez por sesión
           (no por conversación); (d) dar a cada agente un contexto consistente (user_context
           por-agente + historial reciente). Reemplaza y expande el épico 18.16 (#532).
-Estado:   EN CURSO (6/11 — Etapa A completa: 36.1, 36.2, 36.3; Etapa B: 36.4, 36.5 listas,
-          falta 36.6 deploy+e2e contra NSPanel físico; Etapa C: 36.7 lista, falta 36.8).
+Estado:   EN CURSO (7/11 — Etapa A completa: 36.1, 36.2, 36.3; Etapa B: 36.4, 36.5 listas,
+          falta 36.6 deploy+e2e contra NSPanel físico; Etapa C completa: 36.7, 36.8).
 Deps:     conversations.py (FASE 9/22), intent_state + proactivo (FASE 22/27), 19.4 (ruteo WA
           por intent_id — base del frente proactivo), FASE 16 (audio_server/satellite), FASE 35
           (métricas, para 36.10).
@@ -3412,10 +3412,14 @@ Modelo conceptual (decisiones de diseño):
             uno explícito (ambas ramas texto/media); revive incluso conversaciones `expired`
             dentro del TTL del canal (6h). Cerradas o fuera de TTL → arranca fresca; el id
             explícito (quoted-reply) tiene precedencia. PR core #240. Tests (test_wa_continuity.py).
-- [ ] 36.8  Proactivos como turnos: las notificaciones proactivas (advise/goal/request)
+- [x] 36.8  Proactivos como turnos: las notificaciones proactivas (advise/goal/request)
             registran un turno `assistant` en una conversación con su `intent_id`; el reply
             (quoted-reply o por recencia) se liga a esa conversación y rutea al agente dueño
-            (extiende 19.4). Tests del cruce resuelto end-to-end.
+            (extiende 19.4). `_seal_request_to_wa_conversation` → `_register_proactive_turn`
+            (generalizado): request sella conv_id + kind="reply"; advise sella conv_id sin
+            forzar reply; goal sólo registra el turno. `Conversation.add(meta=)`. El cruce por
+            recencia se resuelve con 36.7 (reanuda la conversación sellada). PR core #241.
+            Tests (test_proactive_turns.py, incl. cruce e2e wa_inbound→process→owner).
 
 #### Etapa D - Identidad y saludo (core)
 - [ ] 36.9  Saludo por sesión: `greeted_at` por usuario/canal; saludar 1x por sesión
