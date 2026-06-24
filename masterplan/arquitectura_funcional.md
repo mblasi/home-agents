@@ -605,10 +605,40 @@ usuario/asistente al LLM.
   (anti-alucinación) pero el voice-id reconoce al hablante, el server NO calla: sintetiza
   "no te entendí, repetí" con `needs_reply` (reabre el mic). Voz guest con STT dudoso →
   204 mudo + hard negative (probable TV). `_transcribe` devuelve `(texto, motivo)`.
+- **Reanudación asíncrona en WhatsApp (36.7):** un mensaje entrante sin `conversation_id`
+  explícito (no es un quoted-reply) reanuda la última conversación vigente del remitente vía
+  `resume_latest(source)` —revive incluso conversaciones marcadas `expired` mientras sigan
+  dentro del TTL del canal (6h)—, en vez de abrir una nueva por gap temporal. Conversaciones
+  cerradas o fuera de TTL arrancan frescas; el `conversation_id` explícito tiene precedencia.
+- **Proactivos como turnos (36.8):** al entregar una notificación proactiva (request/advise/
+  goal) por WhatsApp se siembra un turno `assistant` en la conversación canónica del usuario,
+  con meta `{intent_id, agent_id, proactive}` (`_register_proactive_turn`). Para un `request`
+  además se sella el `conversation_id` del intent y se deja la conversación esperando el reply
+  (`kind="reply"`). Así un reply —quoted (19.4) o por recencia (36.7)— cae en ese hilo, con la
+  pregunta como contexto, y el orquestador lo captura y rutea al **agente dueño** del intent.
+  El `advise` siembra el turno y sella el `conversation_id` pero no fuerza `kind="reply"` (no
+  debe secuestrar el próximo comando); el `goal` sólo siembra el turno.
+- **Saludo por sesión (36.9):** el saludo señala el **reconocimiento** del usuario, no el
+  inicio de una conversación. `greeting.py` guarda `greeted_at` por canal en
+  `user.preferences` y respeta un cooldown configurable (`GREETING_COOLDOWN_SECS`, default 6h,
+  override por canal). Se antepone 1x por usuario/canal por sesión (`_maybe_prepend_greeting`,
+  aplicado a los tres paths: recursivo, fallback, stream). Los invitados no se saludan.
+- **Historial multi-turno en el hot-path (36.11):** el runtime recursivo LEE `conv.context()`
+  para armar los `messages` del LLM (`agent_runtime._build_messages`); ahora también ESCRIBE
+  el turno (`conv.add("user"/"assistant", ...)`) al cerrar cada request en `_process_recursive`
+  —antes sólo lo hacía el fallback FASE 40—, así el historial llega efectivamente al LLM en el
+  turno siguiente. `ignore` (respuesta vacía) no deja turno; el saludo no se persiste (es
+  presentación). Los proactivos (36.8) ya sembraban su turno aparte.
+- **Observabilidad de continuidad (36.10):** `metrics_store.continuity_aggregates/series`
+  derivan de `request_metrics` agrupando por `conv_id` (turnos/conv, % multi-turno ≥2 requests,
+  % repreguntas sostenidas ≥3) e `intent_state.proactive_reply_stats` cuenta los replies a
+  proactivos vs. pendientes/vencidos. Expuesto en `GET /metrics/continuity/{summary,series}` y
+  reflejado en el tab "Continuidad" de ambos backoffices (local y cloud vía push del bridge).
 
-> Fronteras de continuidad pendientes (FASE 36): deploy + verificación e2e en paneles (36.6),
-> proactivos como turnos + reanudar conversación en WhatsApp (etapa C), saludo por sesión
-> (etapa D). La sección se consolida en 36.11.
+> El ciclo se valida e2e cross-canal en `tests/test_continuity_e2e.py` (voz: saludo por sesión
+> + multi-turno; WhatsApp: cruce proactivo→reply por recencia ruteado al dueño; canales como
+> sesiones independientes). Pendiente sólo la verificación e2e en hardware con el NSPanel físico
+> (36.6 — deploy + repregunta de voz sin re-wake).
 
 ---
 

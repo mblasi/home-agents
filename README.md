@@ -123,6 +123,30 @@ by `GET /models` via the snapshot).
 
 ---
 
+## Conversation continuity (Phase 36)
+
+Continuity is unified across channels rather than patched per channel. A `Conversation`
+(`core/conversations.py`) is channel-aware: the inactivity TTL is per channel (voice ~120s,
+WhatsApp 6h), and `ContinuationState` models "awaiting the user's reply" (`clarification` /
+`field` / `reply`) as one persisted state exposed on every response.
+
+- **WhatsApp resumes by recency** — a new inbound message reopens the sender's latest vigent
+  conversation instead of starting a fresh one on a time gap.
+- **Proactive notifications are turns** — delivering an advise/goal/request seeds an `assistant`
+  turn tied to its `intent_id`; the user's reply (quoted or by recency) lands in that conversation
+  and routes to the owner agent.
+- **The greeting is per session** — the recognition greeting (`greeting.py`) is prepended once
+  per user/channel session (`greeted_at` + cooldown), not on every conversation.
+- **Multi-turn history reaches the LLM** — the recursive hot-path records each turn so
+  `conv.context()` carries the prior turns to the model on the next request.
+- **Continuity metrics** (turns/conv, multi-turn %, sustained follow-ups, proactive replies) are
+  exposed at `GET /metrics/continuity/*` and charted in both backoffices.
+
+The full cross-channel cycle is covered e2e in `core/tests/test_continuity_e2e.py`; only the
+on-device voice verification with the physical NSPanel remains (36.6).
+
+---
+
 ## Observability (Phase 35)
 
 Voice and LLM metrics are centralized in SQLite by `core/metrics_store.py`, separate from
