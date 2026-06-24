@@ -48,4 +48,6 @@ def build_metrics_snapshot(hours: int = WINDOW_HOURS) -> dict:
         "llm_by_model":  (_get(f"{base}/llm/by-model?{q}") or {}).get("models", []),
         "llm_by_agent":  (_get(f"{base}/llm/by-agent?{q}") or {}).get("agents", []),
         "llm_series":    _get(f"{base}/llm/series?{qs}") or {},
+        "continuity_summary": _get(f"{base}/continuity/summary?{q}") or {},   # FASE 36.10
+        "continuity_series":  _get(f"{base}/continuity/series?{qs}") or {},    # FASE 36.10
     }

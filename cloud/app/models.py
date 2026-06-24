@@ -132,6 +132,8 @@ class MetricsSnapshot(BaseModel):
     llm_by_model: list[dict[str, Any]] = Field(default_factory=list)
     llm_by_agent: list[dict[str, Any]] = Field(default_factory=list)
     llm_series: dict[str, Any] = Field(default_factory=dict)
+    continuity_summary: dict[str, Any] = Field(default_factory=dict)  # FASE 36.10
+    continuity_series: dict[str, Any] = Field(default_factory=dict)   # FASE 36.10
 
 
 class CommandRequest(BaseModel):

@@ -25,6 +25,7 @@
 <div class="flex gap-2 mb-5 border-b border-gray-800">
   <button data-tab="voz" class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-emerald-500 text-white">🎙️ Voz</button>
   <button data-tab="llm" class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-400 hover:text-white">🤖 LLM / Agentes</button>
+  <button data-tab="continuidad" class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-400 hover:text-white">⤴️ Continuidad</button>
 </div>
 
 <!-- ── Sección VOZ ──────────────────────────────────────────────────────────── -->
@@ -107,6 +108,15 @@
   </div>
 </section>
 
+<section data-panel="continuidad" class="hidden">
+  <div id="cont-cards" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6"></div>
+
+  <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+    <div class="text-xs text-gray-400 uppercase tracking-wider mb-3">Conversaciones, requests y turnos/conv promedio</div>
+    <canvas id="cont-chart" height="90"></canvas>
+  </div>
+</section>
+
 <script>
 const $ = (id) => document.getElementById(id);
 const fmtNum = (v) => v == null ? "—" : (typeof v === "number" ? v.toLocaleString("es") : v);
@@ -161,6 +171,7 @@ const vozChart = mkChart("voz-chart", "bar");
 const wwChart = mkChart("ww-chart", "line");
 const confChart = mkChart("conf-chart", "line");
 const llmChart = mkChart("llm-chart", "line");
+const contChart = mkChart("cont-chart", "line");
 
 function applySeries(chart, payload, colorOffset) {
   chart.data.labels = (payload.labels || []).map(fmtLabel);
@@ -264,10 +275,28 @@ function bucketFor() {
   return 86400;                      // 1 d
 }
 
+async function loadContinuidad() {
+  const [sum, series] = await Promise.all([
+    getJSON("/api/metrics/continuity/summary?" + qs()),
+    getJSON("/api/metrics/continuity/series?" + qs({bucket: bucketFor()})),
+  ]);
+  $("cont-cards").innerHTML =
+    card("Conversaciones", fmtNum(sum.conversations)) +
+    card("Turnos/conv prom", sum.avg_turns_per_conv == null ? "—" : sum.avg_turns_per_conv.toFixed(2)) +
+    card("Multi-turno", fmtPct(sum.multi_turn_pct), fmtNum(sum.multi_turn_conversations) + " convs") +
+    card("Repreguntas sost.", fmtPct(sum.sustained_pct), fmtNum(sum.sustained_conversations) + " convs") +
+    card("Replies a proact.", fmtNum(sum.proactive_replies), "rate " + fmtPct(sum.proactive_reply_rate)) +
+    card("Requests pendientes", fmtNum(sum.pending_requests));
+  applySeries(contChart, series, 1);
+}
+
 let activeTab = "voz";
 async function reload() {
-  try { activeTab === "voz" ? await loadVoz() : await loadLLM(); }
-  catch (e) { console.error(e); }
+  try {
+    if (activeTab === "voz") await loadVoz();
+    else if (activeTab === "llm") await loadLLM();
+    else await loadContinuidad();
+  } catch (e) { console.error(e); }
 }
 
 // Tabs

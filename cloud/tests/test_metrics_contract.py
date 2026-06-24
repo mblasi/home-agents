@@ -28,6 +28,20 @@ def test_metrics_snapshot_carries_voice_conf_series():
     assert snap.voice_conf_series["series"][0]["name"] == "known_conf"
 
 
+def test_metrics_snapshot_carries_continuity():  # FASE 36.10
+    snap = MetricsSnapshot(ts="2026-06-24T00:00:00Z",
+        continuity_summary={"conversations": 3, "avg_turns_per_conv": 2.0,
+                            "multi_turn_pct": 0.66, "proactive_replies": 2},
+        continuity_series={"labels": [1, 2], "series": [{"name": "avg_turns", "data": [2.0, 1.5]}]})
+    assert snap.continuity_summary["conversations"] == 3
+    assert snap.continuity_series["series"][0]["name"] == "avg_turns"
+
+
+def test_minimal_snapshot_continuity_defaults_empty():  # FASE 36.10
+    d = MetricsSnapshot(ts="2026-06-24T00:00:00Z").model_dump()
+    assert d["continuity_summary"] == {} and d["continuity_series"] == {}
+
+
 def test_ts_required():
     with pytest.raises(Exception):
         MetricsSnapshot()

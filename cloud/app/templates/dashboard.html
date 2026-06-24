@@ -82,6 +82,9 @@
               <table id="m-models"><thead><tr><th>modelo</th><th>llamadas</th><th>lat ms</th><th>tokens</th></tr></thead><tbody></tbody></table>
               <table id="m-agents"><thead><tr><th>agente</th><th>steps</th><th>aciertos</th><th>lat ms</th></tr></thead><tbody></tbody></table>
             </div>
+            <h3>Continuidad</h3>
+            <div id="m-cont-summary" class="grid"></div>
+            <canvas id="m-cont-chart" height="80"></canvas>
           </div>
         </div>
       </section>
@@ -590,7 +593,7 @@ async function refresh() {
 }
 
 // ── Métricas (FASE 35.6) ──────────────────────────────────────────────────────
-let mVoiceChart = null, mLlmChart = null, mConfChart = null, mWwChart = null;
+let mVoiceChart = null, mLlmChart = null, mConfChart = null, mWwChart = null, mContChart = null;
 const mLabel = (ts) => new Date(ts * 1000).toLocaleString("es", {day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
 
 function mkMetricChart(canvasId, type) {
@@ -668,6 +671,19 @@ async function loadMetrics() {
     const thr = (vs.speaker_threshold != null) ? vs.speaker_threshold : null;
     $("m-conf-thr").textContent = thr != null ? `· threshold ${thr}` : "";
   }
+
+  // Continuidad conversacional (FASE 36.10): turnos/conv, % multi-turno, repreguntas
+  // sostenidas y replies a proactivos.
+  const cont = metrics.continuity_summary || {};
+  $("m-cont-summary").innerHTML =
+    `<div><b>${mFmt(cont.conversations)}</b> convs</div>` +
+    `<div><b>${cont.avg_turns_per_conv ?? "—"}</b> turnos/conv</div>` +
+    `<div><b>${mPct(cont.multi_turn_pct)}</b> multi-turno</div>` +
+    `<div><b>${mPct(cont.sustained_pct)}</b> repreguntas sost.</div>` +
+    `<div title="pendientes ${mFmt(cont.pending_requests)} · tasa ${mPct(cont.proactive_reply_rate)}">` +
+    `<b>${mFmt(cont.proactive_replies)}</b> replies a proact.</div>`;
+  if (!mContChart) mContChart = mkMetricChart("m-cont-chart", "line");
+  setSeries(mContChart, metrics.continuity_series || {}, ["#a78bfa", "#60a5fa", "#34d399"]);
 
   // Tablas de detalle (sólo presentes para roles con view_full)
   const models = metrics.llm_by_model || [], agents = metrics.llm_by_agent || [];
