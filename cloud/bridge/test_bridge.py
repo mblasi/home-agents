@@ -149,6 +149,18 @@ def test_metrics_snapshot_unwraps_list_envelopes():
     assert snap["voice_series"]["labels"] == [1, 2]
 
 
+def test_metrics_snapshot_emits_continuity():  # FASE 36.10
+    def fake_get(url, **k):
+        if "continuity/summary" in url: return {"conversations": 4, "avg_turns_per_conv": 1.5,
+                                                "multi_turn_pct": 0.5, "proactive_replies": 1}
+        if "continuity/series" in url:  return {"labels": [1], "series": []}
+        return None
+    with patch.object(metrics_snapshot, "_get", fake_get):
+        snap = metrics_snapshot.build_metrics_snapshot()
+    assert snap["continuity_summary"]["conversations"] == 4
+    assert snap["continuity_series"]["labels"] == [1]
+
+
 # ── deploy.run / deploy.release invocan el motor único (FASE 34) ───────────────
 
 def test_deploy_run_invokes_engine(monkeypatch):

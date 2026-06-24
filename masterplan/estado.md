@@ -3358,9 +3358,9 @@ Objetivo: Una capa de conversación como COLUMNA VERTEBRAL de la continuidad, ch
           contexto y rutee al agente dueño; (c) identificar al usuario una vez por sesión
           (no por conversación); (d) dar a cada agente un contexto consistente (user_context
           por-agente + historial reciente). Reemplaza y expande el épico 18.16 (#532).
-Estado:   EN CURSO (8/11 — Etapa A completa: 36.1, 36.2, 36.3; Etapa B: 36.4, 36.5 listas,
+Estado:   EN CURSO (9/11 — Etapa A completa: 36.1, 36.2, 36.3; Etapa B: 36.4, 36.5 listas,
           falta 36.6 deploy+e2e contra NSPanel físico; Etapa C completa: 36.7, 36.8;
-          Etapa D completa: 36.9).
+          Etapa D completa: 36.9; Etapa E: 36.10 lista, falta 36.11 docs+e2e).
 Deps:     conversations.py (FASE 9/22), intent_state + proactivo (FASE 22/27), 19.4 (ruteo WA
           por intent_id — base del frente proactivo), FASE 16 (audio_server/satellite), FASE 35
           (métricas, para 36.10).
@@ -3433,8 +3433,13 @@ Modelo conceptual (decisiones de diseño):
             PR core #242. Tests (test_greeting.py + test_recursive_hotpath.py).
 
 #### Etapa E - Observabilidad y documentación
-- [ ] 36.10 Métricas de continuidad (turnos por conversación, % de exchanges multi-turno,
+- [x] 36.10 Métricas de continuidad (turnos por conversación, % de exchanges multi-turno,
             repreguntas sostenidas, replies a proactivos) integradas a los dashboards de FASE 35.
+            core: `metrics_store.continuity_aggregates/series` (desde request_metrics por conv_id)
+            + `intent_state.proactive_reply_stats` + endpoints `/metrics/continuity/{summary,series}`
+            (PR core #243). dashboards: tab "Continuidad" en el backoffice local (`metrics.html`) y
+            sección en el cloud (`dashboard.html`), alimentada por el push del bridge
+            (`metrics_snapshot` + `MetricsSnapshot`). Tests core + cloud (contract + bridge).
 - [ ] 36.11 Tests e2e cross-canal (voz y WA) del ciclo completo + docs: sección "continuidad
             conversacional" en `masterplan/arquitectura_funcional.md` y `README`.
 
