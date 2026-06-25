@@ -251,9 +251,9 @@
 
   <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
     <div class="bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-2 text-center">
-      <div class="text-xs text-gray-500 mb-1">Muestras</div>
+      <div class="text-xs text-gray-500 mb-1">Muestras wake word <span class="text-gray-600">(global)</span></div>
       <div class="text-lg font-bold {{ 'text-emerald-400' if count >= required else 'text-yellow-400' }}">{{ count }}</div>
-      <div class="text-xs text-gray-600">/ {{ required }}</div>
+      <div class="text-xs text-gray-600">/ {{ required }} · cross-user</div>
     </div>
     <div class="bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-2 text-center">
       <div class="text-xs text-gray-500 mb-1">Precisión</div>
@@ -270,10 +270,13 @@
       {% endif %}
     </div>
     <div class="bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-2 text-center">
-      <div class="text-xs text-gray-500 mb-1">Speaker ID</div>
+      <div class="text-xs text-gray-500 mb-1">Voice-ID <span class="text-gray-600">(per-user)</span></div>
       {% if user.has_embedding %}
         <div class="text-lg font-bold text-emerald-400">✓</div>
-        <div class="text-xs text-gray-600">entrenado</div>
+        <div class="text-xs text-gray-600">
+          {{ user.voiceid_enroll_count | default(0) | int }} frase{{ '' if (user.voiceid_enroll_count | default(0) | int) == 1 else 's' }}
+          {% if user.voiceid_enrolled_at %}· {{ user.voiceid_enrolled_at | int | datetimefmt }}{% endif %}
+        </div>
       {% else %}
         <div class="text-lg font-bold text-gray-600">—</div>
         <div class="text-xs text-gray-600">sin modelo</div>

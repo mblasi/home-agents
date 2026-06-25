@@ -51,6 +51,15 @@ CRÍTICO: el embedding debe enrolarse con el MISMO mic (re-enroll desde el nodo)
 Ante una voz no enrolada, el gate sintetiza `UNKNOWN_VOICE_REPLY` (default `"Voz desconocida."`)
 en vez de un `204` mudo, para dar feedback; vacío conserva el `204` silencioso.
 
+**Dos enrollments distintos — no confundir (FASE 44):**
+- **Wake word** ("Capitán") es **cross-user**: las muestras positivas se acumulan en UN pool común
+  (`wakeword_samples` bucket `_global`), no per-usuario. El conteo es uno solo; el trainer levanta
+  ese pool. (La PRECISIÓN TP/FP del modelo sí se mide per-usuario.)
+- **Voice-ID** es **per-usuario**: un embedding `embeddings/<uid>.npy` (promedio móvil de los
+  enrollments). Como el embedding promedia y no acumula, el "número de muestras" se lleva aparte:
+  `voiceid_enroll_count`/`voiceid_enrolled_at` en el user, que el `audio_server` incrementa vía
+  `POST /users/{uid}/voiceid/enrolled` tras cada `/enroll-voice` exitoso (best-effort).
+
 **Canal de enrollment backoffice→nodo (16.21):** el backoffice deja una orden pendiente
 (`POST /nodes/{id}/enroll` type wakeword|voice|verify); el satellite la consume en su loop,
 graba inline (usando el stream del mic, evita conflicto OpenSLES) y reporta progreso.
