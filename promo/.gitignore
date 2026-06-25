@@ -1,0 +1,6 @@
+# Artefactos generados (regenerables con tts.py + render_video.py)
+__pycache__/
+*.wav
+*.mp4
+*.gif
+*.png
