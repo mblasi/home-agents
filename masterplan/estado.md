@@ -4046,3 +4046,34 @@ Decisiones tomadas:
 - [x] 43.7  Docs: `arquitectura_funcional.md` (nueva sección "Orquestador como agente de primera
             clase" + modelo por-agente que subsume el tier de 42.2), READMEs (core: endpoints +
             `/models`; raíz: párrafo FASE 43; cloud: comando `agent.config`); lint de estado + sync.
+
+---
+
+### FASE 44 - Fixes de continuidad y enrollment (bugs de campo)
+
+```
+Objetivo: Cerrar dos bugs detectados en uso real del runtime recursivo y del enrollment de wake
+          word, ambos con e2e/cobertura que los daba por buenos sin ejercitarlos:
+          (a) un agente HOJA que repregunta no reabría el micrófono; (b) el enrollment de wake
+          word desde un nodo subía a un usuario sintético `_global` que el core rechazaba con 404.
+Estado:   COMPLETA (2/2).
+Deps:     FASE 41 (runtime recursivo — RecursiveAgent, continuación), FASE 36 (ContinuationState /
+          needs_reply / X-Needs-Reply), FASE 16 (enrollment de wake word por nodo).
+```
+
+- [x] 44.1  Wake word `_global`: el enrollment desde un nodo POSTea a `/users/_global/wakeword/samples`
+            (la wake word es la misma para todos → bucket común cross-user), pero el core exigía un
+            usuario registrado y devolvía 404 → las muestras se perdían (el contador quedaba congelado).
+            Los endpoints `POST/GET/DELETE /users/{uid}/wakeword/samples` aceptan el id sintético
+            `_global` (constante `wakeword_samples.GLOBAL_USER`); el backoffice muestra el bucket común
+            primero en el desglose y oculta usuarios sin muestras. El trainer ya levantaba todos los
+            dirs, así que entrena sobre `_global` sin cambios. Tests (core: `_global` OK + 404 de user
+            desconocido). (core + backoffice)
+- [x] 44.2  Repregunta de agente HOJA reabre el mic: en el runtime recursivo, sólo `clarify` del
+            ORQUESTADOR fijaba `ContinuationState.waiting`; un agente hoja (p.ej. agenda) que pedía un
+            dato en prosa dejaba `needs_reply=False` → el satélite no reabría el mic y la interacción
+            moría. Se agrega la tool universal `ask_user` (la inyecta `agent_runtime` a cualquier agente
+            que no traiga `clarify`), terminal, que fija continuación `kind=clarification` igual que
+            `clarify`. La suite e2e previa sólo cubría `clarify` del raíz, nunca una repregunta de un
+            hijo delegado: se agrega ese caso (orquestador→hoja→ask_user→reabre) + unit tests del
+            runtime. (core)
