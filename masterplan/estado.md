@@ -4052,13 +4052,16 @@ Decisiones tomadas:
 ### FASE 44 - Fixes de continuidad y enrollment (bugs de campo)
 
 ```
-Objetivo: Cerrar dos bugs detectados en uso real del runtime recursivo y del enrollment de wake
-          word, ambos con e2e/cobertura que los daba por buenos sin ejercitarlos:
+Objetivo: Cerrar bugs detectados en uso real del runtime recursivo y del enrollment de voz/wake
+          word, varios con e2e/cobertura que los daba por buenos sin ejercitarlos:
           (a) un agente HOJA que repregunta no reabría el micrófono; (b) el enrollment de wake
-          word desde un nodo subía a un usuario sintético `_global` que el core rechazaba con 404.
-Estado:   COMPLETA (2/2).
+          word desde un nodo subía a un usuario sintético `_global` que el core rechazaba con 404;
+          (c) la wake word es cross-user pero se contaba per-usuario (UI confusa, conteo stale tras
+          la migración a `_global`); (d) la sección "Reconocimiento de voz" mostraba el conteo de
+          wake word como si fuera voice-id, que no tenía contador propio.
+Estado:   COMPLETA (4/4).
 Deps:     FASE 41 (runtime recursivo — RecursiveAgent, continuación), FASE 36 (ContinuationState /
-          needs_reply / X-Needs-Reply), FASE 16 (enrollment de wake word por nodo).
+          needs_reply / X-Needs-Reply), FASE 16 (enrollment de wake word + voice-id por nodo).
 ```
 
 - [x] 44.1  Wake word `_global`: el enrollment desde un nodo POSTea a `/users/_global/wakeword/samples`
@@ -4077,3 +4080,16 @@ Deps:     FASE 41 (runtime recursivo — RecursiveAgent, continuación), FASE 36
             `clarify`. La suite e2e previa sólo cubría `clarify` del raíz, nunca una repregunta de un
             hijo delegado: se agrega ese caso (orquestador→hoja→ask_user→reabre) + unit tests del
             runtime. (core)
+- [x] 44.3  Wake word cross-user (sin conteo per-usuario): la wake word es la misma para todos, pero
+            se contaba por usuario (UI "Muestras por usuario", y tras 44.1 el conteo per-user quedaba
+            stale porque los nuevos capturados van a `_global`). Se unifica en UN pool común:
+            `wakeword_samples.consolidate_to_global()` (migración idempotente que funde los dirs legacy
+            per-usuario en `_global`, corrida 1× en el Brain) + el backoffice muestra un solo conteo
+            global (wakeword page y card del user_detail). La PRECISIÓN (TP/FP) sigue siendo per-usuario.
+            Tests de la migración. (core + backoffice)
+- [x] 44.4  Contador de voice-id per-usuario: la sección "Reconocimiento de voz" mostraba el conteo de
+            wake word como si fuera voice-id; el voice-id (embedding, promedio móvil) no tenía contador.
+            Se agrega `voiceid_enroll_count`/`voiceid_enrolled_at` al user (core), endpoint
+            `POST /users/{uid}/voiceid/enrolled` que el `audio_server` llama tras guardar el embedding
+            (best-effort), y la card muestra "N frases · última <fecha>". Tests (core: endpoint +
+            persistencia; ear: notifica al core y sobrevive si el core está caído). (core + ear + backoffice)

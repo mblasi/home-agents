@@ -1493,7 +1493,9 @@ def user_detail_page(request: Request, uid: str):
     agents, _ = _load_rbac_context()
     # /agents-meta es instantáneo (sin connectivity checks) — usado para user_context_schema
     agents_meta  = _core("/agents-meta", timeout=5) or {}
-    ww_samples   = _core(f"/users/{uid}/wakeword/samples") or {"count": 0, "required": 30, "samples": []}
+    # La wake word es cross-user (FASE 44.3): el conteo de muestras es el bucket común _global,
+    # no per-usuario. La PRECISIÓN (TP/FP) sí es per-usuario y se mantiene.
+    ww_samples   = _core("/users/_global/wakeword/samples") or {"count": 0, "required": 30, "samples": []}
     ww_metrics   = _core(f"/users/{uid}/wakeword/metrics") or {"tp": 0, "fp": 0, "rbac_deny": 0}
     train_status = _core("/wakeword/train/status") or {"status": "idle"}
     user_context     = _core(f"/users/{uid}/context/raw") or {}
@@ -1839,17 +1841,10 @@ def node_enroll_status_fragment(node_id: str, target: str = Query("")):
 def wakeword_page(request: Request):
     """Página global de wake word (12.16): entrenamiento transversal + métricas + captura por nodo."""
     train_status = _core("/wakeword/train/status") or {"status": "idle"}
-    users = _core("/users") or []
-    breakdown = []
-    # Bucket común (cross-user): la wake word es la misma para todos, el enrollment
-    # desde nodos acumula acá. Va primero para que se vea como pool principal.
-    g = _core("/users/_global/wakeword/samples") or {"count": 0}
-    breakdown.append({"uid": "común", "count": g.get("count", 0)})
-    for u in users:
-        uid = u.get("id") if isinstance(u, dict) else u
-        s = _core(f"/users/{uid}/wakeword/samples") or {"count": 0}
-        if s.get("count", 0):
-            breakdown.append({"uid": uid, "count": s.get("count", 0)})
+    # La wake word es cross-user (FASE 44.3): UN solo pool común (_global), no per-usuario.
+    # Las muestras legacy per-usuario se migraron a _global (consolidate_to_global).
+    g = _core("/users/_global/wakeword/samples") or {"count": 0, "required": 30}
+    breakdown = [{"uid": "común", "count": g.get("count", 0)}]
     panels = _panels()
     nodes = {n["node_id"]: n for n in (_audio("/nodes") or [])}
     negatives = _audio("/wakeword/negatives") or {}
