@@ -165,6 +165,7 @@ MELSPEC_MODEL=/data/data/com.termux/files/home/wakeword/melspectrogram.onnx
 EMBEDDING_MODEL=/data/data/com.termux/files/home/wakeword/embedding_model.onnx
 WAKEWORD_THRESH=0.8
 WAKEWORD_FRAMES_REQ=2
+WAKEWORD_WAKEUP_SCREEN=true
 COMMAND_SECS=5
 SAMPLE_RATE=16000
 EOF
