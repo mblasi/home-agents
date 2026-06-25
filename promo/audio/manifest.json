@@ -1,0 +1,107 @@
+[
+  {
+    "id": "00_landing",
+    "scene": "landing",
+    "voice": "daniela",
+    "dur": 5.801,
+    "text": "Una red de agentes de inteligencia artificial, viviendo en tu casa. Sin nube. Sin que nada salga de tu red."
+  },
+  {
+    "id": "01_arch",
+    "scene": "arch",
+    "voice": "daniela",
+    "dur": 8.797,
+    "text": "En cada ambiente, un panel te escucha. Todos hablan con el Brain: un servidor chico, en tu casa, que corre Home Assistant y los modelos de lenguaje. La nube no participa."
+  },
+  {
+    "id": "02_agents",
+    "scene": "agents",
+    "voice": "daniela",
+    "dur": 8.75,
+    "text": "Adentro vive una red de agentes especializados: clima, domótica, agenda, inversiones, compras, mapas. Cada uno sabe lo suyo. Y colaboran entre ellos."
+  },
+  {
+    "id": "10_c1_user",
+    "scene": "c1_say",
+    "voice": "davefx",
+    "dur": 3.613,
+    "text": "Capitán, prendé la luz del comedor y poné el aire en veintitrés."
+  },
+  {
+    "id": "11_c1_resp",
+    "scene": "room",
+    "voice": "daniela",
+    "dur": 3.709,
+    "text": "Listo. Luz del comedor encendida y aire a veintitrés grados."
+  },
+  {
+    "id": "20_c2_user",
+    "scene": "c2_say",
+    "voice": "davefx",
+    "dur": 2.615,
+    "text": "Agendame una corrida para mañana a la tarde."
+  },
+  {
+    "id": "21_c2_ask",
+    "scene": "weather",
+    "voice": "daniela",
+    "dur": 4.498,
+    "text": "Mañana a la tarde dan lluvia. Tenés la mañana despejada, ¿te la agendo a las ocho?"
+  },
+  {
+    "id": "22_c2_ok",
+    "scene": "c2_ok",
+    "voice": "davefx",
+    "dur": 0.746,
+    "text": "Dale."
+  },
+  {
+    "id": "23_c2_done",
+    "scene": "calendar",
+    "voice": "daniela",
+    "dur": 3.79,
+    "text": "Listo, corrida mañana a las ocho. Te aviso si cambia el tiempo."
+  },
+  {
+    "id": "30_c3_user",
+    "scene": "c3_say",
+    "voice": "davefx",
+    "dur": 6.226,
+    "text": "Capitán, quiero escaparme un finde a la playa el mes que viene, algo tranqui y que no se me dispare el presupuesto."
+  },
+  {
+    "id": "31_c3_orch",
+    "scene": "brain",
+    "voice": "daniela",
+    "dur": 4.684,
+    "text": "Lo voy resolviendo. Cruzo tu agenda, el pronóstico, las rutas y el presupuesto."
+  },
+  {
+    "id": "32_c3_pro",
+    "scene": "c3_pro",
+    "voice": "daniela",
+    "dur": 7.627,
+    "text": "Te tengo algo. El finde del dieciocho está libre y va a estar soleado. La Pedrera te queda a dos horas y entra en presupuesto. ¿Reservo?"
+  },
+  {
+    "id": "33_c3_ok",
+    "scene": "c3_ok",
+    "voice": "davefx",
+    "dur": 0.989,
+    "text": "Reservá."
+  },
+  {
+    "id": "34_c3_done",
+    "scene": "c3_done",
+    "voice": "daniela",
+    "dur": 3.909,
+    "text": "Reservado. Te bloqueé la agenda y te guardé la ruta. Buen finde."
+  },
+  {
+    "id": "40_close",
+    "scene": "close",
+    "voice": "daniela",
+    "dur": 4.478,
+    "text": "Una red de agentes que entiende, coordina y se adelanta. En tu casa. Tuya."
+  }
+]
