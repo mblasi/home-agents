@@ -4059,9 +4059,10 @@ Objetivo: Cerrar bugs detectados en uso real del runtime recursivo y del enrollm
           (c) la wake word es cross-user pero se contaba per-usuario (UI confusa, conteo stale tras
           la migración a `_global`); (d) la sección "Reconocimiento de voz" mostraba el conteo de
           wake word como si fuera voice-id, que no tenía contador propio.
-Estado:   COMPLETA (4/4).
+Estado:   COMPLETA (5/5).
 Deps:     FASE 41 (runtime recursivo — RecursiveAgent, continuación), FASE 36 (ContinuationState /
-          needs_reply / X-Needs-Reply), FASE 16 (enrollment de wake word + voice-id por nodo).
+          needs_reply / X-Needs-Reply), FASE 16 (enrollment de wake word + voice-id por nodo),
+          FASE 35 (metrics_store — retrain_events para rehidratar el estado de train).
 ```
 
 - [x] 44.1  Wake word `_global`: el enrollment desde un nodo POSTea a `/users/_global/wakeword/samples`
@@ -4093,3 +4094,9 @@ Deps:     FASE 41 (runtime recursivo — RecursiveAgent, continuación), FASE 36
             `POST /users/{uid}/voiceid/enrolled` que el `audio_server` llama tras guardar el embedding
             (best-effort), y la card muestra "N frases · última <fecha>". Tests (core: endpoint +
             persistencia; ear: notifica al core y sobrevive si el core está caído). (core + ear + backoffice)
+- [x] 44.5  Estado del último train sobrevive a restarts: `_train_result` es in-memory → un
+            restart/deploy del core lo perdía y el dashboard mostraba "idle / — / 0 reales" aunque
+            hubiera un modelo entrenado. `GET /wakeword/train/status` ahora rehidrata en cold start
+            desde el último `retrain_event` persistido (`metrics_store.retrain_history`); el
+            `_train_result` in-memory (train en curso/recién hecho) tiene precedencia. Tests
+            (rehidrata tras restart, precedencia in-memory, idle si no hay historial). (core)
