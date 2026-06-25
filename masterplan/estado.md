@@ -4100,3 +4100,27 @@ Deps:     FASE 41 (runtime recursivo — RecursiveAgent, continuación), FASE 36
             desde el último `retrain_event` persistido (`metrics_store.retrain_history`); el
             `_train_result` in-memory (train en curso/recién hecho) tiene precedencia. Tests
             (rehidrata tras restart, precedencia in-memory, idle si no hay historial). (core)
+
+---
+
+### FASE 45 - Prender la pantalla del nodo al detectar la wake word
+
+```
+Objetivo: Cuando el NSPanel está enchufado y la pantalla se apaga por timeout (FASE 38), detectar
+          la wake word debe despertar la pantalla además de iniciar la conversación, para que el
+          usuario tenga feedback visual (overlay del VU-meter) y vea el dashboard al hablarle al
+          nodo. Hoy `satellite.py` detecta la wake word y arranca la grabación, pero si la pantalla
+          está apagada por DPMS el overlay no se ve y el panel parece muerto.
+Estado:   COMPLETA (1/1).
+Deps:     FASE 16 (satellite.py — loop wake word, `_run_su` root), FASE 38 (screen timeout por panel:
+          `_apply_screen_timeout` ya gestiona el apagado vía `settings put`).
+```
+
+- [x] 45.1  Despertar la pantalla en la detección: en `satellite.py`, justo tras confirmar la wake
+            word (debounce `consecutive >= WAKEWORD_FRAMES_REQ`) y antes de parar el stream, si la
+            pantalla está apagada despertarla con `_run_su("input keyevent KEYCODE_WAKEUP")`. Helper
+            `_is_screen_off()` (parsea `dumpsys power | grep 'Display Power:'` → `state=OFF`) para no
+            mandar el keyevent en vano cuando ya está prendida. Gateado por flag
+            `WAKEWORD_WAKEUP_SCREEN` (default `true`) leído de `satellite.env`; `nspanel.sh` lo emite
+            al generar la config y `_apply_remote_config` lo acepta como key configurable. Tests del
+            parser de `_is_screen_off` (mock de subprocess: ON/OFF/salida vacía). (ear)

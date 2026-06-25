@@ -95,6 +95,16 @@ El form se **prellena con la config REAL del dispositivo** (38.7): el satélite 
 `device_config` y viaja en el snapshot. Ambos backoffices prefieren ese valor (estado real) sobre
 la config guardada en core, así el admin ve lo que efectivamente corre en el panel.
 
+**Despertar la pantalla con la wake word (FASE 45):** complemento del apagado por timeout de la
+FASE 38 — el NSPanel está siempre enchufado y la pantalla se apaga por DPMS, así que al detectar la
+wake word el satélite la despierta para que el overlay del VU-meter sea visible y el panel no parezca
+muerto. Justo tras confirmar la wake word (debounce) y antes de parar el stream, `_wakeup_screen_now`
+consulta el estado real del display (`dumpsys power` → línea `Display Power: state=ON|OFF`) y sólo si
+está apagado manda `su input keyevent KEYCODE_WAKEUP` (activación pura, no el toggle de
+KEYCODE_POWER). Gateado por `WAKEWORD_WAKEUP_SCREEN` (default `true`, emitido en `satellite.env` por
+`nspanel.sh`), toggleable en caliente vía la clave de config remota `wakeup_screen`. Best-effort: si
+`su` falla, no tumba la interacción.
+
 **Ambientes (16.7):** la fuente de verdad de los ambientes son las **áreas de Home Assistant**
 (`ha_client.get_areas()` vía `/api/template`, porque el area registry no está en la REST API de
 estados). El core las expone en `GET /areas` y `GET /rooms` (áreas + augmentación local del

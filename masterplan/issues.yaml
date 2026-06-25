@@ -637,6 +637,9 @@
 "44.4":  744
 "44.5":  746
 
+# ── FASE 45 (prender pantalla del nodo al detectar wake word) ────────────────
+"45.1":  749
+
 # ── Anexos (iteraciones futuras) ──────────────────────────────────────────────
 "A.1":   118
 "A.2":   121
