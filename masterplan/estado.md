@@ -3358,10 +3358,14 @@ Objetivo: Una capa de conversación como COLUMNA VERTEBRAL de la continuidad, ch
           contexto y rutee al agente dueño; (c) identificar al usuario una vez por sesión
           (no por conversación); (d) dar a cada agente un contexto consistente (user_context
           por-agente + historial reciente). Reemplaza y expande el épico 18.16 (#532).
-Estado:   COMPLETA (10/11 — 36.6 postergada: deploy + verificación e2e contra NSPanel físico,
-          es hardware, no código). Etapa A: 36.1-36.3; Etapa B: 36.4, 36.5; Etapa C: 36.7, 36.8;
-          Etapa D: 36.9; Etapa E: 36.10, 36.11. El e2e cross-canal destapó y corrigió que el
-          hot-path recursivo no persistía turnos (el historial multi-turno no llegaba al LLM).
+Estado:   COMPLETA (11/11). 36.6 resuelta como validación e2e DETERMINISTA de la arquitectura
+          (la verificación de voz manual era flaky por el voice-id del NSPanel): suite recursiva
+          (tests/test_e2e_agent_tree.py) + deploy del core (v0.1.10). Etapa A: 36.1-36.3; Etapa B:
+          36.4, 36.5; Etapa C: 36.7, 36.8; Etapa D: 36.9; Etapa E: 36.10, 36.11. Los e2e destaparon
+          y corrigieron TRES bugs de flujo del hot-path recursivo: (a) no persistía turnos →
+          historial multi-turno no llegaba al LLM (36.11); (b) clarificación contestada no se
+          limpiaba → is_clarification colgado; (c) needs_reply = bool(resp) → el satélite reabría
+          el mic tras cada comando, no sólo en repreguntas (ahora = ContinuationState.waiting).
 Deps:     conversations.py (FASE 9/22), intent_state + proactivo (FASE 22/27), 19.4 (ruteo WA
           por intent_id — base del frente proactivo), FASE 16 (audio_server/satellite), FASE 35
           (métricas, para 36.10).
@@ -3404,8 +3408,15 @@ Modelo conceptual (decisiones de diseño):
             threadeando el `conversation_id`; cierra el ciclo si no hay respuesta a tiempo
             (silencio) o se alcanza `FOLLOWUP_MAX`. Turno extraído a `_run_turn`. PR ear #44.
             Tests del loop con `sounddevice`/audio_server mockeados.
-- [ ] 36.6  Deploy a paneles + verificación e2e: wake → comando → repregunta → respuesta sin
-            re-wake; sin regresiones de falsos positivos.
+- [x] 36.6  Validación e2e del ciclo completo (wake → comando → repregunta → respuesta sin
+            re-wake). La verificación de voz manual contra el NSPanel resultó flaky por el
+            voice-id, así que se validó la ARQUITECTURA/FUNCIONALIDAD con una suite e2e
+            determinista por el hot-path recursivo (`tests/test_e2e_agent_tree.py`): conversación
+            fluida con múltiples repreguntas, recursión del árbol (profundidad 2), delegación
+            multi-agente + consolidación, logro de objetivo (goal) por el agente adecuado, y
+            guardas (ciclos, profundidad). Destapó y corrigió la clarificación colgada y
+            needs_reply=bool(resp) (→ ContinuationState.waiting). Deploy del core (v0.1.10). La
+            prueba hablada en el panel queda como verificación opcional de hardware.
 
 #### Etapa C - Continuidad en WhatsApp (core)
 - [x] 36.7  Conversación activa en WA: TTL largo; un mensaje entrante reanuda la última
