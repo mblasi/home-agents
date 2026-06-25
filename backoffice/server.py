@@ -1841,10 +1841,15 @@ def wakeword_page(request: Request):
     train_status = _core("/wakeword/train/status") or {"status": "idle"}
     users = _core("/users") or []
     breakdown = []
+    # Bucket común (cross-user): la wake word es la misma para todos, el enrollment
+    # desde nodos acumula acá. Va primero para que se vea como pool principal.
+    g = _core("/users/_global/wakeword/samples") or {"count": 0}
+    breakdown.append({"uid": "común", "count": g.get("count", 0)})
     for u in users:
         uid = u.get("id") if isinstance(u, dict) else u
         s = _core(f"/users/{uid}/wakeword/samples") or {"count": 0}
-        breakdown.append({"uid": uid, "count": s.get("count", 0)})
+        if s.get("count", 0):
+            breakdown.append({"uid": uid, "count": s.get("count", 0)})
     panels = _panels()
     nodes = {n["node_id"]: n for n in (_audio("/nodes") or [])}
     negatives = _audio("/wakeword/negatives") or {}

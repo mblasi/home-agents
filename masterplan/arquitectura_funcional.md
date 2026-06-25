@@ -256,6 +256,14 @@ una única clase `RecursiveAgent` (satisface el Protocol `BaseAgent`) configurad
 Así el usuario recibe una respuesta construida por un **árbol de agentes orquestados**, donde en cada
 nodo pudieron ejecutarse tools (backends) y delegaciones a hijos.
 
+**Repregunta desde cualquier nodo (`ask_user`, FASE 44.2).** Fijar la continuación (`waiting`) no es
+privilegio del raíz: `agent_runtime` inyecta la tool universal `ask_user(question)` en **cualquier**
+agente que no traiga ya `clarify`. Es terminal —su pregunta es la respuesta del turno— y fija
+`ContinuationState.kind="clarification"` igual que `clarify`. Sin esto, un agente HOJA (p.ej. agenda
+pidiendo fecha/hora) que pregunta en **prosa** dejaba `needs_reply=False` y, en voz, el satélite no
+reabría el mic: la interacción moría. La guía para usar `ask_user` (en vez de pedir el dato en prosa)
+se agrega al system prompt de esos agentes desde el runtime.
+
 **Housekeeping como tools del raíz.** No hay `is_close_phrase`/`is_acknowledgment`/captura por
 keyword. El agente raíz expone las tools `close_conversation`, `ignore`, `capture_reply`, `clarify`
 (implementadas con `conversations.manager.close`, `intent_state.capture_reply/get_pending_request`,
