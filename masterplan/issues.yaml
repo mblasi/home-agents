@@ -640,6 +640,15 @@
 # ── FASE 45 (prender pantalla del nodo al detectar wake word) ────────────────
 "45.1":  749
 
+# ── FASE 46 (mejora continua de modelos de voz: auto-captura + retrain) ───────
+"46.1":  751
+"46.2":  752
+"46.3":  753
+"46.4":  754
+"46.5":  755
+"46.6":  756
+"46.7":  757
+
 # ── Anexos (iteraciones futuras) ──────────────────────────────────────────────
 "A.1":   118
 "A.2":   121
