@@ -4137,7 +4137,7 @@ Objetivo: Cerrar el loop de mejora continua de wake word y voice-id. Hoy los neg
           modelo respectivo al superar un umbral de muestras nuevas (con cooldown anti-storm),
           congruente con la captura de falsos positivos ya existente. Reflejar las métricas de
           reentrenamiento de AMBOS modelos en los DOS backoffices (local y cloud).
-Estado:   Pendiente (0/7).
+Estado:   COMPLETA (7/7).
 Deps:     FASE 16 (audio_server: voice-id, captura de negativos de wake word, /process-audio),
           FASE 35 (metrics_store: retrain_events, ww_scores, voice_metrics; dashboards web /metrics),
           FASE 33 (backoffice cloud + egress POST /ingest/metrics).
@@ -4153,31 +4153,31 @@ Decisiones:
     se suman al embedding del usuario.
 ```
 
-- [ ] 46.1  Auto-captura de positivos de wake word en TP confirmado: en `audio_server` (`/process-audio`),
+- [x] 46.1  Auto-captura de positivos de wake word en TP confirmado: en `audio_server` (`/process-audio`),
             tras un match confiable (known speaker + STT con texto válido), guardar el clip que disparó
             la wake word como sample positivo del usuario (vía `/users/{uid}/wakeword/samples` →
             `wakeword_samples`). Flag `CAPTURE_POSITIVES` (default true), simétrico a `CAPTURE_NEGATIVES`;
             FIFO/cap y metadata de provenance (node_id, ts, score, speaker_conf). Tests. (ear)
-- [ ] 46.2  Retrain automático de wake word por umbral + cooldown: monitor periódico en core que dispara
+- [x] 46.2  Retrain automático de wake word por umbral + cooldown: monitor periódico en core que dispara
             `/wakeword/train` cuando hay ≥N positivos/negativos nuevos desde el último `retrain_event`,
             respetando un intervalo mínimo (cooldown). Registrar el `trigger` real (`fp_threshold`/`auto`)
             en `retrain_events` (hoy sólo `manual`). Tests del gate (umbral, cooldown, no re-disparo). (core)
-- [ ] 46.3  Auto-captura de muestras de voz en matches de alta confianza: en `/process-audio`, cuando
+- [x] 46.3  Auto-captura de muestras de voz en matches de alta confianza: en `/process-audio`, cuando
             `speaker != guest` y `speaker_conf` supera un MARGEN sobre `SPEAKER_THRESHOLD`, guardar el WAV
             crudo en un store por-usuario (`~/.local/share/capitan/voice-history/<uid>/`), con cap FIFO y
             metadata. NO promediar en caliente. Flag `CAPTURE_VOICEID_POSITIVES`. Tests. (ear)
-- [ ] 46.4  Re-cálculo del embedding por umbral + cooldown: cuando un usuario acumula ≥M muestras nuevas
+- [x] 46.4  Re-cálculo del embedding por umbral + cooldown: cuando un usuario acumula ≥M muestras nuevas
             de alta confianza, RECOMPUTAR su embedding desde los WAV crudos (enrolado manual como ancla),
             no por promedio ciego. Endpoint análogo a `/wakeword/train` (`/users/{uid}/voiceid/retrain`).
             Registrar el evento de retrain. Tests (recompute determinista, cooldown, ancla preservada). (ear)
-- [ ] 46.5  Negativos cross-user + calibración del threshold de voice-id: usar los positivos acumulados
+- [x] 46.5  Negativos cross-user + calibración del threshold de voice-id: usar los positivos acumulados
             de cada usuario como negativos (impostores) de los demás; con los pares genuino-vs-impostor
             calcular scores y calibrar el threshold (global y/o por-usuario) en el punto de operación
             (EER o FAR objetivo) en vez del 0.75 fijo. Persistir el/los threshold(s) calibrado(s) y
             exponerlos. (Base para un futuro clasificador usuario-vs-resto.) Tests de la calibración. (ear + core)
-- [ ] 46.6  Unificar `retrain_events` para ambos modelos: columna `model` (`wakeword`|`voiceid`) +
+- [x] 46.6  Unificar `retrain_events` para ambos modelos: columna `model` (`wakeword`|`voiceid`) +
             poblar `val_accuracy`/`fp_rate` (hoy NULL). Migración idempotente del schema, `record_retrain_event`
             y los endpoints de consulta por modelo (`/metrics/.../retrains`). Tests. (core)
-- [ ] 46.7  Métricas de retrain de ambos modelos en los DOS backoffices: extender `/metrics` (backoffice
+- [x] 46.7  Métricas de retrain de ambos modelos en los DOS backoffices: extender `/metrics` (backoffice
             local) y el dashboard cloud (vía egress `POST /ingest/metrics`) con la tabla/serie de retrains
             de wake word y voice-id (trigger, muestras nuevas, resultado, val_accuracy/fp_rate). Tests. (core + backoffice + cloud)
