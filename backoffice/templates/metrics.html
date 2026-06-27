@@ -61,7 +61,8 @@
     <div class="text-xs text-gray-400 uppercase tracking-wider mb-3">Reentrenamientos</div>
     <table class="w-full text-sm">
       <thead class="text-gray-500 text-xs uppercase">
-        <tr><th class="text-left py-1">Fecha</th><th class="text-right">Pos</th><th class="text-right">Neg</th>
+        <tr><th class="text-left py-1">Fecha</th><th class="text-left">Modelo</th><th class="text-left">Trigger</th>
+            <th class="text-right">Pos</th><th class="text-right">Neg</th>
             <th class="text-right">Val acc</th><th class="text-right">FP rate</th><th class="text-right">Dur</th><th class="text-right">Estado</th></tr>
       </thead>
       <tbody id="voz-retrains" class="font-mono text-gray-300"></tbody>
@@ -193,7 +194,7 @@ async function loadVoz() {
     getJSON("/api/metrics/voice/series?" + qs({...extra, bucket: bucketFor()})),
     getJSON("/api/metrics/voice/conf-series?" + qs({...extra, bucket: bucketFor()})),
     getJSON("/api/metrics/wakeword/series?" + qs({...extra, bucket: bucketFor()})),
-    getJSON("/api/metrics/voice/retrains?limit=10"),
+    getJSON("/api/metrics/voice/retrains?limit=20"),
   ]);
   $("voz-cards").innerHTML =
     card("Eventos", fmtNum(sum.total)) +
@@ -218,12 +219,13 @@ async function loadVoz() {
   $("conf-thr").textContent = sum.speaker_threshold != null ? "· threshold " + sum.speaker_threshold : "";
   $("voz-retrains").innerHTML = (retr.retrains || []).map(r => `<tr class="border-t border-gray-800">
     <td class="py-1">${r.ts ? new Date(r.ts*1000).toLocaleString("es") : "—"}</td>
+    <td class="text-left">${r.model || "wakeword"}</td><td class="text-left">${r.trigger || "—"}</td>
     <td class="text-right">${fmtNum(r.n_positive)}</td><td class="text-right">${fmtNum(r.n_negative)}</td>
     <td class="text-right">${r.val_accuracy != null ? r.val_accuracy : "—"}</td>
     <td class="text-right">${r.fp_rate != null ? r.fp_rate : "—"}</td>
     <td class="text-right">${r.duration_s != null ? r.duration_s + "s" : "—"}</td>
     <td class="text-right">${r.status || "—"}</td></tr>`).join("") ||
-    `<tr><td colspan="7" class="py-2 text-gray-600">sin reentrenamientos</td></tr>`;
+    `<tr><td colspan="9" class="py-2 text-gray-600">sin reentrenamientos</td></tr>`;
 }
 
 // ── LLM ─────────────────────────────────────────────────────────────────────

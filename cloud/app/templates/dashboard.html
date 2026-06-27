@@ -82,6 +82,10 @@
               <table id="m-models"><thead><tr><th>modelo</th><th>llamadas</th><th>lat ms</th><th>tokens</th></tr></thead><tbody></tbody></table>
               <table id="m-agents"><thead><tr><th>agente</th><th>steps</th><th>aciertos</th><th>lat ms</th></tr></thead><tbody></tbody></table>
             </div>
+            <h3>Reentrenamientos</h3>
+            <div id="m-retrains-wrap">
+              <table id="m-retrains"><thead><tr><th>modelo</th><th>trigger</th><th>muestras</th><th>val acc</th><th>FP rate</th><th>dur</th><th>estado</th><th>fecha</th></tr></thead><tbody></tbody></table>
+            </div>
             <h3>Continuidad</h3>
             <div id="m-cont-summary" class="grid"></div>
             <canvas id="m-cont-chart" height="80"></canvas>
@@ -694,6 +698,16 @@ async function loadMetrics() {
   $("m-agents").querySelector("tbody").innerHTML = agents.map(a =>
     `<tr><td>${esc(a.agent_id) || "—"}</td><td>${mFmt(a.steps)}</td><td>${mPct(a.success_rate)}</td>` +
     `<td>${mFmt(a.avg_latency_ms)}</td></tr>`).join("");
+
+  // Reentrenamientos: wake word + voice-id (FASE 46.7). Sólo presente para roles con view_full.
+  const retrains = metrics.retrains || [];
+  $("m-retrains-wrap").style.display = retrains.length ? "" : "none";
+  $("m-retrains").querySelector("tbody").innerHTML = retrains.map(r =>
+    `<tr><td>${esc(r.model) || "wakeword"}</td><td>${esc(r.trigger) || "—"}</td>` +
+    `<td>${mFmt(r.n_positive)}</td><td>${r.val_accuracy != null ? r.val_accuracy : "—"}</td>` +
+    `<td>${r.fp_rate != null ? r.fp_rate : "—"}</td><td>${r.duration_s != null ? r.duration_s + "s" : "—"}</td>` +
+    `<td>${esc(r.status) || "—"}</td>` +
+    `<td class="muted">${r.ts ? new Date(r.ts*1000).toLocaleString("es") : "—"}</td></tr>`).join("");
 }
 
 // ── Formulario tipado de comandos (37.5) ──────────────────────────────────────

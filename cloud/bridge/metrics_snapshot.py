@@ -43,7 +43,8 @@ def build_metrics_snapshot(hours: int = WINDOW_HOURS) -> dict:
         "voice_series":  _get(f"{base}/voice/series?{qs}") or {},
         "voice_conf_series": _get(f"{base}/voice/conf-series?{qs}") or {},   # FASE 37.12
         "ww_score_series":   _get(f"{base}/wakeword/series?{qs}") or {},      # FASE 37.11
-        "retrains":      (_get(f"{base}/voice/retrains?limit=10") or {}).get("retrains", []),
+        # Sin filtro de modelo → trae wake word + voice-id mezclados (más reciente primero, FASE 46.7)
+        "retrains":      (_get(f"{base}/voice/retrains?limit=20") or {}).get("retrains", []),
         "llm_summary":   _get(f"{base}/llm/summary?{q}") or {},
         "llm_by_model":  (_get(f"{base}/llm/by-model?{q}") or {}).get("models", []),
         "llm_by_agent":  (_get(f"{base}/llm/by-agent?{q}") or {}).get("agents", []),
