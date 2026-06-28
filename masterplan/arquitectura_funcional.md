@@ -60,6 +60,13 @@ en vez de un `204` mudo, para dar feedback; vacío conserva el `204` silencioso.
   `voiceid_enroll_count`/`voiceid_enrolled_at` en el user, que el `audio_server` incrementa vía
   `POST /users/{uid}/voiceid/enrolled` tras cada `/enroll-voice` exitoso (best-effort).
 
+**Mejora continua del voice-id (FASE 46.3-46.8):** los positivos por-usuario se acumulan en
+`voice-history/<uid>/` desde DOS fuentes — la auto-captura de comandos de alta confianza (46.3,
+`sample_*.wav`) y las frases de enrollment (46.8, `enroll_*.wav`). Ese store alimenta el re-cálculo
+del embedding (46.4, enrolado como ancla) y, en la calibración del threshold (46.5), los positivos de
+CADA usuario son los impostores (negativos) de los demás: el enrollment de A endurece el umbral del
+resto sin tocar su embedding.
+
 **Canal de enrollment backoffice→nodo (16.21):** el backoffice deja una orden pendiente
 (`POST /nodes/{id}/enroll` type wakeword|voice|verify); el satellite la consume en su loop,
 graba inline (usando el stream del mic, evita conflicto OpenSLES) y reporta progreso.

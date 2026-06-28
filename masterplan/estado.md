@@ -4137,7 +4137,7 @@ Objetivo: Cerrar el loop de mejora continua de wake word y voice-id. Hoy los neg
           modelo respectivo al superar un umbral de muestras nuevas (con cooldown anti-storm),
           congruente con la captura de falsos positivos ya existente. Reflejar las métricas de
           reentrenamiento de AMBOS modelos en los DOS backoffices (local y cloud).
-Estado:   COMPLETA (7/7).
+Estado:   COMPLETA (8/8).
 Deps:     FASE 16 (audio_server: voice-id, captura de negativos de wake word, /process-audio),
           FASE 35 (metrics_store: retrain_events, ww_scores, voice_metrics; dashboards web /metrics),
           FASE 33 (backoffice cloud + egress POST /ingest/metrics).
@@ -4150,7 +4150,9 @@ Decisiones:
   - Negativos de voice-id (cross-user): el encoder (resemblyzer GE2E) está congelado — no se
     "reentrena" con negativos. En su lugar, los positivos acumulados de CADA usuario son los
     negativos (impostores) de los demás. Esos pares genuino-vs-impostor calibran el threshold; no
-    se suman al embedding del usuario.
+    se suman al embedding del usuario. Esos positivos vienen de DOS fuentes: la auto-captura de
+    comandos de alta confianza (46.3) y las frases de enrollment (46.8) — ambas al mismo store
+    por-usuario `voice-history/<uid>/`.
 ```
 
 - [x] 46.1  Auto-captura de positivos de wake word en TP confirmado: en `audio_server` (`/process-audio`),
@@ -4181,3 +4183,9 @@ Decisiones:
 - [x] 46.7  Métricas de retrain de ambos modelos en los DOS backoffices: extender `/metrics` (backoffice
             local) y el dashboard cloud (vía egress `POST /ingest/metrics`) con la tabla/serie de retrains
             de wake word y voice-id (trigger, muestras nuevas, resultado, val_accuracy/fp_rate). Tests. (core + backoffice + cloud)
+- [x] 46.8  Frases de enrollment como negativos cross-user: en `/enroll-voice`, persistir el WAV crudo de
+            cada frase enrolada en el store por-usuario (`voice-history/<uid>/enroll_*.wav`), no sólo
+            computar el embedding. Así el enrollment de A es positivo de A y, en la calibración (46.5),
+            impostor de los demás — cerrando el supuesto de 46.5 (hoy los negativos cross-user salían sólo
+            de la auto-captura de comandos 46.3). Helper `_store_voiceid_sample` compartido con 46.3; el
+            guard de RMS sigue cortando el silencio antes de guardar. Tests. (ear)
