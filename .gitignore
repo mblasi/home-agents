@@ -1,6 +1,8 @@
 # Config local de herramientas (excepto commands, que se versionan)
 .claude/*
 !.claude/commands/
+.opencode/*
+!.opencode/commands/
 
 # Datos generados (samples TTS, modelos entrenados, outputs)
 wakeword/data/
