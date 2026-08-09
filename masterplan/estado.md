@@ -704,7 +704,7 @@ Nota:     El Brain (Beelink, iGPU 780M/ROCm) alcanza para los servicios y el 7b,
 - [ ] 8.31 Auto power-on del Brain tras corte de luz: setear en BIOS "Restore AC Power Loss"
 - [ ] 8.32  Investigar por qué sin internet no se accede a HAOS en la LAN
            = Power On (no Last State) para que Proxmox levante solo. Verificar que VM 100
-           (HAOS) y LXC 101 (capitan-lxc) tengan onboot=1. Complementa 8.25 (UPS): sin BIOS,
+           (HAOS) y LXC 101 (brain-ai) tengan onboot=1. Complementa 8.25 (UPS): sin BIOS,
            un corte largo deja todo caído hasta volver físicamente.
 
 #### Latencias objetivo post-migración (con GPU)
@@ -2015,8 +2015,8 @@ Objetivo: Mover toda la infraestructura de producción a la Beelink SER9 Pro.
           Misma restricción de modelo 7B que la configuración actual.
           HAOS migra desde el PC viejo dedicado al Brain.
 Estado:   COMPLETA (23/23 — consolidación en Brain realizada: audio_server en LXC, NSPanels como I/O de audio, laptop dev-only; decisión 21.21 implementada vía FASE 16)
-Hardware: Beelink SER9 Pro — AMD Ryzen AI 7 HX 255, 32GB DDR5, Radeon 780M (RDNA 3)
-Stack:    Proxmox VE → VM HAOS + LXC Ubuntu privilegiado (core + backoffice + wa + Ollama)
+Hardware: Beelink SER9 Pro — AMD Ryzen 7 255 (8c/16t), 27 GiB RAM, Radeon 780M (RDNA 3)
+Stack:    Debian 13 Trixie · Proxmox VE 9.2.2 → VM HAOS + LXC Ubuntu privilegiado (core + backoffice + wa + Ollama)
 Nota:     Stepping stone a FASE 8 (servidor con GPU discreta). No escala modelos: sigue en 7B.
 ```
 
@@ -2042,12 +2042,12 @@ y /dev/snd (audio ALSA, si corre el ear) sea directo y sin complejidad de IOMMU 
 
 - [x] 21.1  Instalar Proxmox VE en el Brain (ISO oficial, bare metal).
             IP estática en la interfaz física del host PVE.
-            Hostname: `capitan`, accesible como `capitan.local` (mDNS) o por IP fija.
+            Hostname: `brain`, accesible como `brain.local` (mDNS) o por IP fija.
 - [x] 21.2  Crear bridge `vmbr0` sobre la interfaz física.
             El bridge da a las VMs y LXCs IP real en la LAN (sin NAT).
             Reservar IP del HAOS VM en el router (DHCP reservation por MAC → 192.168.68.101).
 - [x] 21.3  SSH desde laptop configurado: clave pública copiada al host PVE y al LXC.
-            Alias en `~/.ssh/config`: `Host capitan` → IP fija del LXC.
+            Alias en `~/.ssh/config`: `Host brain-ai` → IP fija del LXC.
 
 #### Etapa B — VM de HAOS
 
@@ -2111,8 +2111,8 @@ y /dev/snd (audio ALSA, si corre el ear) sea directo y sin complejidad de IOMMU 
 - [x] 21.19 Levantar el cliente WA (`node ear/wa/index.js` o como esté estructurado),
             escanear QR, verificar reconexión automática y respuesta a mensajes.
 - [x] 21.20 Test end-to-end desde la laptop:
-            `curl -X POST http://capitan.local:8765/process -H 'Content-Type: application/json' -d '{"text":"prende la luz"}'`
-            Backoffice accesible en `http://capitan.local:8080`.
+            `curl -X POST http://brain-ai.local:8765/process -H 'Content-Type: application/json' -d '{"text":"prende la luz"}'`
+            Backoffice accesible en `http://brain-ai.local:8080`.
 
 #### Etapa F — Ear (decisión tomada)
 
@@ -2134,7 +2134,7 @@ y /dev/snd (audio ALSA, si corre el ear) sea directo y sin complejidad de IOMMU 
             #!/usr/bin/env zsh
             # Deploy home-agents al LXC de producción en el Brain.
             set -e
-            ssh capitan "
+            ssh brain-ai "
               cd ~/workspace/home-agents &&
               git pull --recurse-submodules &&
               source ~/home-agents-env/bin/activate &&
@@ -2151,7 +2151,7 @@ y /dev/snd (audio ALSA, si corre el ear) sea directo y sin complejidad de IOMMU 
 
 ```zsh
 # Ollama — en el LXC via SSH
-ssh capitan "sudo systemctl stop ollama && curl -fsSL https://ollama.ai/install.sh | sh && sudo systemctl start ollama"
+ssh brain-ai "sudo systemctl stop ollama && curl -fsSL https://ollama.ai/install.sh | sh && sudo systemctl start ollama"
 # Los modelos descargados sobreviven la actualización.
 
 # HAOS — desde la UI del HAOS en la VM (192.168.68.101:8123)
@@ -2162,13 +2162,13 @@ ssh capitan "sudo systemctl stop ollama && curl -fsSL https://ollama.ai/install.
 bash scripts/deploy.sh   # desde la laptop, tras mergear PR a main
 
 # ear — si está en el LXC del Brain
-ssh capitan "cd ~/workspace/home-agents && git pull --recurse-submodules && systemctl --user restart capitan"
+ssh brain-ai "cd ~/workspace/home-agents && git pull --recurse-submodules && systemctl --user restart capitan"
 
 # ear — si está en la laptop (opción B de 21.21)
 git -C ~/workspace/home-agents pull --recurse-submodules && systemctl --user restart capitan
 
 # OS del LXC
-ssh capitan "sudo apt update && sudo apt upgrade -y"
+ssh brain-ai "sudo apt update && sudo apt upgrade -y"
 
 # Proxmox host — desde la UI de PVE o via SSH al host
 ssh root@<ip-pve> "apt update && apt dist-upgrade -y"
@@ -2834,7 +2834,7 @@ Objetivo: Explorar palancas de mejora de latencia LLM en el Brain (Beelink, Rade
           Target: reducir latencia warm por debajo de 5s sin cambiar el modelo.
 Estado:   COMPLETA (5/5 — Vulkan/ROCm, keepalive, iGPU, benchmark de quantización: se mantiene q4_k_m)
 Deps:     FASE 21 (Brain operativo con LXC — COMPLETA)
-Hardware: Beelink SER9 Pro — Ryzen AI 7 HX 255, 32GB DDR5, Radeon 780M (RDNA 3 / gfx1103)
+Hardware: Beelink SER9 Pro — Ryzen 7 255 (8c/16t), 27 GiB RAM, Radeon 780M (RDNA 3 / gfx1103)
 ```
 
 - [x] 31.1  Vulkan backend: benchmarkar `OLLAMA_GPU_BACKEND=vulkan` vs ROCm en Brain.
@@ -2959,7 +2959,7 @@ Stack GCP elegido: Cloud Run (web + API, scale-to-zero), Firestore (snapshot de
             TTL, SAs) + `infra/setup_firebase.sh` (Identity Platform/Firebase Auth).
 
 #### Etapa C - Bridge / executor en el Brain
-> Desplegado en capitan-lxc: `cloud/bridge/` + systemd `capitan-bridge.service`.
+> Desplegado en brain-ai: `cloud/bridge/` + systemd `capitan-bridge.service`.
 - [x] 33.10 Daemon `cloud_bridge.py` (systemd unit en el LXC): push periódico del snapshot
             de estado a `/ingest/state`, reusando datos que ya escriben core/backoffice.
 - [x] 33.11 Loop de polling: `GET /commands/pending` con backoff/reconexión; ejecuta cada

@@ -185,21 +185,29 @@ La laptop NO corre servicios en producción. Solo git, editor, deploy vía SSH.
 
 ### Servidor central — Brain (Beelink SER9 Pro)
 ```
-CPU:  AMD Ryzen AI 7 HX 255, 32GB DDR5
+CPU:  AMD Ryzen 7 255 (8c/16t)
+RAM:  27 GiB usable + 8 GiB swap
 GPU:  Radeon 780M (RDNA 3 / gfx1103) — ROCm con HSA_OVERRIDE_GFX_VERSION=11.0.0
-OS:   Proxmox VE — IP 192.168.68.99
+OS:   Debian 13 Trixie · Proxmox VE 9.2.2 · kernel 7.0.2-6-pve — IP 192.168.68.99
+Storage: local 94G + local-lvm 794G (8% usado)
+Recuperación autónoma total: BIOS AC-Power-On + onboot/startup en todos los guests.
 ```
 
-Stack en Proxmox:
-- VM 100: HAOS — IP 192.168.68.101 (reserva DHCP por MAC)
-- LXC 101 (capitan-lxc): Ubuntu 24.04 — IP 192.168.68.132
-  - core (FastAPI :8765, `0.0.0.0`)
-  - backoffice (FastAPI :8080)
-  - wa (Node.js whatsapp-web.js)
-  - ear (servidor de audio — FASE 16, pendiente)
-  - Ollama (:11434) con ROCm — 13.3s warm (vs 27.5s CPU-only)
+Stack en Proxmox (onboot order 1→5):
+| ID      | Host           | Tipo         | Rol                          | IP             | Recursos                          | Detalle                                            |
+|---------|----------------|--------------|------------------------------|----------------|-----------------------------------|----------------------------------------------------|
+| VM 100  | brain-haos     | HAOS (UEFI)  | Núcleo de domótica           | 192.168.68.101 | 4c / 8192 MB / 32G                | Home Assistant → :8123 (HTTP/WebSocket API).       |
+| LXC 101 | brain-ai       | Ubuntu 24.04 | IA + agentes (home-agents)   | 192.168.68.132 | 4c / 4096 MB / swap 512 / 40G ⚠PRIVILEGED · GPU passthrough (dri+kfd) | Ollama :11434 (ROCm, ~3-5s warm), core :8765, backoffice :8080, ear/audio_server :8766, cloud bridge, Postfix loopback :25. |
+| LXC 102 | brain-influx   | Debian 12    | Histórico/métricas de HA     | 192.168.68.135 | 2c / 2048 MB / swap 512 / 8G · unprivileged | InfluxDB v2.7 → :8086.                     |
+| LXC 103 | brain-grafana  | Debian 12    | Visualización de métricas    | 192.168.68.126 | 2c / 1024 MB / swap 512 / 4G · unprivileged | Grafana 13.1 → :80 (HTTP).                 |
+| VM 104  | brain-workspace| Ubuntu 24.04 | Workspace + Hermes + OpenCode (dev 24/7) ← EN CONSTRUCCIÓN | 192.168.68.140 | 2c / 4096 MB / 50G | uv 0.12.3, git, rsync, build-essential, tmux, htop. Pendiente: Hermes, OpenCode, workspace, gateway Telegram, dashboard, sync. |
 
-SSH: `ssh capitan` → host PVE | `ssh capitan-lxc` → LXC Ubuntu
+Nota: brain-influx y brain-grafana responden bien en red interna pero dan "no route" desde
+la laptop — revisar. LXC 101 es privileged por el GPU passthrough.
+
+SSH: `ssh brain` → host PVE | `ssh brain-haos` → VM 100 (root) | `ssh brain-ai` → LXC 101 (root)
+| `ssh brain-influx` → LXC 102 (root) | `ssh brain-grafana` → LXC 103 (root)
+| `ssh brain-workspace` → VM 104 (matias, login por clave)
 
 ### Nodos distribuidos — NSPanel Pro (Sonoff)
 ```
@@ -347,9 +355,9 @@ bash scripts/deploy.sh           # actualiza core + backoffice
 bash scripts/deploy.sh --restart-wa  # incluye WA
 
 # Logs en Brain
-ssh capitan-lxc "journalctl --user -u capitan-core -f"
-ssh capitan-lxc "journalctl --user -u capitan-backoffice -f"
-ssh capitan-lxc "journalctl --user -u capitan-wa -f"
+ssh brain-ai "journalctl --user -u capitan-core -f"
+ssh brain-ai "journalctl --user -u capitan-backoffice -f"
+ssh brain-ai "journalctl --user -u capitan-wa -f"
 
 # Test del core en Brain
 curl http://192.168.68.132:8765/health
@@ -358,8 +366,8 @@ curl -X POST http://192.168.68.132:8765/process \
   -d '{"text":"prende la luz"}'
 
 # Servicios en Brain
-ssh capitan-lxc "systemctl --user status capitan-core capitan-backoffice capitan-wa"
-ssh capitan-lxc "systemctl --user restart capitan-core"
+ssh brain-ai "systemctl --user status capitan-core capitan-backoffice capitan-wa"
+ssh brain-ai "systemctl --user restart capitan-core"
 
 # NSPanel Pro
 bash scripts/nspanel.sh connect       # conectar ADB
@@ -420,7 +428,7 @@ el snapshot): `core/audio_server/backoffice/wa/bridge` → `deploy.release`; `cl
 scripts/deploy.sh <target>`. El motor hace el pin a HEAD de main, restart, health-gate y, si
 falla, rollback. NO hace falta entrar al Brain a mano.
 
-> El Brain es el rol del servidor central (LXC capitan-lxc). "SER9" es sólo el modelo de
+> El Brain es el rol del servidor central (LXC brain-ai). "SER9" es sólo el modelo de
 > hardware actual (Beelink SER9 Pro) — no usarlo como nombre del rol.
 
 ## Pipeline actual (objetivo FASE 16)

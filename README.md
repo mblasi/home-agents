@@ -1,8 +1,8 @@
 # home-agents
 
-A local-first, privacy-preserving multi-agent AI system running entirely on a laptop — no cloud, no subscriptions, no data leaving the house.
+A local-first, privacy-preserving multi-agent AI system running entirely on a home server — no cloud, no subscriptions, no data leaving the house.
 
-Built on Gentoo Linux with an AMD Ryzen 9 5900HX (64GB RAM). Every component runs on CPU: speech recognition, language models, text-to-speech, and home automation control.
+Runs on the **Brain** (Beelink SER9 Pro — AMD Ryzen 7 255, 27 GiB RAM, Radeon 780M / ROCm) under Debian 13 Trixie · Proxmox VE 9.2.2. Speech recognition, language models, text-to-speech, and home automation control all run on the LAN, with the LLM accelerated on the integrated GPU via ROCm. A laptop serves as the development environment.
 
 ---
 
@@ -223,8 +223,8 @@ bash ~/workspace/home-agents/ear/dashboard.sh
 | Layer | Tool | Notes |
 |-------|------|-------|
 | Wake word | openWakeWord (custom trained) | "Capitán", ONNX, threshold 0.8 |
-| STT | faster-whisper `small` int8 | Spanish, CPU, ~4.6s |
-| LLM | qwen2.5:7b via Ollama | 3.5s warm, correct ACTION format |
+| STT | faster-whisper `small` int8 | Spanish, ~4.6s |
+| LLM | qwen2.5:7b via Ollama | ROCm (Radeon 780M), ~3-5s warm, correct ACTION format |
 | TTS | Piper v1.2.0 | `es_AR-daniela-high` voice, offline |
 | Home automation | Home Assistant OS | REST API only, LAN |
 | Audio nodes | NSPanel Pro (satellite.py) | wake word + mic/speaker per room |
@@ -243,7 +243,7 @@ bash ~/workspace/home-agents/ear/dashboard.sh
 ## Design decisions
 
 - **Everything local.** No API keys, no external services (except Open-Meteo, geocoding, and ML OAuth), no telemetry.
-- **CPU-only inference.** Radeon Vega 8 shares RAM and is not useful for ML. All models run on CPU with int8 quantization.
+- **GPU-accelerated inference on the Brain.** qwen2.5:7b runs on Ollama with ROCm on the Radeon 780M (RDNA 3 / gfx1103, `HSA_OVERRIDE_GFX_VERSION=11.0.0`), ~3-5s warm vs ~27.5s CPU-only. STT/TTS run with int8 quantization.
 - **ear ↔ core over HTTP.** Separating audio I/O from agent logic via a REST boundary allows multiple `ear` instances (rooms, WhatsApp) to share one `core`.
 - **Audio resampling.** ALC256 doesn't support 16kHz. Captured at 44100Hz, resampled with `scipy.signal.resample_poly` (up=160, down=441).
 - **qwen2.5:7b.** phi3:mini too slow (24.8s), phi3-ha invented entity IDs. qwen2.5:7b gives consistent ACTION format in 3.5s.

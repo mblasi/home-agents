@@ -8,7 +8,7 @@ _Última actualización: 2026-06-11_
 
 ## Visión general
 
-home-agents es una red de agentes de IA que corre en el **Brain** (Beelink SER9 Pro — Ryzen AI 7, Proxmox VE; core + backoffice + WA + audio_server en un LXC, HAOS en una VM, Ollama con GPU ROCm). La laptop quedó como entorno de desarrollo. No hay dependencias de servicios externos de pago ni telemetría; el perímetro de red es la LAN local. Los nodos de voz son NSPanel Pro.
+home-agents es una red de agentes de IA que corre en el **Brain** (Beelink SER9 Pro — Ryzen 7 255, Debian 13 Trixie · Proxmox VE 9.2.2; core + backoffice + WA + audio_server en un LXC, HAOS en una VM, Ollama con GPU ROCm). La laptop quedó como entorno de desarrollo. No hay dependencias de servicios externos de pago ni telemetría; el perímetro de red es la LAN local. Los nodos de voz son NSPanel Pro.
 
 El sistema combina tres capacidades:
 
@@ -1107,9 +1107,11 @@ Paneles Rich en terminal, lanzados con `bash ear/dashboard.sh`. Leen de `/tmp/ca
 
 | Componente | Modelo/Config |
 |------------|---------------|
-| CPU | AMD Ryzen 9 5900HX (znver3, 8c/16t) |
-| RAM | 64GB DDR4 |
-| LLM | qwen2.5:7b via Ollama (int8, CPU, ~3.5s warm) |
+| Host runtime | Brain (Beelink SER9 Pro) — Debian 13 Trixie · Proxmox VE 9.2.2 · kernel 7.0.2-6-pve, 192.168.68.99 |
+| CPU | AMD Ryzen 7 255 (8c/16t) |
+| RAM | 27 GiB usable + 8 GiB swap |
+| GPU | Radeon 780M (RDNA 3 / gfx1103) — ROCm, HSA_OVERRIDE_GFX_VERSION=11.0.0 |
+| LLM | qwen2.5:7b via Ollama (ROCm sobre Radeon 780M, ~3-5s warm) |
 | STT | faster-whisper `small` (int8, CPU, ~4.6s para 5s audio) |
 | TTS | Piper v1.2.0, `es_AR-daniela-high.onnx`, 22050Hz |
 | Wake word | openWakeWord custom, `capitan.onnx`, threshold 0.8 + `FRAMES_REQ=2` (2 frames consecutivos, anti-transitorios) |
@@ -1127,7 +1129,7 @@ condicional a ≥20 negativos nuevos) → los nodos bajan el modelo nuevo solo c
 
 | Decisión | Razón |
 |----------|-------|
-| CPU-only | Radeon Vega 8 comparte RAM, no útil para ML |
+| GPU-accel (Brain) | qwen2.5:7b en Ollama con ROCm sobre Radeon 780M (~3-5s warm vs ~27.5s CPU) |
 | ear ↔ core via HTTP | Permite múltiples ears (mic, WhatsApp) en un solo core |
 | qwen2.5:7b | phi3:mini demasiado lento (24.8s), phi3-ha inventa entity_ids |
 | faster-whisper sobre openai-whisper | Más rápido, mismo modelo |

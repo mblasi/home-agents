@@ -534,7 +534,7 @@ def scene_hardware():
     """Sección técnica: hardware + stack + arquitectura (reveal por líneas)."""
     rows = [
         [("HARDWARE", "cyan")],
-        [("  Brain    ", "gray"), ("Beelink SER9 · Ryzen AI 7 · 32GB DDR5", "white")],
+        [("  Brain    ", "gray"), ("Beelink SER9 · Ryzen 7 255 · 27 GiB", "white")],
         [("           ", "gray"), ("Radeon 780M (RDNA3) · ROCm", "white")],
         [("  Nodos    ", "gray"), ("NSPanel Pro · PX30 · mic+parlante · Termux", "white")],
         [("", None)],
