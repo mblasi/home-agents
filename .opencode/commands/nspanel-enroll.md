@@ -27,7 +27,7 @@ ssh -p 8022 -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa -
 
 3. Tras ~N×3 segundos, verificar cuántas muestras se subieron:
 ```bash
-ssh capitan-lxc "curl -s http://localhost:8765/users/$UID/wakeword/samples 2>/dev/null | python3 -c 'import sys,json; print(\"muestras:\", json.load(sys.stdin).get(\"count\"))'"
+ssh brain-ai "curl -s http://localhost:8765/users/$UID/wakeword/samples 2>/dev/null | python3 -c 'import sys,json; print(\"muestras:\", json.load(sys.stdin).get(\"count\"))'"
 ```
 
 4. Recordar al usuario que ahora corra `/retrain` y que reinicie el satellite normal cuando

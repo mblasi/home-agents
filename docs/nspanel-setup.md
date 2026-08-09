@@ -20,7 +20,7 @@ Replica exactamente el panel del comedor (192.168.68.113) que quedó funcionando
 ## Resumen de arquitectura
 
 ```
-NSPanel Pro (Android 8.1, Termux)            Brain LXC (capitan-lxc)
+NSPanel Pro (Android 8.1, Termux)            Brain LXC (brain-ai)
   satellite.py                                 audio_server.py (:8766)
   - openWakeWord (capitan.onnx)                - faster-whisper STT
   - graba 5s post-wake-word                    - strip wake word prefix

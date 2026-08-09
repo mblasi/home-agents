@@ -93,7 +93,7 @@ ciclo (idempotente: la nube reemplaza el snapshot actual y conserva histórico c
 {
   "schema_version": 1,
   "ts": "2026-06-16T12:00:00Z",        // ISO-8601 UTC, momento de captura
-  "host": "capitan-lxc",                // identificador del emisor (no IP)
+  "host": "brain-ai",                // identificador del emisor (no IP)
   "services": {                          // up/down por servicio
     "core":       { "up": true,  "detail": "ok" },
     "llm":        { "up": true,  "detail": "qwen2.5:7b warm" },

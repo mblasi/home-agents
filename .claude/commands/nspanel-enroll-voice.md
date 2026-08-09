@@ -35,7 +35,7 @@ ssh -p 8022 -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa -
 4. Reiniciar el satellite normal y pedirle al usuario que diga "Capitán, <comando>".
    Revisar el voice-id en el server (debe identificar al usuario, no guest):
 ```bash
-ssh capitan-lxc "journalctl --user -u capitan-audio-server --since '30 seconds ago' --no-pager | grep voice-id | tail -3"
+ssh brain-ai "journalctl --user -u capitan-audio-server --since '30 seconds ago' --no-pager | grep voice-id | tail -3"
 ```
    El gate ya está activo (`SPEAKER_THRESHOLD=0.6`, `REQUIRE_KNOWN_SPEAKER=true` en
    ear/.env del Brain). Verificar que el usuario dé conf > 0.6 (conocido) y el TV < 0.6

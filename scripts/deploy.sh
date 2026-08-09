@@ -27,15 +27,15 @@ run_target() {            # $1 = target (puede ser ""), resto = flags (--ref, --
   # cloud-bo: activar la SA de deploy (el bridge ya la tiene en su entorno; acá la activamos
   # para que el camino sea autocontenido). Idempotente.
   if [[ "$target" == "cloud-bo" ]]; then
-    ssh capitan-lxc 'test -f ~/.config/capitan/deployer-key.json && \
+    ssh brain-ai 'test -f ~/.config/capitan/deployer-key.json && \\
       CLOUDSDK_CORE_DISABLE_PROMPTS=1 gcloud auth activate-service-account \
       --key-file=~/.config/capitan/deployer-key.json >/dev/null 2>&1 || true'
   fi
-  ssh capitan-lxc \
+  ssh brain-ai \
     "cd $REMOTE_DIR && DEPLOY_TAG_RELEASES=$TAG $PY cloud/bridge/deploy_cli.py $target $*"
 }
 
-echo "=== Deploy home-agents → capitan-lxc (target = ${1:-services default}) ==="
+echo "=== Deploy home-agents → brain-ai (target = ${1:-services default}) ==="
 
 # Compat histórico: --restart-wa = deploy de los services default + wa.
 if [[ "${1:-}" == "--restart-wa" ]]; then

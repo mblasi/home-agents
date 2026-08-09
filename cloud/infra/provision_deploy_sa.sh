@@ -110,11 +110,11 @@ cat <<EOF
 
 === Listo. Próximo paso en el Brain ===
 1) Copiar la key al LXC (fuera del repo):
-     scp $KEY_OUT capitan-lxc:~/.config/capitan/deployer-key.json
+     scp $KEY_OUT brain-ai:~/.config/capitan/deployer-key.json
 2) En el entorno del motor (bridge.env / unit del bridge) exportar:
      GOOGLE_APPLICATION_CREDENTIALS=\$HOME/.config/capitan/deployer-key.json
 3) Verificar (egress-only, saliente):
-     ssh capitan-lxc 'gcloud auth activate-service-account --key-file ~/.config/capitan/deployer-key.json \\
+     ssh brain-ai 'gcloud auth activate-service-account --key-file ~/.config/capitan/deployer-key.json \\
        && gcloud run services list --region $REGION'
 
 La key da poder de deploy: mantenerla fuera del repo (gitignored) y rotarla periódicamente.

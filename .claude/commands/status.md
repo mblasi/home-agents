@@ -4,7 +4,7 @@ Incluye: estado de cada servicio systemd, health del core, accesibilidad del bac
 
 Comando a ejecutar:
 ```bash
-ssh capitan-lxc "
+ssh brain-ai "
 echo '=== Servicios ==='
 systemctl --user status capitan-core capitan-backoffice capitan-wa --no-pager | grep -E '\.service|Active|Main PID'
 echo ''

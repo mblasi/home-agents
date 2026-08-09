@@ -19,7 +19,7 @@ CORE_URL = os.environ.get("CORE_URL", "http://localhost:8765")
 AUDIO_URL = os.environ.get("AUDIO_SERVER_URL", "http://localhost:8766")
 LLM_URL = os.environ.get("LLM_BASE_URL", os.environ.get("OLLAMA_URL", "http://localhost:11434"))
 METRICS_DIR = Path(os.environ.get("METRICS_DIR", "/tmp/capitan"))
-HOST = os.environ.get("BRIDGE_HOST", "capitan-lxc")
+HOST = os.environ.get("BRIDGE_HOST", "brain-ai")
 RECENT_LIMIT = int(os.environ.get("SNAPSHOT_RECENT_LIMIT", "20"))
 
 SYSTEMD_UNITS = {

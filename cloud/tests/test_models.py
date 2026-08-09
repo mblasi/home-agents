@@ -16,7 +16,7 @@ def test_schema_version_constant_matches_default():
 
 
 def test_minimal_snapshot_validates():
-    snap = StateSnapshot(ts="2026-06-16T00:00:00Z", host="capitan-lxc")
+    snap = StateSnapshot(ts="2026-06-16T00:00:00Z", host="brain-ai")
     d = snap.model_dump()
     assert d["schema_version"] == 1
     assert d["services"] == {} and d["agents"] == []
@@ -30,7 +30,7 @@ def test_ts_and_host_required():
 # ── FASE 37.1: campos ampliados (alerts, wakeword.status, counts) ──
 
 def test_new_fields_default_empty():
-    snap = StateSnapshot(ts="2026-06-21T00:00:00Z", host="capitan-lxc")
+    snap = StateSnapshot(ts="2026-06-21T00:00:00Z", host="brain-ai")
     d = snap.model_dump()
     assert d["alerts"] == []
     assert d["counts"] == {"intents": 0, "goals": 0, "routines": 0, "conversations": 0}
@@ -47,7 +47,7 @@ def test_counts_are_only_aggregates():
 
 def test_alerts_and_wakeword_status_roundtrip():
     snap = StateSnapshot(
-        ts="2026-06-21T00:00:00Z", host="capitan-lxc",
+        ts="2026-06-21T00:00:00Z", host="brain-ai",
         alerts=["El documento de X vence en 3 días"],
         wakeword=Wakeword(status="running"),
         counts=Counts(conversations=5),

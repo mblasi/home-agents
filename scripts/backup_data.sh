@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Backup diario de ~/.local/share/capitan/ en el LXC.
-# Retiene 7 días. Ejecutar como cron en capitan-lxc.
+# Retiene 7 días. Ejecutar como cron en brain-ai.
 
 set -euo pipefail
 

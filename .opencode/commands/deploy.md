@@ -1,4 +1,4 @@
-Desplegá home-agents al Brain (LXC de producción, capitan-lxc 192.168.68.132) por TARGET.
+Desplegá home-agents al Brain (LXC de producción, brain-ai 192.168.68.132) por TARGET.
 
 `scripts/deploy.sh <target>` resuelve el target al MISMO comando tipado que emite el cloud-bo
 (deploy.release / deploy.cloud / deploy.satellites) y lo corre con validate_command +
