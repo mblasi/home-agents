@@ -1,7 +1,9 @@
 # AGENTS.md — home-agents
 
 Red de agentes de IA local-first para domótica, clima, agenda, inversiones y viajes.
-Todo corre en la laptop. Nada sale de la red local.
+Corre en el **Brain** (Beelink SER9 Pro, Proxmox). La laptop es entorno de desarrollo.
+Nada sale de la red local. Ver `masterplan/infra_dev_brain_workspace.md` para la
+infraestructura de desarrollo (Hermes + OpenCode + sincronización laptop ↔ Brain).
 
 ## Dashboard — política de actualización
 
