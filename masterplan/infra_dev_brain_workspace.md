@@ -177,6 +177,9 @@ Robustez:
 - **flock** (`~/.local/share/worksync.lock`) — una sola instancia a la vez (timer +
   runs manuales no se pisan).
 - **timeout 120s por repo** — un repo problemático se SKIPea, no traba el batch.
+- **`-ui text` + stdin `</dev/null`** — CRÍTICO: sin esto, unison intenta UI
+  interactiva y se cuelga cuando no hay TTY (contexto systemd/background/Hermes),
+  haciendo timeout en cada repo. Con el flag, cada repo sincroniza en ~10s.
 - Log en `~/.local/share/worksync.log`.
 
 ### Timers systemd (solo en la laptop)
@@ -234,6 +237,18 @@ disponible 24/7 sin intervención manual.
 
 ## Issues conocidos
 
-- **`ai-training`**: unison hace timeout consistente con este repo (chico, 72 archivos,
-  idénticos en ambos lados; sin symlinks/nombres raros/mtimes futuros). Se SKIPea por
-  el timeout por-repo, sin afectar al resto. Pendiente de diagnóstico de raíz.
+- **Primer sync de repos pesados**: algunos repos grandes (`fletti`, `fletti-api`)
+  pueden hacer timeout (>120s) en su **primer** sync por la transferencia inicial. En
+  ciclos siguientes, con el estado de unison ya cacheado, sincronizan en segundos.
+- **Repos desalineados**: si laptop y Brain están en distinto HEAD/rama (ej:
+  `fletti.corp`), el working-tree se SKIPea hasta alinear la rama manualmente. Es el
+  comportamiento correcto (no pisar), no un bug.
+
+## Lección aprendida — unison sin TTY
+
+El bug más costoso de diagnosticar: unison, sin `-ui text` y sin stdin redirigido a
+`/dev/null`, intenta levantar UI interactiva y **se cuelga indefinidamente** cuando no
+hay un TTY real (contexto systemd, background, o el terminal de Hermes). El síntoma
+engañoso era "todos los repos hacen timeout de 120s". La solución (`-ui text < /dev/null`)
+lo bajó a ~10s por repo. Cualquier invocación de unison desde automatización DEBE
+llevar estos flags.
