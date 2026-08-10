@@ -2,8 +2,8 @@
 
 Red de agentes de IA local-first para domótica, clima, agenda, inversiones y viajes.
 Corre en el **Brain** (Beelink SER9 Pro, Proxmox). La laptop es entorno de desarrollo.
-Nada sale de la red local. Ver `masterplan/infra_dev_brain_workspace.md` para la
-infraestructura de desarrollo (Hermes + OpenCode + sincronización laptop ↔ Brain).
+Nada sale de la red local. Ver [`workspace/docs/infra_dev_brain_workspace.md`](https://github.com/mblasi/workspace/blob/main/docs/infra_dev_brain_workspace.md)
+para la infraestructura de desarrollo (Hermes + OpenCode + sincronización laptop ↔ Brain).
 
 ## Dashboard — política de actualización
 
