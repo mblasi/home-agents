@@ -188,7 +188,7 @@ home-agents/
 ├── backoffice/   → web admin UI at :8080 (LAN)
 ├── cloud/        → cloud backoffice (Cloud Run + Firestore) + bridge (egress-only)
 ├── masterplan/   → estado.md (task list + decisions + functional docs)
-├── scripts/      → sync_issues.py, lint_estado.py
+├── scripts/      → utilidades operativas (deploy.sh, nspanel.sh, ...)
 └── interagent/   → product concept (Interagent network)
 ```
 

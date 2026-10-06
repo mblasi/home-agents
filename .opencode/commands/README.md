@@ -28,9 +28,6 @@ Alias de `/nspanel-enroll` para voice-id enrollment desde un panel.
 ### `/nspanel-passwd [panel]`
 Configura la contraseña SSH en Termux de un NSPanel Pro.
 
-### `/backlog <command> [args]`
-Gestiona el backlog de tareas. Comandos: `show`, `add`, `done`, `sync`.
-
 ## Uso
 
 Todos estos comandos están disponibles escribiendo `/` seguido del nombre del comando en OpenCode o Claude.
