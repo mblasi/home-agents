@@ -1,0 +1,11 @@
+[project]
+repo = "mblasi/home-agents"
+
+[harness]
+version = "0.1.0"
+
+[doctor]
+# Los archivos del plan los lee la pagina Plan del backoffice (server.py): se conservan
+# hasta el refactor del issue #766, y AGENTS.md los nombra para explicarlo.
+# Quitar estas lineas al terminarlo.
+ignore = ["masterplan/*", "AGENTS.md"]

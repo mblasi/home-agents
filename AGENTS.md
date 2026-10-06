@@ -62,9 +62,11 @@ Al implementar **cada ítem del plan** (`- [ ] N.M ...`), seguir este flujo obli
 
 Si la tarea afecta solo el repo umbrella (`masterplan/`, `scripts/`), el branch y PR van en `home-agents` directamente.
 
-### Sincronización obligatoria al terminar cada tarea
+### Al terminar cada tarea
 
-Al completar cualquier ítem del plan, **siempre** hacer estas dos cosas antes de avanzar a la siguiente:
+El flujo es el del harness compartido (`harness new` → `take` → `pr` → `merge`, ver `.harness/config.toml`). Los issues de GitHub son la fuente de verdad: el PR cierra su issue y `harness merge` limpia las labels.
+
+`masterplan/estado.md` ya NO se sincroniza con GitHub (el sync automático se eliminó al adoptar el harness). Mientras la página Plan del backoffice siga leyéndolo (issue de refactor #766), hay que mantenerlo a mano:
 
 1. **Marcar `[x]` en `estado.md`** — la tarea debe quedar marcada como completada.
 
@@ -74,26 +76,7 @@ Al completar cualquier ítem del plan, **siempre** hacer estas dos cosas antes d
    **No usar sub-headers `#### Completado` / `#### Pendiente`** — los marcadores `[x]`/`[ ]`
    son suficientes y los sub-headers quedan desincronizados. Si existen, eliminarlos.
 
-3. **Correr el lint de estado.md**:
-   ```zsh
-   python scripts/lint_estado.py
-   ```
-   Detecta: (a) tareas `[x]` bajo `#### Pendiente` y viceversa; (b) **el `Estado:` de cada FASE
-   desincronizado con sus checkboxes** — todo `[x]` pero no COMPLETA, o avance parcial pero
-   `Estado: Pendiente` (debería ser EN CURSO). COMPLETA con algún `[ ]` se permite (convención
-   "COMPLETA (X postergada)"). Debe pasar sin errores antes de continuar. Si falla, corregir
-   antes del sync de issues. Esto evita la deriva de marcar tareas sin actualizar el Estado de fase.
-
-4. **Correr el sync de issues**:
-   ```zsh
-   source ~/home-agents-env/bin/activate
-   python scripts/sync_issues.py
-   ```
-   Esto cierra el issue de GitHub correspondiente. Sin este paso, el proyecto de GH
-   queda desincronizado con el plan.
-
-Si se completaron varias tareas en la sesión sin sincronizar, correr el sync al final
-de la sesión como mínimo. Hacer siempre `--dry-run` primero para verificar.
+El lint y el sync automáticos de `estado.md` se eliminaron: no hay chequeo de que `estado.md` coincida con los issues. Tareas nuevas: crear el issue con `harness new` y, si la página Plan debe mostrarla, agregarla a `estado.md` y a `masterplan/issues.yaml` a mano.
 
 ---
 
@@ -161,17 +144,12 @@ El plan vive en `masterplan/estado.md`. Al iniciar sesión, leerlo para saber en
 estamos y cuál es el próximo paso. Las tareas completadas tienen issues cerrados en GitHub;
 las pendientes tienen issues abiertos en https://github.com/mblasi/home-agents.
 
-Para sincronizar estado del plan con los issues de GitHub:
-```
-python scripts/sync_issues.py           # aplica cambios
-python scripts/sync_issues.py --dry-run # solo muestra qué haría
-```
-
-**Fuente de verdad: `estado.md` → GitHub, nunca al revés.**
-El script lee el plan y ajusta GitHub para que coincida: `- [x]` cierra el issue,
-`- [ ]` lo reabre. Nunca leer el estado de GitHub para modificar el plan.
-Agregar tareas nuevas: primero en `estado.md`, luego crear el issue en GH con
-`gh issue create`, y finalmente registrar el número en `masterplan/issues.yaml`.
+**Fuente de verdad: los issues de GitHub** (flujo `harness`, ver `.harness/config.toml`).
+`estado.md` y `masterplan/issues.yaml` se conservan solo porque la página Plan del backoffice
+los lee (`backoffice/server.py`); ya no hay sync automático entre ellos y GitHub, así que
+pueden desfasarse. El refactor que corta esa dependencia es el issue #766.
+Agregar tareas nuevas: `harness new "título" --type feat`; sumarlas a `estado.md` e
+`issues.yaml` solo si la página Plan debe mostrarlas.
 
 ## Hardware
 
@@ -319,11 +297,11 @@ home-agents/              ← repo umbrella (este repo)
 │   └── capitan-core.service  unit file para el servidor
 │
 ├── masterplan/
-│   ├── estado.md         plan completo con estado, latencias y decisiones
-│   └── issues.yaml       mapeo task_id → GitHub issue number
+│   ├── estado.md         plan completo con estado, latencias y decisiones (lo lee la página Plan del backoffice)
+│   └── issues.yaml       mapeo task_id → GitHub issue number (idem; ver issue #766)
 │
 ├── scripts/
-│   └── sync_issues.py    sincroniza estado.md con GitHub issues
+│   └── (deploy.sh, nspanel.sh, ...)  utilidades operativas
 │
 └── interagent/           concepto del producto Interagent (red de redes de agentes)
 ```
@@ -376,8 +354,8 @@ bash scripts/nspanel.sh connect       # conectar ADB
 bash scripts/nspanel.sh ssh           # abrir shell Termux
 bash scripts/nspanel.sh status        # ver estado
 
-# Sync issues con GitHub
-python scripts/sync_issues.py
+# Issues y flujo de trabajo
+harness list
 
 # Actualizar submodules
 git submodule update --remote
