@@ -2,7 +2,7 @@
 repo = "mblasi/home-agents"
 
 [harness]
-version = "0.1.1"
+version = "0.1.2"
 
 [doctor]
 # Los archivos del plan los lee la pagina Plan del backoffice (server.py): se conservan
