@@ -187,7 +187,7 @@ home-agents/
 ├── core/         → submodule: home-agents-core
 ├── backoffice/   → web admin UI at :8080 (LAN)
 ├── cloud/        → cloud backoffice (Cloud Run + Firestore) + bridge (egress-only)
-├── masterplan/   → estado.md (task list + decisions + functional docs)
+├── masterplan/   → functional docs and decisions (the plan itself lives in GitHub issues)
 ├── scripts/      → utilidades operativas (deploy.sh, nspanel.sh, ...)
 └── interagent/   → product concept (Interagent network)
 ```
@@ -256,7 +256,7 @@ bash ~/workspace/home-agents/ear/dashboard.sh
 
 ## Status
 
-See [`masterplan/estado.md`](masterplan/estado.md) for the full task list and decisions.
+The plan is the open/closed GitHub issues (`harness list`; phases are `fase-N` labels), also shown in the backoffice `/plan` page.
 See [`masterplan/arquitectura_funcional.md`](masterplan/arquitectura_funcional.md) for the detailed functional documentation.
 
 Phases 1–40 complete and in production. Phase 41 (recursive agent runtime) + Phase 42 (latency

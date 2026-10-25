@@ -66,17 +66,10 @@ Si la tarea afecta solo el repo umbrella (`masterplan/`, `scripts/`), el branch 
 
 El flujo es el del harness compartido (`harness new` → `take` → `pr` → `merge`, ver `.harness/config.toml`). Los issues de GitHub son la fuente de verdad: el PR cierra su issue y `harness merge` limpia las labels.
 
-`masterplan/estado.md` ya NO se sincroniza con GitHub (el sync automático se eliminó al adoptar el harness). Mientras la página Plan del backoffice siga leyéndolo (issue de refactor #766), hay que mantenerlo a mano:
-
-1. **Marcar `[x]` en `estado.md`** — la tarea debe quedar marcada como completada.
-
-2. **Actualizar el `Estado:` de la FASE** — al marcar el último `[ ]` de una fase,
-   cambiar `Estado: Pendiente` / `Estado: EN CURSO (...)` a `Estado: COMPLETA`.
-   Si quedan ítems pendientes, actualizar el conteo (ej: `EN CURSO (6/7 — solo queda 3.4)`).
-   **No usar sub-headers `#### Completado` / `#### Pendiente`** — los marcadores `[x]`/`[ ]`
-   son suficientes y los sub-headers quedan desincronizados. Si existen, eliminarlos.
-
-El lint y el sync automáticos de `estado.md` se eliminaron: no hay chequeo de que `estado.md` coincida con los issues. Tareas nuevas: crear el issue con `harness new` y, si la página Plan debe mostrarla, agregarla a `estado.md` y a `masterplan/issues.yaml` a mano.
+El plan son los issues de GitHub: no hay archivo de plan que mantener. Cerrar el issue (el PR lo cierra) basta;
+la página Plan del backoffice lee los issues (labels `fase-N`, `backoffice/plan_gh.py`). Una tarea nueva
+pertenece a una fase con `harness new "título" --type feat` y el label `fase-N` correspondiente
+(título `[N.M] ...` para que la página la ordene).
 
 ---
 
@@ -119,14 +112,12 @@ Convenciones:
 
 Cada vez que se agregue o corrija funcionalidad, **antes de cerrar la sesión**:
 
-1. **`masterplan/estado.md`** — reflejar la tarea completa con `[x]` y actualizar el estado de fase.
-
-2. **`README.md` (raíz y submodules afectados)** — mantener consistente con el estado real del sistema:
+1. **`README.md` (raíz y submodules afectados)** — mantener consistente con el estado real del sistema:
    - Agentes activos vs. planificados
    - Endpoints disponibles
    - Arquitectura actualizada
 
-3. **`masterplan/arquitectura_funcional.md`** — documento funcional detallado del sistema. Actualizar la sección correspondiente cuando cambie:
+2. **`masterplan/arquitectura_funcional.md`** — documento funcional detallado del sistema. Actualizar la sección correspondiente cuando cambie:
    - Un agente (nuevo, modificado, activado)
    - El ciclo de vida de intents o goals
    - El sistema proactivo
@@ -140,16 +131,12 @@ Un hook de Stop en `.opencode/settings.json` / `.claude/settings.local.json` rec
 
 ## Plan y estado
 
-El plan vive en `masterplan/estado.md`. Al iniciar sesión, leerlo para saber en qué fase
-estamos y cuál es el próximo paso. Las tareas completadas tienen issues cerrados en GitHub;
-las pendientes tienen issues abiertos en https://github.com/mblasi/home-agents.
-
-**Fuente de verdad: los issues de GitHub** (flujo `harness`, ver `.harness/config.toml`).
-`estado.md` y `masterplan/issues.yaml` se conservan solo porque la página Plan del backoffice
-los lee (`backoffice/server.py`); ya no hay sync automático entre ellos y GitHub, así que
-pueden desfasarse. El refactor que corta esa dependencia es el issue #766.
-Agregar tareas nuevas: `harness new "título" --type feat`; sumarlas a `estado.md` e
-`issues.yaml` solo si la página Plan debe mostrarlas.
+El plan son los issues de GitHub (flujo `harness`, ver `.harness/config.toml`): `harness list`
+para ver el trabajo abierto. Cada tarea es un issue; la fase se indica con el label `fase-N` (cuya
+descripción es el título de la fase) y el título empieza con el id (`[N.M] ...`). La página Plan del
+backoffice (`/plan`) se arma desde ahí (`backoffice/plan_gh.py`). Al iniciar sesión, mirar
+`harness list` para saber en qué fase estamos y cuál es el próximo paso. El histórico del plan
+anterior (`masterplan/estado.md`, eliminado en #766) queda en `git log -- masterplan/estado.md`.
 
 ## Hardware
 
@@ -297,8 +284,9 @@ home-agents/              ← repo umbrella (este repo)
 │   └── capitan-core.service  unit file para el servidor
 │
 ├── masterplan/
-│   ├── estado.md         plan completo con estado, latencias y decisiones (lo lee la página Plan del backoffice)
-│   └── issues.yaml       mapeo task_id → GitHub issue number (idem; ver issue #766)
+│   ├── arquitectura_funcional.md  documento funcional del sistema
+│   ├── decisiones_deploy.md       decisiones D1–D9 del motor de deploy (FASE 34)
+│   └── fase33_cloud_backoffice.md contrato y modelo de amenazas del backoffice cloud
 │
 ├── scripts/
 │   └── (deploy.sh, nspanel.sh, ...)  utilidades operativas
@@ -322,6 +310,11 @@ CORE_PORT=8765
 ```
 CORE_URL=http://localhost:8765
 CORE_TIMEOUT=30
+```
+
+**`backoffice/.env`** (opcional):
+```
+GITHUB_TOKEN=ghp_...   # sube el rate limit de la API de GitHub para la página Plan (/plan); sin token funciona con 60 req/h
 ```
 
 ## Comandos frecuentes

@@ -414,8 +414,8 @@ las tablas anchas scrollean dentro de su card (el acceso remoto es típicamente 
   `ww_scores`) y del **voice-id** (`speaker_conf` known/guest vs `SPEAKER_THRESHOLD`), con charts
   en Métricas de ambos backoffices (view_full). Viajan por el push de métricas egress-only.
 
-Contrato y modelo de amenazas: `masterplan/fase33_cloud_backoffice.md`. Paridad de secciones y
-detalle de FASE 37: `masterplan/estado.md`.
+Contrato y modelo de amenazas: `masterplan/fase33_cloud_backoffice.md`. Decisiones del motor de deploy (D1–D9): `masterplan/decisiones_deploy.md`. El seguimiento
+de tareas vive en los issues de GitHub (`harness list`).
 
 ---
 
@@ -954,7 +954,7 @@ FastAPI + Jinja2 en `:8080`. Interfaz web de administración.
 - **Intents y goals** — por usuario, con estados y ciclo de vida
 - **Rutinas** — rutinas inferidas por usuario
 - **Shared State** — estado compartido entre agentes con TTL
-- **Plan** — visualización de `estado.md` con progreso de fases
+- **Plan** — progreso de fases y tareas leído de los issues de GitHub (labels `fase-N`, `backoffice/plan_gh.py`; caché 5 min, `GITHUB_TOKEN` opcional en `backoffice/.env`)
 
 ### Tipos de trace
 
