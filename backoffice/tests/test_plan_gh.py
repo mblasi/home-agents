@@ -225,6 +225,39 @@ def test_failed_refresh_does_not_hammer_github(monkeypatch):
     assert g.call_count == 1
 
 
+def test_one_repo_failing_keeps_the_others_and_reports_it(monkeypatch):
+    monkeypatch.setattr(plan_gh, "REPOS", ["o/pub", "o/priv"])
+    ok = _resp([_issue(1, "[39.1] a", labels=[F39])])
+    nf = _resp([], status=404)
+
+    def fake_get(url, **kw):
+        return ok if "/o/pub/" in url else nf
+
+    with patch.object(plan_gh.requests, "get", side_effect=fake_get):
+        data = plan_gh.get_plan()
+    assert data["phases"][0]["tasks_total"] == 1
+    assert "o/priv" in data["error"] and data["stale"] is False
+
+
+def test_partial_error_survives_cache_hit(monkeypatch):
+    monkeypatch.setattr(plan_gh, "REPOS", ["o/pub", "o/priv"])
+
+    def fake_get(url, **kw):
+        return _resp([]) if "/o/pub/" in url else _resp([], status=404)
+
+    with patch.object(plan_gh.requests, "get", side_effect=fake_get) as g:
+        plan_gh.get_plan()
+        data = plan_gh.get_plan()
+    assert g.call_count == 2 and "o/priv" in data["error"]
+
+
+def test_all_repos_failing_is_a_total_failure(monkeypatch):
+    monkeypatch.setattr(plan_gh, "REPOS", ["o/a", "o/b"])
+    with patch.object(plan_gh.requests, "get", return_value=_resp([], status=404)):
+        data = plan_gh.get_plan()
+    assert data["phases"] == [] and "o/a" in data["error"] and "o/b" in data["error"]
+
+
 # ── server: ya no depende de estado.md / issues.yaml ───────────────────────────
 
 def test_server_no_longer_reads_masterplan_files():

@@ -133,39 +133,49 @@ def _headers() -> dict:
     return h
 
 
-def _fetch_issues() -> list[dict]:
+def _fetch_issues() -> tuple[list[dict], list[str]]:
+    """Issues de todos los repos + errores por repo (un repo caído/privado no tumba al resto)."""
     issues: list[dict] = []
+    errors: list[str] = []
     for repo in REPOS:
-        page = 1
-        while True:
-            r = requests.get(
-                f"{API}/repos/{repo}/issues",
-                params={"state": "all", "per_page": PAGE_SIZE, "page": page},
-                headers=_headers(), timeout=HTTP_TIMEOUT,
-            )
-            r.raise_for_status()
-            batch = r.json()
-            issues.extend(batch)
-            if len(batch) < PAGE_SIZE:
-                break
-            page += 1
-    return issues
+        try:
+            page = 1
+            while True:
+                r = requests.get(
+                    f"{API}/repos/{repo}/issues",
+                    params={"state": "all", "per_page": PAGE_SIZE, "page": page},
+                    headers=_headers(), timeout=HTTP_TIMEOUT,
+                )
+                r.raise_for_status()
+                batch = r.json()
+                issues.extend(batch)
+                if len(batch) < PAGE_SIZE:
+                    break
+                page += 1
+        except Exception as e:  # noqa: BLE001
+            errors.append(f"{repo}: {e}")
+    return issues, errors
 
 
 def get_plan() -> dict:
-    """{'phases': [...], 'error': str|None, 'stale': bool}. Nunca lanza."""
+    """{'phases': [...], 'error': str|None, 'stale': bool}. Nunca lanza.
+
+    `error` también se informa con éxito parcial (algún repo inaccesible): `phases` trae lo
+    que se pudo leer. Si fallan TODOS los repos se sirve el caché previo (`stale`) o vacío.
+    """
     with _lock:
         now = time.time()
         if _cache["data"] is not None and now - _cache["at"] < CACHE_TTL:
-            return {"phases": _cache["data"], "error": None, "stale": False}
+            return {"phases": _cache["data"], "error": _cache["error"], "stale": False}
         if _cache["failed_at"] and now - _cache["failed_at"] < RETRY_AFTER_FAIL:
             return {"phases": _cache["data"] or [], "error": _cache["error"],
                     "stale": _cache["data"] is not None}
-        try:
-            phases = build_phases(_fetch_issues())
-        except Exception as e:  # noqa: BLE001 — degradación elegante ante cualquier falla
-            _cache.update(failed_at=now, error=str(e) or type(e).__name__)
+        issues, errors = _fetch_issues()
+        if errors and len(errors) == len(REPOS):
+            _cache.update(failed_at=now, error="; ".join(errors))
             return {"phases": _cache["data"] or [], "error": _cache["error"],
                     "stale": _cache["data"] is not None}
-        _cache.update(data=phases, at=now, failed_at=0.0, error=None)
-        return {"phases": phases, "error": None, "stale": False}
+        phases = build_phases(issues)
+        err = "; ".join(errors) or None
+        _cache.update(data=phases, at=now, failed_at=0.0, error=err)
+        return {"phases": phases, "error": err, "stale": False}

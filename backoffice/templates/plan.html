@@ -7,7 +7,7 @@
 
 {% if plan_error %}
 <div class="mb-6 rounded-xl border border-amber-800/60 bg-amber-900/20 px-5 py-3 text-sm text-amber-300">
-  {% if plan_stale %}No se pudo actualizar desde GitHub; se muestra el último plan cacheado.{% else %}No se pudo leer el plan desde GitHub.{% endif %}
+  {% if plan_stale %}No se pudo actualizar desde GitHub; se muestra el último plan cacheado.{% elif phases %}El plan está incompleto: no se pudo leer algún repo.{% else %}No se pudo leer el plan desde GitHub.{% endif %}
   <span class="text-amber-500/70">({{ plan_error }})</span>
 </div>
 {% endif %}
