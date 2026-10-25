@@ -3,13 +3,20 @@
 
 {% block content %}
 <h1 class="text-2xl font-bold mb-2">Plan de desarrollo</h1>
-<p class="text-gray-500 text-sm mb-6">masterplan/estado.md</p>
+<p class="text-gray-500 text-sm mb-6">Issues de GitHub · labels <span class="font-mono">fase-N</span></p>
+
+{% if plan_error %}
+<div class="mb-6 rounded-xl border border-amber-800/60 bg-amber-900/20 px-5 py-3 text-sm text-amber-300">
+  {% if plan_stale %}No se pudo actualizar desde GitHub; se muestra el último plan cacheado.{% else %}No se pudo leer el plan desde GitHub.{% endif %}
+  <span class="text-amber-500/70">({{ plan_error }})</span>
+</div>
+{% endif %}
 
 <!-- Resumen global -->
 <div class="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-8">
   <div class="bg-gray-900 border border-gray-800 rounded-xl px-5 py-4">
     <div class="text-xs text-gray-500 uppercase tracking-wider mb-1">Fases completadas</div>
-    <div class="text-2xl font-bold">{{ phases_complete }}<span class="text-gray-600 text-lg font-normal">/{{ phases|length }}</span></div>
+    <div class="text-2xl font-bold">{{ phases_complete }}<span class="text-gray-600 text-lg font-normal">/{{ phases_total }}</span></div>
   </div>
   <div class="bg-gray-900 border border-gray-800 rounded-xl px-5 py-4">
     <div class="text-xs text-gray-500 uppercase tracking-wider mb-1">Tareas completadas</div>
@@ -47,7 +54,7 @@
 
       <!-- Phase id + badge -->
       <div class="flex items-center gap-2 shrink-0 w-40">
-        <span class="text-xs font-mono text-gray-500">FASE {{ p.id }}</span>
+        <span class="text-xs font-mono text-gray-500">{% if p.id == "—" %}ISSUES{% else %}FASE {{ p.id }}{% endif %}</span>
         {% if is_complete %}
         <span class="px-1.5 py-0.5 bg-emerald-900/40 text-emerald-400 rounded text-xs font-medium">COMPLETA</span>
         {% elif is_active %}
@@ -57,12 +64,9 @@
         {% endif %}
       </div>
 
-      <!-- Title + objetivo -->
+      <!-- Title -->
       <div class="flex-1 min-w-0">
         <div class="font-medium truncate {% if not is_complete and not is_active %}text-gray-400{% endif %}">{{ p.title }}</div>
-        {% if p.objetivo %}
-        <div class="text-xs text-gray-600 truncate mt-0.5">{{ p.objetivo }}</div>
-        {% endif %}
       </div>
 
       <!-- Progress bar -->

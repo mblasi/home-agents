@@ -5,7 +5,7 @@ Principio (FASE 34): existe UN solo motor con la lógica de deploy (snapshot →
 install → restart → health-gate → rollback → registro de versión). Lo invocan dos frontends
 sin reimplementar nada: el executor del bridge (remoto, comando `deploy.release` del cloud-bo)
 y `scripts/deploy.sh` (local, cuando se opera desde la LAN). Ver DECISIONES CONSOLIDADAS en
-masterplan/estado.md (D1–D9).
+masterplan/decisiones_deploy.md (D1–D9).
 
 Modelo (Tanda 2): se separan dos conceptos que la Tanda 1 mezclaba —
   - REPO: unidad de VERSIÓN. Un repo git pineable a un ref. Son tres: `core` (submodule),

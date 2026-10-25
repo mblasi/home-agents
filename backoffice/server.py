@@ -2196,143 +2196,15 @@ def integrations_page(request: Request):
 
 
 # ── Plan ───────────────────────────────────────────────────────────────────────
+# El plan sale de los issues de GitHub (labels `fase-N`): ver plan_gh.py (issue #766).
 
-import re as _re
-import yaml as _yaml
-
-_GH_DEFAULT_REPO = "mblasi/home-agents"
-_TASK_ID_RE = _re.compile(r"^\d+(\.\d+)*$")
-
-
-def _load_issue_urls() -> dict[str, tuple[str, int]]:
-    """Return {task_id: (gh_url, issue_number)} from masterplan/issues.yaml."""
-    issues_path = Path.home() / "workspace/home-agents/masterplan/issues.yaml"
-    try:
-        raw = _yaml.safe_load(issues_path.read_text()) or {}
-    except Exception:
-        return {}
-    urls: dict[str, tuple[str, int]] = {}
-    for task_id, v in raw.items():
-        task_id = str(task_id)
-        if isinstance(v, int):
-            urls[task_id] = (f"https://github.com/{_GH_DEFAULT_REPO}/issues/{v}", v)
-        elif isinstance(v, dict):
-            repo = v.get("repo", _GH_DEFAULT_REPO)
-            num  = v.get("number")
-            if num:
-                urls[task_id] = (f"https://github.com/{repo}/issues/{num}", num)
-    return urls
-
-
-def _parse_plan() -> list[dict]:
-    """Parse masterplan/estado.md → phases with per-task detail and GH issue links."""
-    plan_path = Path.home() / "workspace/home-agents/masterplan/estado.md"
-    try:
-        content = plan_path.read_text()
-    except Exception:
-        return []
-
-    issue_urls = _load_issue_urls()
-
-    phases: list[dict] = []
-    current: dict | None = None
-    in_code_block = False
-    in_masterplan = False
-
-    for line in content.splitlines():
-        if line.strip() == "## MASTERPLAN":
-            in_masterplan = True
-            continue
-        if not in_masterplan:
-            continue
-
-        if line.startswith("### FASE"):
-            if current:
-                phases.append(current)
-            rest = line[4:].strip()[5:]  # drop "### " then "FASE "
-            phase_id, _, title = rest.partition(" - ")
-            current = {
-                "id": phase_id.strip(),
-                "title": title.strip() or phase_id.strip(),
-                "objetivo": "",
-                "estado_raw": "Pendiente",
-                "tasks_done": 0,
-                "tasks_total": 0,
-                "tasks": [],
-            }
-            in_code_block = False
-            continue
-
-        if current is None:
-            continue
-
-        if line.strip().startswith("```"):
-            in_code_block = not in_code_block
-            continue
-
-        if in_code_block:
-            stripped = line.strip()
-            if stripped.startswith("Objetivo:"):
-                current["objetivo"] = stripped[9:].strip()
-            elif stripped.startswith("Estado:"):
-                current["estado_raw"] = stripped[7:].strip()
-            continue
-
-        done = None
-        if line.startswith("- [x]"):
-            done = True
-        elif line.startswith("- [ ]"):
-            done = False
-
-        if done is not None:
-            current["tasks_total"] += 1
-            if done:
-                current["tasks_done"] += 1
-            # Extract task id and text: "- [x] 1.9  Elegir voz..."
-            rest = line[6:].strip()
-            parts = rest.split(None, 1)
-            task_id = parts[0] if parts else ""
-            text    = parts[1].strip() if len(parts) > 1 else task_id
-            # Strip markdown bold markers
-            text = text.replace("**", "")
-            # Only treat as linkable id if it looks like N.M[.K...]
-            if not _TASK_ID_RE.match(task_id):
-                task_id = ""
-            gh_url, gh_num = issue_urls.get(task_id, (None, None))
-            current["tasks"].append({
-                "id":      task_id,
-                "text":    text,
-                "done":    done,
-                "gh_url":  gh_url,
-                "gh_num":  gh_num,
-            })
-
-    if current:
-        phases.append(current)
-
-    for p in phases:
-        raw = p["estado_raw"].upper()
-        if "COMPLETA" in raw:
-            p["estado"] = "COMPLETA"
-        elif "EN CURSO" in raw or "PROGRESO" in raw:
-            p["estado"] = "EN CURSO"
-        else:
-            p["estado"] = "Pendiente"
-        if p["tasks_total"] > 0:
-            p["pct"] = round(100 * p["tasks_done"] / p["tasks_total"])
-        else:
-            p["pct"] = 100 if p["estado"] == "COMPLETA" else 0
-
-    return phases
+import plan_gh
 
 
 @app.get("/plan", response_class=HTMLResponse)
 def plan_page(request: Request):
-    phases = _parse_plan()
-    total_done  = sum(p["tasks_done"]  for p in phases)
-    total_tasks = sum(p["tasks_total"] for p in phases)
-    total_pct   = round(100 * total_done / total_tasks) if total_tasks else 0
-    phases_complete = sum(1 for p in phases if p["estado"] == "COMPLETA")
-    return _render(request, "plan.html", "plan",
-                   phases=phases, total_done=total_done, total_tasks=total_tasks,
-                   total_pct=total_pct, phases_complete=phases_complete)
+    plan = plan_gh.get_plan()
+    phases = plan["phases"]
+    return _render(request, "plan.html", "plan", phases=phases,
+                   plan_error=plan["error"], plan_stale=plan["stale"],
+                   **plan_gh.summarize(phases))
