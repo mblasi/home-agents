@@ -3,3 +3,8 @@ repo = "mblasi/home-agents"
 
 [harness]
 version = "0.1.22"
+
+[verify]
+# Suite del padre (core/ es un submodulo con su propio [verify]). scripts/ queda fuera: necesita sounddevice.
+# python del venv por ruta absoluta: los comandos se parten con shlex y no expanden ~.
+final_commands = ["/home/matias/home-agents-env/bin/python -m pytest backoffice/tests cloud/bridge cloud/tests -q -p no:cacheprovider"]
