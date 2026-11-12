@@ -2,7 +2,7 @@
 repo = "mblasi/home-agents"
 
 [harness]
-version = "0.1.22"
+version = "0.1.25"
 
 [verify]
 # Suite del padre (core/ es un submodulo con su propio [verify]). scripts/ queda fuera: necesita sounddevice.
